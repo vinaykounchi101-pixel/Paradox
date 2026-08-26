@@ -10,6 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from app.db.session import async_session_maker
 from app.db.models.expense import Expense
 from app.db.models.budget import Budget
+from app.db.models.category import Category
+from app.db.models.payment_method import PaymentMethod
 from app.constants.categories import STARTER_CATEGORIES
 from app.constants.payment_methods import STARTER_PAYMENT_METHODS
 
