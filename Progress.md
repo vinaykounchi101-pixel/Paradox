@@ -145,3 +145,26 @@ All frontend API call paths were audited against backend router definitions. **N
 | `1d604fc` | `chore: configure backend dockerfile and postgresql connection validation for render and supabase deployment` |
 | `007c4e2` | `fix: import Any in dashboard_service to resolve deploy time NameError` |
 | `f1270d1` | `fix: add vercel.json to configure Next.js framework and output directory` |
+| `19b985c` | `docs: update progress.md and technical debt with deployment notes` |
+| `3af1998` | `feat: run alembic migrations automatically on startup via lifespan event` |
+
+---
+
+## 9. Auto-Migration on Startup
+
+### Problem
+Tables were not being created in Supabase because `alembic upgrade head` was never run
+against the production database. The Render backend would boot successfully (health check OK)
+but all API endpoints returned HTTP 500 because no tables existed.
+
+### Solution
+Added a `lifespan` startup event in `backend/app/main.py` that runs `alembic upgrade head`
+automatically every time the server boots:
+- Derives a **synchronous** `postgresql://` URL from the `DATABASE_URL` env var (stripping `+asyncpg`) so Alembic's sync runner works correctly.
+- Uses `alembic.command.upgrade(cfg, "head")` via the Alembic scripting API.
+- Logs `INFO` on success and `ERROR` (with full traceback) on failure.
+- Added `psycopg2-binary>=2.9.9` to `requirements.txt` — required by Alembic's sync engine.
+
+### Behavior
+- If tables already exist, Alembic detects the migration is already at `head` and skips — **idempotent, safe to run on every restart**.
+- If tables are missing, they are created and seeded before the first request is served.
