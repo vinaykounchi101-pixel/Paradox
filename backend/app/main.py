@@ -1,1 +1,76 @@
-# main entrypoint
+import logging
+import time
+
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from app.api.router import api_router
+from app.core.config import settings
+from app.core.error_handlers import register_error_handlers
+from app.core.logging import setup_logging
+
+# 1. Initialize logging configuration
+setup_logging()
+logger = logging.getLogger("app.request")
+
+# 2. Instantiate FastAPI Application
+app = FastAPI(
+    title=settings.APP_NAME,
+    description="Personal Expense Tracker Backend - Phase 1 MVP",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+# 3. Add CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# 4. Request Logging Middleware
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        start_time = time.perf_counter()
+        
+        # Process the request
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            # General exception handler will catch this, but we log the duration here as well
+            duration = (time.perf_counter() - start_time) * 1000
+            logger.error(
+                "Request failed: %s %s - Duration: %.2fms - Error: %s",
+                request.method,
+                request.url.path,
+                duration,
+                str(e),
+            )
+            raise e
+
+        duration = (time.perf_counter() - start_time) * 1000
+        
+        # Log request summary at INFO level (or WARNING/ERROR for 4xx/5xx)
+        log_msg = f"Request: {request.method} {request.url.path} - Status: {response.status_code} - Duration: {duration:.2f}ms"
+        if response.status_code >= 500:
+            logger.error(log_msg)
+        elif response.status_code >= 400:
+            logger.warning(log_msg)
+        else:
+            logger.info(log_msg)
+
+        return response
+
+
+app.add_middleware(RequestLoggingMiddleware)
+
+# 5. Register custom error handlers
+register_error_handlers(app)
+
+# 6. Mount API Router under prefix
+app.include_router(api_router, prefix=settings.API_V1_PREFIX)

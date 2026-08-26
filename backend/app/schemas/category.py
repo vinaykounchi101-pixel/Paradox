@@ -1,1 +1,32 @@
-# category Pydantic schemas
+import uuid
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class CategoryBase(BaseModel):
+    name: str = Field(..., max_length=60)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("name must not be empty or whitespace only")
+        return stripped
+
+
+class CategoryCreate(CategoryBase):
+    pass
+
+
+class CategoryUpdate(CategoryBase):
+    pass
+
+
+class CategoryRead(CategoryBase):
+    id: uuid.UUID
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

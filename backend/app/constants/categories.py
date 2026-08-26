@@ -1,1 +1,15 @@
-# categories starter constants
+import uuid
+
+STARTER_CATEGORIES = {
+    "Food & Dining": uuid.UUID("11111111-1111-1111-1111-111111111111"),
+    "Transportation": uuid.UUID("22222222-2222-2222-2222-222222222222"),
+    "Shopping": uuid.UUID("33333333-3333-3333-3333-333333333333"),
+    "Entertainment": uuid.UUID("44444444-4444-4444-4444-444444444444"),
+    "Bills & Utilities": uuid.UUID("55555555-5555-5555-5555-555555555555"),
+    "Health": uuid.UUID("66666666-6666-6666-6666-666666666666"),
+    "Education": uuid.UUID("77777777-7777-7777-7777-777777777777"),
+    "Groceries": uuid.UUID("88888888-8888-8888-8888-888888888888"),
+    "Uncategorized": uuid.UUID("99999999-9999-9999-9999-999999999999"),  # Fallback category
+}
+
+UNCATEGORIZED_ID = STARTER_CATEGORIES["Uncategorized"]
