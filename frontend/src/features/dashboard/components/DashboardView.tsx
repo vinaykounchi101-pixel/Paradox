@@ -16,7 +16,7 @@ import {
 import { useDashboard } from "../hooks/useDashboard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DonutChart } from "./DonutChart";
+import { BarChart } from "./BarChart";
 import { TrendGraph } from "./TrendGraph";
 
 export default function DashboardView() {
@@ -212,17 +212,17 @@ export default function DashboardView() {
           </CardContent>
         </Card>
 
-        {/* Category Breakdown Donut (1 column) */}
+        {/* Category Breakdown Bar Chart (1 column) */}
         <Card variant="glass" className="lg:col-span-1">
           <CardHeader>
             <div className="flex items-center space-x-2">
               <Tags className="h-5 w-5 text-primary" />
               <CardTitle>Spending Categories</CardTitle>
             </div>
-            <CardDescription>Breakdown by category percentage</CardDescription>
+            <CardDescription>Breakdown by category totals</CardDescription>
           </CardHeader>
           <CardContent>
-            <DonutChart data={category_breakdown} totalSpent={total_spent} />
+            <BarChart data={category_breakdown} />
           </CardContent>
         </Card>
       </div>
