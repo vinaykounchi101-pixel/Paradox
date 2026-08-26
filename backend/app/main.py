@@ -46,13 +46,19 @@ def _run_migrations() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: run migrations before accepting requests.
+    """Application lifespan: run migrations then seed dummy data on startup.
 
     _run_migrations is dispatched to a thread pool so that Alembic's
     internal asyncio.run() call gets a clean event loop (not the
     already-running uvicorn loop).
+    Seeding is idempotent — existing records are skipped on re-runs.
     """
     await asyncio.to_thread(_run_migrations)
+
+    from app.db.seed_dummy_data import seed_dummy_data
+    logger.info("Seeding dummy data...")
+    await seed_dummy_data()
+    logger.info("Dummy data seeding complete.")
     yield
 
 
