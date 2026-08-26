@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -45,8 +46,13 @@ def _run_migrations() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: run migrations before accepting requests."""
-    _run_migrations()
+    """Application lifespan: run migrations before accepting requests.
+
+    _run_migrations is dispatched to a thread pool so that Alembic's
+    internal asyncio.run() call gets a clean event loop (not the
+    already-running uvicorn loop).
+    """
+    await asyncio.to_thread(_run_migrations)
     yield
 
 
