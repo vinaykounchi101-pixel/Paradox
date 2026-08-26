@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ChartData {
   category_id: string;
@@ -16,18 +16,20 @@ interface DonutChartProps {
 }
 
 const COLORS = [
-  "#6366f1", // Indigo
-  "#a855f7", // Purple
-  "#3b82f6", // Blue
-  "#10b981", // Emerald
-  "#f59e0b", // Amber
+  "#14b8a6", // Teal/Cyan (BILLS in screenshot is teal)
   "#f43f5e", // Rose
+  "#6366f1", // Indigo
+  "#10b981", // Emerald
+  "#a855f7", // Purple
+  "#f59e0b", // Amber
   "#06b6d4", // Cyan
   "#ec4899", // Pink
 ];
 
 export const DonutChart: React.FC<DonutChartProps> = ({ data, totalSpent }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // Constants for Donut Geometry
   const radius = 50;
@@ -35,6 +37,15 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data, totalSpent }) => {
   const hoveredStrokeWidth = 18;
   const center = 80;
   const circumference = 2 * Math.PI * radius; // ~314.16
+
+  // Handle mouse movements for tooltip tracking
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMousePos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
 
   // If no data, render empty circle
   if (data.length === 0) {
@@ -70,15 +81,12 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data, totalSpent }) => {
     };
   });
 
-  // Center display texts
-  const activeSegment = hoveredIndex !== null ? segments[hoveredIndex] : null;
-  const labelText = activeSegment ? activeSegment.category_name : "Total Spent";
-  const amountText = activeSegment ? `$${activeSegment.total}` : `$${totalSpent}`;
-  const pctText = activeSegment ? `${activeSegment.percentage.toFixed(1)}%` : "";
-
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-center gap-8 py-4">
-      {/* SVG Chart */}
+    <div 
+      className="relative flex flex-col items-center justify-center py-4 w-full"
+      onMouseMove={handleMouseMove}
+    >
+      {/* SVG Chart centered */}
       <div className="relative w-44 h-44 flex-shrink-0">
         <svg
           width="100%"
@@ -101,8 +109,14 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data, totalSpent }) => {
                   strokeDasharray={`${seg.strokeLength} ${circumference - seg.strokeLength}`}
                   strokeDashoffset={seg.strokeOffset}
                   strokeLinecap="round"
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
+                  onMouseEnter={() => {
+                    setHoveredIndex(index);
+                    setShowTooltip(true);
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredIndex(null);
+                    setShowTooltip(false);
+                  }}
                   className="transition-all duration-200 cursor-pointer origin-center"
                   style={{
                     opacity: hoveredIndex === null || isHovered ? 1 : 0.6,
@@ -116,53 +130,59 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data, totalSpent }) => {
           </AnimatePresence>
         </svg>
 
-        {/* Center text hole */}
+        {/* Hollow center area */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-4">
           <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground truncate w-full">
-            {labelText}
+            Total Spent
           </span>
           <span className="text-xl font-extrabold tracking-tight text-foreground truncate w-full mt-0.5">
-            {amountText}
+            ${totalSpent}
           </span>
-          {pctText && (
-            <span className="text-xs font-semibold text-primary mt-0.5 animate-in fade-in duration-200">
-              {pctText}
-            </span>
-          )}
         </div>
       </div>
 
-      {/* Legend list */}
-      <div className="flex-1 space-y-2.5 w-full max-w-[200px]">
-        {segments.slice(0, 5).map((seg, index) => (
+      {/* Legend list flowing horizontally beneath the pie chart */}
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-6 w-full px-2">
+        {segments.map((seg, index) => (
           <button
             key={seg.category_id}
             onMouseEnter={() => setHoveredIndex(index)}
             onMouseLeave={() => setHoveredIndex(null)}
-            className={`flex items-center justify-between w-full text-left p-1.5 rounded-lg transition-colors cursor-pointer ${
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs transition-colors cursor-pointer ${
               hoveredIndex === index ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <div className="flex items-center space-x-2 min-w-0">
-              <span
-                className="h-3 w-3 rounded-full flex-shrink-0"
-                style={{ backgroundColor: seg.color }}
-              />
-              <span className="text-xs font-semibold truncate">{seg.category_name}</span>
-            </div>
-            <span className="text-xs font-bold font-mono ml-2">
-              {seg.percentage.toFixed(0)}%
-            </span>
+            <span
+              className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: seg.color }}
+            />
+            <span className="font-semibold uppercase tracking-wider text-[10px]">{seg.category_name}</span>
+            <span className="font-mono text-[10px] font-bold">({seg.percentage.toFixed(0)}%)</span>
           </button>
         ))}
-        {segments.length > 5 && (
-          <div className="text-[10px] text-muted-foreground text-center pt-1 border-t border-border/50">
-            + {segments.length - 5} other categories
-          </div>
-        )}
       </div>
+
+      {/* Floating Tooltip */}
+      {showTooltip && hoveredIndex !== null && segments[hoveredIndex] && (
+        <div
+          className="absolute z-50 pointer-events-none glass px-3 py-2 rounded-lg shadow-md text-xs font-semibold animate-in fade-in zoom-in-95 duration-100 border border-primary/20 text-center"
+          style={{
+            left: `${mousePos.x}px`,
+            top: `${mousePos.y - 12}px`,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <div className="font-bold text-foreground uppercase tracking-wider text-[10px]">
+            {segments[hoveredIndex].category_name}
+          </div>
+          <div className="font-bold text-primary text-sm mt-0.5">
+            ${segments[hoveredIndex].total}
+          </div>
+          <div className="text-[9px] text-muted-foreground mt-0.5">
+            {segments[hoveredIndex].percentage.toFixed(1)}% of total
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-import { AnimatePresence } from "framer-motion";
