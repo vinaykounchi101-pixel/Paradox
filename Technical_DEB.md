@@ -44,3 +44,21 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Impact**: Prevents compound filters (e.g., searching for "Shopping" expenses *only* in "December").
 * **Future Work**:
   - Update repository logic and frontend components to support composite filtering if the product requirements relax this constraint.
+
+---
+
+## 6. Frontend Environment Variable Coupling (Vercel Static Builds)
+* **Debt / Tradeoff**: The `NEXT_PUBLIC_API_BASE_URL` environment variable is baked into the Next.js static build output at compile time. Vercel pre-renders all static pages (`○`) during the build step, embedding the backend URL directly into the generated HTML/JS bundles.
+* **Impact**: Any change to the backend URL (e.g., new Render service, domain migration) requires a full frontend **redeploy** on Vercel — not just an environment variable update — for the change to take effect. Static pages will not dynamically pick up the new value at runtime.
+* **Future Work**:
+  - Consider moving backend URL resolution to a server-side Next.js API route or middleware so it can be updated at runtime without rebuilding the frontend bundle.
+  - Alternatively, document this redeploy requirement clearly in runbooks.
+
+---
+
+## 7. Single Dockerfile — No Multi-Stage Build Optimization
+* **Debt / Tradeoff**: The current `backend/Dockerfile` uses a single-stage build (`python:3.11-slim`). It copies all source files including dev tooling and test fixtures into the final image.
+* **Impact**: Docker image size is larger than necessary. Build time and pull time are slower on cold starts (particularly noticeable on Render's free tier which spins down inactive services).
+* **Future Work**:
+  - Migrate to a multi-stage Dockerfile: a `builder` stage installs dependencies and compiles files; a `runtime` stage copies only the necessary artifacts into a minimal base image.
+  - Add a `.dockerignore` file to exclude `tests/`, `.venv/`, `*.pyc`, `__pycache__/`, and other non-runtime files from the image.

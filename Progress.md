@@ -98,3 +98,50 @@ The frontend web application (`frontend/`) is fully implemented with **Next.js (
 * **Frontend Builds**: Executed `npm run build` inside `frontend/`; compiled production package with zero TypeScript or ESLint errors.
 * **DB Liveness Check**: Verified liveness checks connected successfully to PostgreSQL (`{"status":"ok","database":"connected"}`).
 * **Repository State**: Cleanly pushed tracking states to the remote repository.
+
+---
+
+## 8. Deployment Configuration (Vercel + Render + Supabase)
+
+### A. Changes Made for Production Deployment
+- **`backend/Dockerfile`**: Populated with a production-ready multi-stage configuration using `python:3.11-slim`. Dynamically binds to the `$PORT` environment variable required by Render.
+- **`backend/app/core/config.py`**: Extended the `DATABASE_URL` validator to handle both `postgresql://` and `postgres://` URL prefixes (converting both to `postgresql+asyncpg://`). This ensures full compatibility with Supabase connection strings.
+- **`backend/app/services/dashboard_service.py`**: Fixed a deploy-time `NameError` — `Any` was used in a type annotation but was missing from the `typing` import. Added `Any` to the import line.
+- **`frontend/vercel.json`**: Created with explicit `"framework": "nextjs"` and `"outputDirectory": ".next"` so Vercel correctly detects the Next.js framework when deploying from a monorepo subdirectory.
+
+### B. Required Environment Variables
+
+#### Render (Backend)
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | Supabase connection string (`postgres://...`) |
+| `CORS_ALLOWED_ORIGINS` | Vercel frontend URL (e.g. `https://paradox.vercel.app`) |
+| `APP_ENV` | `production` |
+| `DEBUG` | `false` |
+| `LOG_LEVEL` | `INFO` |
+
+#### Vercel (Frontend)
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | Render backend URL + `/api/v1` (e.g. `https://paradox-backend.onrender.com/api/v1`) |
+| `NEXT_PUBLIC_APP_ENV` | `production` |
+
+> **Important**: After setting `NEXT_PUBLIC_*` variables on Vercel, a full **Redeploy** must be triggered for the values to be baked into the static build output.
+
+### C. Database Setup (Supabase)
+1. Create a Supabase project and copy the PostgreSQL connection string.
+2. Set `DATABASE_URL` in the local shell temporarily and run:
+   ```powershell
+   .venv\Scripts\alembic upgrade head
+   ```
+   This creates all tables and seeds starter categories, payment methods, and the placeholder primary user.
+
+### D. API Endpoint Audit
+All frontend API call paths were audited against backend router definitions. **No mismatches found.** All routes for expenses, categories, payment-methods, budget, and dashboard are correctly aligned.
+
+### E. Commits Pushed (This Session)
+| Commit | Description |
+|---|---|
+| `1d604fc` | `chore: configure backend dockerfile and postgresql connection validation for render and supabase deployment` |
+| `007c4e2` | `fix: import Any in dashboard_service to resolve deploy time NameError` |
+| `f1270d1` | `fix: add vercel.json to configure Next.js framework and output directory` |
