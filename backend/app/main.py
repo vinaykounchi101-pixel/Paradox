@@ -1,5 +1,6 @@
 import logging
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,42 @@ from app.core.logging import setup_logging
 
 # 1. Initialize logging configuration
 setup_logging()
-logger = logging.getLogger("app.request")
+logger = logging.getLogger("app.startup")
+
+
+def _run_migrations() -> None:
+    """Run Alembic migrations on startup.
+
+    Derives a synchronous psycopg2-compatible URL from the async DATABASE_URL
+    so that Alembic's standard sync runner works correctly.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    # Derive sync URL: strip +asyncpg driver suffix for Alembic's sync engine
+    sync_url = (
+        settings.DATABASE_URL
+        .replace("postgresql+asyncpg://", "postgresql://", 1)
+    )
+
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
+
+    logger.info("Running Alembic migrations...")
+    try:
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Alembic migrations completed successfully.")
+    except Exception as exc:
+        logger.error("Alembic migration failed: %s", exc, exc_info=True)
+        raise
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: run migrations before accepting requests."""
+    _run_migrations()
+    yield
+
 
 # 2. Instantiate FastAPI Application
 app = FastAPI(
@@ -21,6 +57,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # 3. Add CORS Middleware
@@ -37,7 +74,7 @@ app.add_middleware(
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         start_time = time.perf_counter()
-        
+
         # Process the request
         try:
             response = await call_next(request)
@@ -54,7 +91,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             raise e
 
         duration = (time.perf_counter() - start_time) * 1000
-        
+
         # Log request summary at INFO level (or WARNING/ERROR for 4xx/5xx)
         log_msg = f"Request: {request.method} {request.url.path} - Status: {response.status_code} - Duration: {duration:.2f}ms"
         if response.status_code >= 500:
@@ -66,6 +103,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         return response
 
+
+# Re-init request logger after setup (startup logger used above)
+request_logger = logging.getLogger("app.request")
 
 app.add_middleware(RequestLoggingMiddleware)
 
