@@ -1,0 +1,1 @@
+# db base declarative class

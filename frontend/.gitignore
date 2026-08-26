@@ -1,0 +1,29 @@
+# Dependency directories
+node_modules/
+/jspm_packages/
+
+# Next.js build output
+.next/
+out/
+
+# Production build output
+build/
+
+# Next.js server component CSS files
+*.pcss
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local env files
+.env*.local
+.env
+
+# Vercel
+.vercel
+
+# TypeScript
+tsconfig.tsbuildinfo
