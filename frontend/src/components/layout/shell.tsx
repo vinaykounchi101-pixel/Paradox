@@ -4,9 +4,10 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Receipt, Tags, PiggyBank, Wallet } from "lucide-react";
+import { LayoutDashboard, Receipt, Tags, PiggyBank, Wallet, Sun, Moon } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { useTheme } from "@/components/common/ThemeProvider";
 
 interface ShellProps {
   children: React.ReactNode;
@@ -21,6 +22,7 @@ const navItems = [
 
 export const Shell: React.FC<ShellProps> = ({ children }) => {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
@@ -70,14 +72,23 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
 
         {/* Footer/User state placeholder */}
         <div className="border-t border-border pt-4 mt-auto">
-          <div className="flex items-center space-x-3">
-            <div className="h-9 w-9 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-xs">
-              U
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center font-bold text-xs">
+                U
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-foreground">Primary User</p>
+                <p className="text-[10px] text-muted-foreground">V1 MVP Session</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-foreground">Primary User</p>
-              <p className="text-[10px] text-muted-foreground">V1 MVP Session</p>
-            </div>
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
           </div>
         </div>
       </aside>
@@ -92,8 +103,17 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
             Paradox
           </span>
         </div>
-        <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-xs">
-          U
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+          <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center font-bold text-xs">
+            U
+          </div>
         </div>
       </header>
 

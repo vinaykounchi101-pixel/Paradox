@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import React from "react";
 import QueryProvider from "@/components/common/QueryProvider";
+import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { ToastProvider } from "@/components/ui/toast";
 import { Shell } from "@/components/layout/shell";
 import "@/styles/globals.css";
@@ -19,9 +20,11 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="antialiased">
         <QueryProvider>
-          <ToastProvider>
-            <Shell>{children}</Shell>
-          </ToastProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <Shell>{children}</Shell>
+            </ToastProvider>
+          </ThemeProvider>
         </QueryProvider>
       </body>
     </html>

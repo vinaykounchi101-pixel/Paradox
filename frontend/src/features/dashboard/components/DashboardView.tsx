@@ -16,6 +16,8 @@ import {
 import { useDashboard } from "../hooks/useDashboard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DonutChart } from "./DonutChart";
+import { TrendGraph } from "./TrendGraph";
 
 export default function DashboardView() {
   const [period, setPeriod] = useState<"current_month" | "last_30_days" | "current_week">("current_month");
@@ -194,45 +196,41 @@ export default function DashboardView() {
         </Card>
       </div>
 
-      {/* Grid: Category breakdown & Recent expenses */}
+      {/* Grid: Analytics Section (Trend Curve & Donut Chart) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Category breakdown (simple rank list) */}
-        <Card variant="glass" className="lg:col-span-1">
+        {/* Trend Graph (2 columns) */}
+        <Card variant="glass" className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Spending Categories</CardTitle>
-            <CardDescription>Breakdown by category</CardDescription>
+            <div className="flex items-center space-x-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <CardTitle>Spending Trends</CardTitle>
+            </div>
+            <CardDescription>Visual review of weekly transaction aggregates</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {category_breakdown.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-                <Tags className="h-8 w-8 mb-2 opacity-50" />
-                <p className="text-sm">No category breakdown available</p>
-              </div>
-            ) : (
-              category_breakdown.map((c) => (
-                <div key={c.category_id} className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="font-semibold">{c.category_name}</span>
-                    <span className="text-muted-foreground font-mono">
-                      ${c.total} ({c.percentage.toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-primary rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${c.percentage}%` }}
-                      transition={{ duration: 0.5 }}
-                    />
-                  </div>
-                </div>
-              ))
-            )}
+          <CardContent>
+            <TrendGraph data={data.trend} />
           </CardContent>
         </Card>
 
+        {/* Category Breakdown Donut (1 column) */}
+        <Card variant="glass" className="lg:col-span-1">
+          <CardHeader>
+            <div className="flex items-center space-x-2">
+              <Tags className="h-5 w-5 text-primary" />
+              <CardTitle>Spending Categories</CardTitle>
+            </div>
+            <CardDescription>Breakdown by category percentage</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DonutChart data={category_breakdown} totalSpent={total_spent} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Grid: Latest Transactions */}
+      <div className="grid grid-cols-1 gap-6">
         {/* Recent expenses */}
-        <Card variant="glass" className="lg:col-span-2">
+        <Card variant="glass" className="w-full">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Recent Expenses</CardTitle>
