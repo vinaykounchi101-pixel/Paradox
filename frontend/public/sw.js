@@ -1,21 +1,18 @@
-// Service Worker for Paradox PWA
-const CACHE_NAME = "paradox-cache-v1";
-const STATIC_ASSETS = [
-  "/",
-  "/dashboard",
-  "/expenses",
-  "/categories",
-  "/budget",
+// Robust PWA Service Worker for Paradox
+const CACHE_NAME = "paradox-v2";
+
+const STATIC_FILES = [
   "/manifest.json",
   "/icons/icon-192.svg",
-  "/icons/icon-512.svg"
+  "/icons/icon-512.svg",
+  "/icons/icon-maskable.svg",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn("Service worker cache.addAll non-critical warning:", err);
+      return cache.addAll(STATIC_FILES).catch((err) => {
+        console.warn("PWA pre-cache warning:", err);
       });
     })
   );
@@ -32,46 +29,65 @@ self.addEventListener("activate", (event) => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
-  // Do not cache API requests or non-GET requests
+  // Only handle GET requests
+  if (event.request.method !== "GET") return;
+
+  const url = new URL(event.request.url);
+
+  // Ignore cross-origin requests, API calls, and Next.js internal endpoints
   if (
-    event.request.method !== "GET" ||
-    event.request.url.includes("/api/") ||
-    event.request.url.includes("/_next/data/")
+    url.origin !== self.location.origin ||
+    url.pathname.startsWith("/api") ||
+    url.pathname.startsWith("/_next/data")
   ) {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request)
-        .then((networkResponse) => {
-          if (
-            networkResponse &&
-            networkResponse.status === 200 &&
-            networkResponse.type === "basic"
-          ) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
+  // Network-first strategy for navigation and HTML pages
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           }
-          return networkResponse;
+          return response;
         })
         .catch(() => {
-          // Fallback if offline
-          if (event.request.mode === "navigate") {
+          return caches.match(event.request).then((cached) => {
+            if (cached) return cached;
             return caches.match("/");
+          });
+        })
+    );
+    return;
+  }
+
+  // Cache-first strategy for static assets (icons, images)
+  if (
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.endsWith(".svg") ||
+    url.pathname.endsWith(".png") ||
+    url.pathname.endsWith(".ico")
+  ) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           }
+          return response;
         });
-    })
-  );
+      })
+    );
+    return;
+  }
 });
