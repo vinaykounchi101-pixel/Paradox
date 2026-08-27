@@ -30,7 +30,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
       {/* Animated 3D perspective grid background */}
       <BackgroundGrid />
       {/* Desktop Sidebar Navigation */}
-      <aside className="relative z-10 hidden md:flex flex-col w-64 bg-card border-r border-border p-6 flex-shrink-0">
+      <aside className="relative z-10 hidden md:flex flex-col w-64 h-screen sticky top-0 bg-card border-r border-border p-6 flex-shrink-0">
         {/* Brand/Logo — 3D spinning cube */}
         <div className="flex items-center space-x-3 mb-8">
           <div className="logo-cube-scene">
