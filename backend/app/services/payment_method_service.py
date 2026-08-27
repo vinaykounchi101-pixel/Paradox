@@ -38,9 +38,5 @@ class PaymentMethodService:
         return await self.repo.update(pm, name)
 
     async def delete_payment_method(self, id: uuid.UUID) -> None:
-        pm = await self.get_payment_method(id)
-
-        if pm.is_default:
-            raise ConflictError("Starter payment methods cannot be deleted")
-
-        await self.repo.delete_custom_payment_method(id)
+        await self.get_payment_method(id)
+        await self.repo.delete_payment_method(id)

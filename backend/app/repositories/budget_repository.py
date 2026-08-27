@@ -29,3 +29,9 @@ class BudgetRepository:
         self.db.add(budget)
         await self.db.flush()
         return budget
+
+    async def delete_budget(self) -> None:
+        budget = await self.get_budget()
+        if budget:
+            await self.db.delete(budget)
+            await self.db.flush()

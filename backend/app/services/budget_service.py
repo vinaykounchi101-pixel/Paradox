@@ -16,3 +16,6 @@ class BudgetService:
 
     async def upsert_budget(self, amount: Decimal) -> Budget:
         return await self.repo.upsert_budget(amount)
+
+    async def delete_budget(self) -> None:
+        await self.repo.delete_budget()

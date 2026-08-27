@@ -224,9 +224,6 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
         <p className="text-[10px] text-muted-foreground">
           Selected:{" "}
           <span className="text-foreground font-semibold">{selectedCat.name}</span>
-          {selectedCat.is_default && (
-            <span className="ml-1 opacity-50">(default)</span>
-          )}
         </p>
       )}
 

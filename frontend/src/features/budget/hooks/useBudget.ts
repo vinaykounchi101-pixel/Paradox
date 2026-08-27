@@ -14,7 +14,7 @@ export function useBudget() {
 export function useBudgetMutation() {
   const queryClient = useQueryClient();
 
-  const mutation = useMutation({
+  const upsertMutation = useMutation({
     mutationFn: (amount: number) => budgetApi.upsert(amount),
     onSuccess: async () => {
       await Promise.all([
@@ -24,8 +24,20 @@ export function useBudgetMutation() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => budgetApi.delete(),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["budget"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    },
+  });
+
   return {
-    upsertBudget: mutation.mutateAsync,
-    isSaving: mutation.isPending,
+    upsertBudget: upsertMutation.mutateAsync,
+    isSaving: upsertMutation.isPending,
+    deleteBudget: deleteMutation.mutateAsync,
+    isDeleting: deleteMutation.isPending,
   };
 }

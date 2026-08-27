@@ -41,11 +41,16 @@ class CategoryRepository:
         await self.db.flush()
         return category
 
-    async def delete_custom_category(self, id: uuid.UUID) -> None:
-        # Atomic transaction: reassign expenses to Uncategorized, then delete the category
-        # Since self.db is an AsyncSession, changes are flushable and will be committed/rolled back together.
-        
-        # 1. Update referencing expenses to UNCATEGORIZED_ID
+    async def delete_category(self, id: uuid.UUID) -> None:
+        # Atomic transaction: reassign expenses to another existing category, then delete
+        stmt = select(Category).where(Category.id != id).limit(1)
+        res = await self.db.execute(stmt)
+        fallback = res.scalar_one_or_none()
+        if not fallback:
+            from app.core.exceptions import ConflictError
+            raise ConflictError("Cannot delete the only remaining category. Please create another category first.")
+
+        # 1. Update referencing expenses to fallback category
         update_stmt = (
             select(Expense)
             .where(Expense.category_id == id)
@@ -53,7 +58,7 @@ class CategoryRepository:
         expenses_result = await self.db.execute(update_stmt)
         expenses = expenses_result.scalars().all()
         for expense in expenses:
-            expense.category_id = UNCATEGORIZED_ID
+            expense.category_id = fallback.id
             self.db.add(expense)
         
         # Flush the updates

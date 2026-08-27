@@ -30,3 +30,12 @@ async def upsert_budget(
     service = BudgetService(db)
     budget = await service.upsert_budget(data.amount)
     return {"data": BudgetRead.model_validate(budget)}
+
+
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_budget(
+    db=Depends(get_db),
+) -> None:
+    """Delete the monthly budget configuration."""
+    service = BudgetService(db)
+    await service.delete_budget()

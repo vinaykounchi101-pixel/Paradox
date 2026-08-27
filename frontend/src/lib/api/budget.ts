@@ -14,4 +14,6 @@ export const budgetApi = {
   get: () => client.get<DataResponse<BudgetRead>>("/budget"),
   
   upsert: (amount: number) => client.put<DataResponse<BudgetRead>>("/budget", { amount }),
+
+  delete: () => client.delete<void>("/budget"),
 };

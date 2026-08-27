@@ -40,10 +40,5 @@ class CategoryService:
         return await self.repo.update(category, name)
 
     async def delete_category(self, id: uuid.UUID) -> None:
-        category = await self.get_category(id)
-        
-        # Block deleting starter categories
-        if category.is_default:
-            raise ConflictError("Starter categories cannot be deleted")
-
-        await self.repo.delete_custom_category(id)
+        await self.get_category(id)
+        await self.repo.delete_category(id)

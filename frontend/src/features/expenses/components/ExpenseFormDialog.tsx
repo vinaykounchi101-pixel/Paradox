@@ -189,7 +189,7 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
           ) : (
             paymentMethods.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} {p.is_default ? "(Default)" : ""}
+                {p.name}
               </option>
             ))
           )}
