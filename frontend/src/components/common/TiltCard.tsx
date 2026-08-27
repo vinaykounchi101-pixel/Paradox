@@ -68,10 +68,10 @@ export const TiltCard: React.FC<TiltCardProps> = ({
 
   return (
     /* Perspective wrapper — must NOT be the animated element itself */
-    <div className="perspective-800 w-full">
+    <div className={`perspective-800 w-full ${className ?? ""}`}>
       <motion.div
         ref={ref}
-        className={`relative ${className}`}
+        className="relative h-full"
         style={{
           rotateX,
           rotateY,

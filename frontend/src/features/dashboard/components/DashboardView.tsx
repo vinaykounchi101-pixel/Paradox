@@ -97,10 +97,10 @@ export default function DashboardView() {
       </div>
 
       {/* Top row cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:items-stretch">
         {/* Spent card */}
-        <TiltCard>
-          <Card variant="glass" className="relative overflow-hidden group">
+        <TiltCard className="h-full">
+          <Card variant="glass" className="relative overflow-hidden group h-full flex flex-col">
             <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 h-24 w-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -108,7 +108,7 @@ export default function DashboardView() {
               </CardTitle>
               <TrendingDown className="h-4 w-4 text-emerald-500" />
             </CardHeader>
-            <CardContent className="pt-2">
+            <CardContent className="pt-2 flex flex-col flex-1">
               {/* 3D flip-counter on value change */}
               <div className="text-4xl font-extrabold tracking-tight overflow-hidden h-12 flex items-center">
                 <AnimatePresence mode="wait" initial={false}>
@@ -124,7 +124,7 @@ export default function DashboardView() {
                   </motion.span>
                 </AnimatePresence>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-muted-foreground mt-auto pt-4">
                 For the selected {period.replace("_", " ")}
               </p>
             </CardContent>
@@ -132,10 +132,10 @@ export default function DashboardView() {
         </TiltCard>
 
         {/* Budget Status card */}
-        <TiltCard>
+        <TiltCard className="h-full">
           <Card
             variant="glass"
-            className={`relative overflow-hidden ${
+            className={`relative overflow-hidden h-full ${
               isOverBudget
                 ? "border-destructive/30 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
                 : isNearBudget
