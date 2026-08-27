@@ -1,175 +1,143 @@
-# Progress Report: Paradox Project (Backend & Frontend Implementation)
+# Progress & Technical Architecture Report: Paradox Project
 
-This document summarizes the final status, configurations, architectural decisions, and verification results for **Paradox Phase 1 MVP**. It serves as a comprehensive overview of the entire project lifecycle.
-
----
-
-## 1. Project Rules & Guidelines
-- **Folder Structure**: Follows the strict layout specified in the SRS.
-- **Environment Driven**: The application is strictly environment-variable driven.
-- **Secrets Constraint**: 
-  - **Do NOT read, edit, or access `.env` or `.env.local` files** from any agent tool call.
-  - The application retrieves all values dynamically from the OS process environment.
-  - `.env.local` is ignored in both the backend and frontend `.gitignore` configurations.
-- **Push Policy**: Commits and pushes are only executed upon explicit instructions from the user.
+This document provides a comprehensive summary of all architectural implementations, feature additions, database migrations, Progressive Web App (PWA) configurations, testing results, and deployment states for **Paradox Phase 1 MVP**.
 
 ---
 
-## 2. Workspace Directory Layout
-The project workspace consists of decoupled frontend and backend modules:
-- **`backend/`**: FastAPI implementation, Alembic migrations, database models, schemas, repositories, services, and pytest unit tests.
-- **`frontend/`**: Next.js App Router workspace, features directories, API client integrations, and styling sheets.
-- **`docs/`**: Holds product-level specifications (`PARADOX_PRD_FINAL.md`, `PARADOX_SRS.md`, and `DESIGN SYSTEM.md`).
+## 1. Core Project Guidelines & Constraints
+- **Strict Architecture**: Layered architecture (**API/Router ➔ Service Layer ➔ Repository Layer ➔ Database**).
+- **Zero Inline Hardcoding**: All configurations, URLs, categories, budgets, and tokens are dynamically managed or environment-driven.
+- **Secrets & Environment Isolation**: `.env` and `.env.local` are strictly ignored by Git and never committed or directly accessed by tools.
+- **Precision Monetary Values**: Uses fixed-precision `Numeric(12, 2)` (Python `Decimal`) with database `CHECK (amount > 0)` and `CHECK (amount >= 0)` constraints.
+- **Communication Conventions**: Follows pair-programming callout rules (`"Roger That"` before starting work, `"Over n Out"` upon completion).
 
 ---
 
-## 3. Database Schema & Migration Layer
-We have implemented the relational database mappings in SQLAlchemy 2.0 and initialized Alembic async migrations:
-- **Entities**:
-  - `users`: Placeholder table for future multi-user compatibility (seeded with 1 primary user).
-  - `categories`: Unique category names. Custom categories can be deleted. Default starter categories are protected (`is_default = true`) and cannot be deleted.
-  - `payment_methods`: Unique payment methods. Custom methods can be deleted; default methods are protected.
-  - `expenses`: Fixed-precision `amount` (using `Numeric(12,2)` with `CHECK (amount > 0)`), category, payment method, date, and description. Indexes are placed on `date` and `category_id`.
-  - `budgets`: Singular monthly budget resource upserted on `PUT` requests (`CHECK (amount >= 0)`).
+## 2. Directory Layout & Module Structure
+```
+Paradox/
+├── backend/
+│   ├── app/
+│   │   ├── api/                 # FastAPI router endpoints (expenses, categories, payment_methods, budget, dashboard, health)
+│   │   ├── constants/           # Starter system UUIDs & definitions
+│   │   ├── core/                # App configuration, logging, and error handling
+│   │   ├── db/
+│   │   │   ├── models/          # SQLAlchemy 2.0 ORM models (User, Category, PaymentMethod, Expense, Budget)
+│   │   │   ├── session.py       # Async engine & sessionmaker
+│   │   │   └── seed_dummy_data.py # Idempotent starter data seed (no fake financial data)
+│   │   ├── repositories/        # Database access layer (CRUD, queries, atomic cascade reassignments)
+│   │   ├── schemas/             # Pydantic validation models & serializers
+│   │   ├── services/            # Pure business logic layer
+│   │   └── utils/               # Datetime and formatting utilities
+│   ├── migrations/              # Alembic asynchronous migrations
+│   │   └── versions/            # 80a4bc410a4b, b2f8a1c9d4e5, c3a7b9e1f5d2
+│   ├── tests/                   # Pytest automated test suites
+│   ├── Dockerfile               # Production container config for Render
+│   └── requirements.txt         # Production backend dependencies
+├── frontend/
+│   ├── public/
+│   │   ├── icons/               # PWA icons (icon-192.svg, icon-512.svg, icon-maskable.svg)
+│   │   ├── manifest.json        # Web App Manifest
+│   │   └── sw.js                # Resilient Service Worker (network-first navigation)
+│   ├── src/
+│   │   ├── app/                 # Next.js App Router (layout, dashboard, expenses, categories, budget, manifest.ts)
+│   │   ├── components/
+│   │   │   ├── common/          # PwaRegister, BackgroundGrid, ThemeProvider, QueryProvider
+│   │   │   ├── layout/          # Shell navigation with Hamburger Drawer & Topbar
+│   │   │   └── ui/              # Button, Card, TiltCard, Dialog, Toast, CategoryPicker, BarChart3D
+│   │   ├── features/            # Feature-scoped hooks, components, and views
+│   │   │   ├── dashboard/
+│   │   │   ├── expenses/
+│   │   │   ├── categories/
+│   │   │   └── budget/
+│   │   ├── lib/api/             # Typed API client services
+│   │   └── styles/              # Global CSS & Design System tokens
+│   └── vercel.json              # Vercel deployment framework configuration
+└── docs/                        # PRD, SRS, and Design System specifications
+```
+
+---
+
+## 3. Database Architecture & Alembic Migrations
+- **Database Engine**: PostgreSQL on Supabase (accessed asynchronously via `asyncpg` and synchronously via `psycopg2` during migrations).
+- **Migration History**:
+  1. `80a4bc410a4b_initial_schema.py`: Initial schema for `users`, `categories`, `payment_methods`, `expenses`, and `budgets`.
+  2. `b2f8a1c9d4e5_add_month_to_budgets.py`: Added `month` column with raw idempotent SQL.
+  3. `c3a7b9e1f5d2_add_period_granularity_to_budgets.py`:
+     - Added `period_type` (`"month" | "week" | "day"`) and `period_key` (`"YYYY-MM"`, `"YYYY-Www"`, `"YYYY-MM-DD"`).
+     - Idempotent raw DDL: `ALTER TABLE budgets ADD COLUMN IF NOT EXISTS ...`
+     - Enforced composite constraint `uq_budget_period (period_type, period_key)`.
 - **Atomic Cascade Reassignments**:
-  - Deleting a custom category reassigns referencing expenses to the default `Uncategorized` fallback category in the **same transaction block** before deleting the category row.
-  - Deleting a custom payment method reassigns referencing expenses to the default `Other` fallback payment method in the same transaction block.
-- **Seeded Seeds**: Sourced via Alembic upgrade with fixed UUIDs for starter categories and payment methods (defined in `app/constants/categories.py` and `app/constants/payment_methods.py`).
+  - When a category or payment method is deleted, referencing expenses are atomically reassigned to remaining fallback entities in the exact same database transaction block.
+- **No Dummy Auto-Seeding**: Automatic creation of placeholder financial budgets on boot has been completely eliminated to maintain database integrity.
 
 ---
 
-## 4. Backend Implementation Details
-The backend service (`backend/app/`) is fully implemented with a structured layered architecture (**Router ➔ Service ➔ Repository ➔ Database**):
-- **Core Configurations**: Environment settings parsed via Pydantic `BaseSettings`. Fallback helper to convert `postgresql://` string prefixes to `postgresql+asyncpg://` to prevent asyncpg driver errors.
-- **Domain Exceptions**: Mapping rules to HTTP status codes (`NotFoundError` -> 404, `ValidationError` -> 422, `ConflictError` -> 409, `UnprocessableRequestError` -> 422) with a custom JSON error-response envelope.
-- **Pydantic Schemas**: Serializing decimal values as string representations with 2 decimal places to avoid floating-point loss in transit.
-- **Request Logger**: Custom middleware logging HTTP method, path, status code, and processing duration in milliseconds.
-- **Structured JSON Logging**: Standard JSON formatter printing logs cleanly to stdout.
-- **Health Check Router**: Custom endpoint performing health checks and verifying DB connectivity.
-- **Development Server**: Uvicorn server running locally in the background on `http://127.0.0.1:8000`.
+## 4. Multi-Granularity Budget System
+- **Budgeting Granularities**:
+  - **Monthly**: Target identified by `YYYY-MM` (e.g. `2026-08`).
+  - **Weekly**: Target identified by ISO week `YYYY-Www` (e.g. `2026-W35`).
+  - **Daily**: Target identified by date `YYYY-MM-DD` (e.g. `2026-08-27`).
+- **REST Endpoints**:
+  - `GET /api/v1/budget?period_type=...&period_key=...`
+  - `GET /api/v1/budget/all?period_type=...`
+  - `PUT /api/v1/budget` (Upsert target)
+  - `DELETE /api/v1/budget?period_type=...&period_key=...`
+- **Frontend Budget Planner (`/budget`)**:
+  - Granularity switcher tabs (**Monthly**, **Weekly**, **Daily**).
+  - Dynamic native date pickers (`<input type="month" />`, `<input type="week" />`, `<input type="date" />`).
+  - Real-time audit meter, spending limit slider, and status alerts.
+  - History table of all configured budgets with edit/delete dialogs and category/period filtering.
 
 ---
 
-## 5. Frontend Implementation Details
-The frontend web application (`frontend/`) is fully implemented with **Next.js (App Router), TypeScript, Tailwind CSS v4, Framer Motion, and TanStack Query**:
-- **Central API Client**: Built custom Client wrapper that handles REST requests and maps backend validation error dictionaries to visual inputs.
-- **State Synchronizer**: React Query configured with a 30s cache stale-time threshold to balance DB overhead with UI freshness.
-- **Global Theme Switcher**: Installed client-side `ThemeProvider` supporting transitions between a premium dark glass theme and a slate light theme. Persistent selection is stored in `localStorage` and loads without SSR hydration mismatches.
-- **Premium SVG Visualizations**:
-  - **Spending Trends**: Custom area chart displaying weekly spending aggregates with bezier lines, gradient fills, and cursor hover tooltip boxes.
-  - **Spending Categories**: Custom vertical bar chart displaying category spending totals. Hovering over a bar scales it and shows a floating cursor tooltip indicating category name and amount spent.
-- **Navigation Shell**: A sidebar (desktop layout) that collapses into a bottom navigation bar (mobile viewport) for absolute accessibility.
-- **Feature Screen Suites**:
-  - **Dashboard Page**: Displays period aggregations, spending totals, budget consumption status bars, category bar charts, trend curves, and recent transactions.
-  - **Expense List**: Handles paginated, sorted lists with mutually exclusive single-dimension search filters (picking a category clears date ranges; selecting date ranges clears category filter). Dialog modals manage creations, edits, and deletions.
-  - **Metadata Manager**: Tabbed view displaying Categories and Payment Methods. Protects system defaults and handles warnings for cascade items.
-  - **Budget Configurator**: Sliders let users update thresholds, showing green (normal), yellow (>=80%), and red (exceeded) status indicators.
+## 5. Progressive Web App (PWA) Implementation
+- **Manifest (`public/manifest.json` & `app/manifest.ts`)**:
+  - Configured with `display: "standalone"`, `start_url: "/"`, theme `#6366f1`, and background `#09090b`.
+- **App Icons**:
+  - High-resolution SVG icons: `icon-192.svg`, `icon-512.svg`, and `icon-maskable.svg`.
+- **Service Worker (`public/sw.js`)**:
+  - Network-first caching strategy for navigation and HTML documents to eliminate `ERR_FAILED` or stale-cache locks.
+  - Cache-first strategy for static image assets and icons.
+  - Excludes API requests (`/api/*`) and Next.js internal data (`/_next/data/*`).
+- **PWA Auto-Registration (`PwaRegister.tsx`)**:
+  - Checks for HTTPS and browser capability on window load, handling update lifecycles automatically.
 
 ---
 
-## 6. How to Run the Project Locally
-
-### A. Run the Backend Server
-1. Load environment variables.
-2. Run database migrations:
-   ```powershell
-   .venv\Scripts\alembic upgrade head
-   ```
-3. Seed the test database:
-   ```powershell
-   .venv\Scripts\python app/db/seed_dummy_data.py
-   ```
-4. Run the development server (available on `http://127.0.0.1:8000`):
-   ```powershell
-   .venv\Scripts\uvicorn app.main:app
-   ```
-
-### B. Run the Frontend Server
-1. Navigate to the `frontend/` directory.
-2. Run development server (available on `http://localhost:3000`):
-   ```powershell
-   npm run dev
-   ```
+## 6. UI & Navigation (Hamburger Drawer Layout)
+- **Top Navigation Bar**:
+  - Sticky glass header with 3D perspective animated grid background.
+  - Rotating 3D Paradox logo cube + gradient title.
+  - Animated Hamburger Menu toggle (`Menu` ➔ `X`).
+  - Dark / Light mode toggle and session avatar.
+- **Slide-Out Hamburger Drawer**:
+  - Full backdrop blur overlay (`backdrop-blur-sm bg-black/60`).
+  - Smooth Framer Motion spring slide-in panel.
+  - Direct navigation links with icons, descriptions, and active spring highlight indicators.
+  - Dark/Light mode switcher and Live PWA online status badge.
 
 ---
 
-## 7. Verification Summary
-* **Backend Tests**: Executed `pytest` inside the virtual environment; all unit tests pass cleanly.
-* **Frontend Builds**: Executed `npm run build` inside `frontend/`; compiled production package with zero TypeScript or ESLint errors.
-* **DB Liveness Check**: Verified liveness checks connected successfully to PostgreSQL (`{"status":"ok","database":"connected"}`).
-* **Repository State**: Cleanly pushed tracking states to the remote repository.
+## 7. Automated Testing & Verification
+- **Backend Tests (`pytest`)**:
+  - `tests/unit/test_budget_granularity.py`: Passed (100% assertions for month, week, day schemas, validation, and serializers).
+  - `tests/unit/test_budget_status.py`: Passed (Budget threshold math & warning ranges).
+  - `tests/unit/test_money.py`: Passed (Decimal precision verification).
+  - **Result**: `3 passed in 0.76s`.
+- **Frontend Builds (`next build`)**:
+  - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors.
+  - All routes (`/`, `/dashboard`, `/expenses`, `/categories`, `/budget`, `/manifest.webmanifest`) generated cleanly.
 
 ---
 
-## 8. Deployment Configuration (Vercel + Render + Supabase)
-
-### A. Changes Made for Production Deployment
-- **`backend/Dockerfile`**: Populated with a production-ready multi-stage configuration using `python:3.11-slim`. Dynamically binds to the `$PORT` environment variable required by Render.
-- **`backend/app/core/config.py`**: Extended the `DATABASE_URL` validator to handle both `postgresql://` and `postgres://` URL prefixes (converting both to `postgresql+asyncpg://`). This ensures full compatibility with Supabase connection strings.
-- **`backend/app/services/dashboard_service.py`**: Fixed a deploy-time `NameError` — `Any` was used in a type annotation but was missing from the `typing` import. Added `Any` to the import line.
-- **`frontend/vercel.json`**: Created with explicit `"framework": "nextjs"` and `"outputDirectory": ".next"` so Vercel correctly detects the Next.js framework when deploying from a monorepo subdirectory.
-
-### B. Required Environment Variables
-
-#### Render (Backend)
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | Supabase connection string (`postgres://...`) |
-| `CORS_ALLOWED_ORIGINS` | Vercel frontend URL (e.g. `https://paradox.vercel.app`) |
-| `APP_ENV` | `production` |
-| `DEBUG` | `false` |
-| `LOG_LEVEL` | `INFO` |
-
-#### Vercel (Frontend)
-| Variable | Value |
-|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | Render backend URL + `/api/v1` (e.g. `https://paradox-backend.onrender.com/api/v1`) |
-| `NEXT_PUBLIC_APP_ENV` | `production` |
-
-> **Important**: After setting `NEXT_PUBLIC_*` variables on Vercel, a full **Redeploy** must be triggered for the values to be baked into the static build output.
-
-### C. Database Setup (Supabase)
-1. Create a Supabase project and copy the PostgreSQL connection string.
-2. Set `DATABASE_URL` in the local shell temporarily and run:
-   ```powershell
-   .venv\Scripts\alembic upgrade head
-   ```
-   This creates all tables and seeds starter categories, payment methods, and the placeholder primary user.
-
-### D. API Endpoint Audit
-All frontend API call paths were audited against backend router definitions. **No mismatches found.** All routes for expenses, categories, payment-methods, budget, and dashboard are correctly aligned.
-
-### E. Commits Pushed (This Session)
-| Commit | Description |
-|---|---|
-| `1d604fc` | `chore: configure backend dockerfile and postgresql connection validation for render and supabase deployment` |
-| `007c4e2` | `fix: import Any in dashboard_service to resolve deploy time NameError` |
-| `f1270d1` | `fix: add vercel.json to configure Next.js framework and output directory` |
-| `19b985c` | `docs: update progress.md and technical debt with deployment notes` |
-| `3af1998` | `feat: run alembic migrations automatically on startup via lifespan event` |
-| `425d6b2` | `feat(ui): add 3D elements - perspective grid, spinning logo cube, tilt cards, 3D bar chart, flip counter` |
-| `30e4df3` | `fix(ui): add h-screen sticky to sidebar so theme toggle is always visible` |
-| `6f4b6be` | `feat(ui): premium category picker with inline creation, equal-height dashboard cards` |
-| `7f3729d` | `fix(ui): fix budget save button, add clear budget, fix double category on inline creation` |
-| `986de6a` | `feat: complete budget CRUD with delete endpoint, enable unrestricted category/payment-method editing and deletion` |
+## 8. Deployment Information
+- **Live Frontend**: [https://paradox-neon.vercel.app/](https://paradox-neon.vercel.app/)
+- **Live Backend**: Render Web Service connected to Supabase PostgreSQL.
+- **Latest Commit Pushed**: `43a4bcb` (All features, tests, migrations, and PWA assets synchronized with `origin/main`).
 
 ---
 
-## 9. Auto-Migration on Startup
-
-### Problem
-Tables were not being created in Supabase because `alembic upgrade head` was never run
-against the production database. The Render backend would boot successfully (health check OK)
-but all API endpoints returned HTTP 500 because no tables existed.
-
-### Solution
-Added a `lifespan` startup event in `backend/app/main.py` that runs `alembic upgrade head`
-automatically every time the server boots:
-- Derives a **synchronous** `postgresql://` URL from the `DATABASE_URL` env var (stripping `+asyncpg`) so Alembic's sync runner works correctly.
-- Uses `alembic.command.upgrade(cfg, "head")` via the Alembic scripting API.
-- Logs `INFO` on success and `ERROR` (with full traceback) on failure.
-- Added `psycopg2-binary>=2.9.9` to `requirements.txt` — required by Alembic's sync engine.
-
-### Behavior
-- If tables already exist, Alembic detects the migration is already at `head` and skips — **idempotent, safe to run on every restart**.
-- If tables are missing, they are created and seeded before the first request is served.
+## 9. Next Session Handoff Notes
+- All requested features (3D elements, unrestricted categories, multi-granularity budgets, PWA, and hamburger menu navigation) are fully implemented, tested, and pushed to production.
+- For local testing: Run backend with `.venv\Scripts\uvicorn app.main:app` and frontend with `npm run dev`.
