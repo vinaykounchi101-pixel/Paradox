@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { PiggyBank, Save, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { PiggyBank, Save, AlertTriangle, CheckCircle, Info, Trash2 } from "lucide-react";
 import { useBudget, useBudgetMutation } from "../hooks/useBudget";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
 export default function BudgetConfigView() {
@@ -41,9 +40,21 @@ export default function BudgetConfigView() {
 
     try {
       await upsertBudget(parsedAmount);
-      success("Monthly budget configuration saved successfully");
-    } catch (err: any) {
-      toastError(err.message || "Failed to save budget");
+      success("Monthly budget saved successfully");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save budget";
+      toastError(msg);
+    }
+  };
+
+  const handleClear = async () => {
+    try {
+      await upsertBudget(0);
+      setAmount("0");
+      success("Budget cleared");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to clear budget";
+      toastError(msg);
     }
   };
 
@@ -128,14 +139,36 @@ export default function BudgetConfigView() {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                fullWidth
-                className="cursor-pointer"
-                isLoading={isSaving}
-              >
-                <Save className="h-4 w-4 mr-2" /> Save Budget
-              </Button>
+              {/* Action buttons — use native buttons to ensure type="submit" is honoured */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-1 inline-flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                >
+                  {isSaving ? (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Save Budget
+                </button>
+                {currentLimit > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    disabled={isSaving}
+                    className="inline-flex items-center justify-center gap-1.5 h-10 px-3 text-sm font-medium rounded-lg border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                    title="Clear budget limit"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Clear
+                  </button>
+                )}
+              </div>
             </form>
           </CardContent>
         </Card>

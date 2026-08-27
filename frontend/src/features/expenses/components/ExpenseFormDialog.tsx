@@ -43,14 +43,14 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
 
   const [errors, setErrors] = useState<Partial<Record<keyof ExpenseFormValues, string>>>({});
 
-  // Sync server categories into local list
-  useEffect(() => {
-    setLocalCategories(categories);
-  }, [categories]);
-
-  // Reset or pre-fill form fields when modal opens/changes
+  // Initialise localCategories when the dialog opens, then manage locally.
+  // Do NOT sync on every categories change — that causes duplicates when a
+  // newly-created category triggers a cache invalidation refetch.
   useEffect(() => {
     if (isOpen) {
+      // Reset local categories to server list on open
+      setLocalCategories(categories);
+
       if (expense) {
         setAmount(expense.amount);
         setCategoryId(expense.category_id);
@@ -68,7 +68,8 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
       }
       setErrors({});
     }
-  }, [isOpen, expense, categories, paymentMethods]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // intentionally only on open — not on categories change
 
   // Called by CategoryPicker when user creates a new category inline
   const handleCreateCategory = async (name: string): Promise<CategoryRead> => {
