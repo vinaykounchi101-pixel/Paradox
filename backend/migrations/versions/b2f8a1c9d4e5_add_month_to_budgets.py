@@ -20,20 +20,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 1. Add month column as nullable first
-    op.add_column('budgets', sa.Column('month', sa.String(length=7), nullable=True))
-    
-    # 2. Backfill any existing budget records with current month YYYY-MM
+    op.execute("ALTER TABLE budgets ADD COLUMN IF NOT EXISTS month VARCHAR(7);")
     current_month = datetime.utcnow().strftime("%Y-%m")
-    op.execute(f"UPDATE budgets SET month = '{current_month}' WHERE month IS NULL")
-    
-    # 3. Alter month column to nullable=False, unique constraint, and index
-    op.alter_column('budgets', 'month', nullable=False)
-    op.create_unique_constraint('uq_budgets_month', 'budgets', ['month'])
-    op.create_index('idx_budgets_month', 'budgets', ['month'], unique=False)
+    op.execute(f"UPDATE budgets SET month = '{current_month}' WHERE month IS NULL;")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_budgets_month ON budgets (month);")
 
 
 def downgrade() -> None:
-    op.drop_index('idx_budgets_month', table_name='budgets')
-    op.drop_constraint('uq_budgets_month', 'budgets', type_='unique')
-    op.drop_column('budgets', 'month')
+    op.execute("DROP INDEX IF EXISTS idx_budgets_month;")
+    op.execute("ALTER TABLE budgets DROP COLUMN IF EXISTS month;")

@@ -20,30 +20,30 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # 1. Add period_type with default 'month'
-    op.add_column('budgets', sa.Column('period_type', sa.String(length=10), server_default='month', nullable=False))
+    op.execute("ALTER TABLE budgets ADD COLUMN IF NOT EXISTS period_type VARCHAR(10) DEFAULT 'month' NOT NULL;")
     
     # 2. Add period_key
-    op.add_column('budgets', sa.Column('period_key', sa.String(length=20), nullable=True))
+    op.execute("ALTER TABLE budgets ADD COLUMN IF NOT EXISTS period_key VARCHAR(20);")
     
-    # 3. Backfill period_key from month
-    op.execute("UPDATE budgets SET period_key = month WHERE period_key IS NULL")
+    # 3. Backfill period_key from month if available
+    op.execute("UPDATE budgets SET period_key = month WHERE period_key IS NULL AND month IS NOT NULL;")
+    op.execute("UPDATE budgets SET period_key = TO_CHAR(NOW(), 'YYYY-MM') WHERE period_key IS NULL;")
     
     # 4. Make period_key not nullable and make month nullable
-    op.alter_column('budgets', 'period_key', nullable=False)
-    op.alter_column('budgets', 'month', nullable=True)
+    op.execute("ALTER TABLE budgets ALTER COLUMN period_key SET NOT NULL;")
+    op.execute("ALTER TABLE budgets ALTER COLUMN month DROP NOT NULL;")
     
-    # 5. Drop uq_budgets_month if present and create uq_budget_period
-    try:
-        op.drop_constraint('uq_budgets_month', 'budgets', type_='unique')
-    except Exception:
-        pass
-
-    op.create_unique_constraint('uq_budget_period', 'budgets', ['period_type', 'period_key'])
-    op.create_index('idx_budgets_period', 'budgets', ['period_type', 'period_key'], unique=False)
+    # 5. Drop uq_budgets_month safely if exists
+    op.execute("ALTER TABLE budgets DROP CONSTRAINT IF EXISTS uq_budgets_month;")
+    op.execute("ALTER TABLE budgets DROP CONSTRAINT IF EXISTS uq_budget_period;")
+    
+    # 6. Create uq_budget_period constraint and index
+    op.execute("ALTER TABLE budgets ADD CONSTRAINT uq_budget_period UNIQUE (period_type, period_key);")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_budgets_period ON budgets (period_type, period_key);")
 
 
 def downgrade() -> None:
-    op.drop_index('idx_budgets_period', table_name='budgets')
-    op.drop_constraint('uq_budget_period', 'budgets', type_='unique')
-    op.drop_column('budgets', 'period_key')
-    op.drop_column('budgets', 'period_type')
+    op.execute("DROP INDEX IF EXISTS idx_budgets_period;")
+    op.execute("ALTER TABLE budgets DROP CONSTRAINT IF EXISTS uq_budget_period;")
+    op.execute("ALTER TABLE budgets DROP COLUMN IF EXISTS period_key;")
+    op.execute("ALTER TABLE budgets DROP COLUMN IF EXISTS period_type;")
