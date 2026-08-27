@@ -1,3 +1,4 @@
+import uuid
 from decimal import Decimal
 from datetime import datetime
 from typing import Optional
@@ -7,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 class BudgetBase(BaseModel):
     amount: Decimal = Field(..., ge=0, max_digits=12, decimal_places=2)
+    month: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}$", description="Month in YYYY-MM format")
 
 
 class BudgetCreate(BudgetBase):
@@ -14,6 +16,8 @@ class BudgetCreate(BudgetBase):
 
 
 class BudgetRead(BaseModel):
+    id: Optional[uuid.UUID] = None
+    month: Optional[str] = None
     amount: Optional[Decimal] = None
     updated_at: Optional[datetime] = None
 

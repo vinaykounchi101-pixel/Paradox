@@ -57,7 +57,7 @@ class DashboardService:
         
         month_spent = sum((e.amount for e in month_expenses), Decimal("0.00"))
 
-        budget = await self.budget_repo.get_budget()
+        budget = await self.budget_repo.get_budget(today.strftime("%Y-%m"))
         budget_data = self._calculate_budget_status(budget, month_spent)
 
         # 4. Calculate category breakdown & top categories
