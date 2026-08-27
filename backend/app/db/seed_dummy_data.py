@@ -97,20 +97,7 @@ async def seed_dummy_data() -> None:
 
     async with async_session_maker() as session:
         try:
-            # 1. Upsert a monthly budget of 1200.00 for current month if empty
-            current_month_str = f"{year:04d}-{month:02d}"
-            budget_result = await session.execute(
-                Budget.__table__.select().where(Budget.month == current_month_str).limit(1)
-            )
-            existing_budget = budget_result.first()
-            if not existing_budget:
-                budget = Budget(month=current_month_str, amount=Decimal("1200.00"))
-                session.add(budget)
-                print(f"Seeded monthly budget of 1200.00 for {current_month_str}")
-            else:
-                print("Budget already exists, skipping...")
-
-            # 2. Add dummy expenses
+            # 1. Add dummy expenses
             expense_count = 0
             for item in dummy_expenses:
                 # Basic check to avoid duplicates if re-run on same day/description
