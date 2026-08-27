@@ -8,7 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 class BudgetBase(BaseModel):
     amount: Decimal = Field(..., ge=0, max_digits=12, decimal_places=2)
-    month: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}$", description="Month in YYYY-MM format")
+    period_type: str = Field("month", pattern=r"^(month|week|day)$", description="Budget granularity: month, week, or day")
+    period_key: Optional[str] = Field(None, description="Identifier for period: YYYY-MM for month, YYYY-Www or YYYY-MM-DD for week/day")
+    month: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}$", description="Optional legacy month field")
 
 
 class BudgetCreate(BudgetBase):
@@ -17,6 +19,8 @@ class BudgetCreate(BudgetBase):
 
 class BudgetRead(BaseModel):
     id: Optional[uuid.UUID] = None
+    period_type: str = "month"
+    period_key: Optional[str] = None
     month: Optional[str] = None
     amount: Optional[Decimal] = None
     updated_at: Optional[datetime] = None

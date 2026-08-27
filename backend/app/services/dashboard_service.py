@@ -48,17 +48,21 @@ class DashboardService:
         # Calculate total spent in the period
         total_spent = sum((e.amount for e in expenses), Decimal("0.00"))
 
-        # 3. Calculate budget status for the *current calendar month* (strictly)
-        month_start = date(today.year, today.month, 1)
-        if period == "current_month":
-            month_expenses = expenses
+        # 3. Calculate budget status according to selected period
+        if period == "current_week":
+            week_key = f"{today.year}-W{today.isocalendar()[1]:02d}"
+            budget = await self.budget_repo.get_budget("week", week_key)
+            spent_for_budget = total_spent
         else:
-            month_expenses = await self.expense_repo.get_expenses_for_period(month_start, today)
-        
-        month_spent = sum((e.amount for e in month_expenses), Decimal("0.00"))
+            month_start = date(today.year, today.month, 1)
+            if period == "current_month":
+                month_expenses = expenses
+            else:
+                month_expenses = await self.expense_repo.get_expenses_for_period(month_start, today)
+            spent_for_budget = sum((e.amount for e in month_expenses), Decimal("0.00"))
+            budget = await self.budget_repo.get_budget("month", today.strftime("%Y-%m"))
 
-        budget = await self.budget_repo.get_budget(today.strftime("%Y-%m"))
-        budget_data = self._calculate_budget_status(budget, month_spent)
+        budget_data = self._calculate_budget_status(budget, spent_for_budget)
 
         # 4. Calculate category breakdown & top categories
         category_breakdown, top_categories = self._calculate_category_stats(expenses, total_spent)

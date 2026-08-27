@@ -1,21 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { budgetApi } from "@/lib/api/budget";
+import { budgetApi, BudgetCreate, BudgetPeriodType } from "@/lib/api/budget";
 
-export function useBudget(month?: string) {
+export function useBudget(period_type: BudgetPeriodType = "month", period_key?: string) {
   return useQuery({
-    queryKey: ["budget", month || "current"],
+    queryKey: ["budget", period_type, period_key || "current"],
     queryFn: async () => {
-      const response = await budgetApi.get(month);
+      const response = await budgetApi.get(period_type, period_key);
       return response.data;
     },
   });
 }
 
-export function useBudgetsList() {
+export function useBudgetsList(period_type?: BudgetPeriodType) {
   return useQuery({
-    queryKey: ["budgets-all"],
+    queryKey: ["budgets-all", period_type || "all"],
     queryFn: async () => {
-      const response = await budgetApi.list();
+      const response = await budgetApi.list(period_type);
       return response.data;
     },
   });
@@ -25,8 +25,7 @@ export function useBudgetMutation() {
   const queryClient = useQueryClient();
 
   const upsertMutation = useMutation({
-    mutationFn: ({ amount, month }: { amount: number; month?: string }) =>
-      budgetApi.upsert(amount, month),
+    mutationFn: (data: BudgetCreate) => budgetApi.upsert(data),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["budget"] }),
@@ -37,7 +36,8 @@ export function useBudgetMutation() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (month?: string) => budgetApi.delete(month),
+    mutationFn: ({ period_type, period_key }: { period_type: BudgetPeriodType; period_key?: string }) =>
+      budgetApi.delete(period_type, period_key),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["budget"] }),

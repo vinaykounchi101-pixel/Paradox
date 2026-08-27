@@ -1,5 +1,4 @@
 from decimal import Decimal
-from datetime import date
 from typing import List, Optional
 import uuid
 
@@ -14,41 +13,57 @@ class BudgetRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def _resolve_month(self, month: Optional[str] = None) -> str:
-        if month:
-            return month
-        today = get_current_date()
-        return today.strftime("%Y-%m")
+    def _resolve_period(self, period_type: str = "month", period_key: Optional[str] = None) -> tuple[str, str]:
+        pt = period_type if period_type in ("month", "week", "day") else "month"
+        if period_key:
+            return pt, period_key
 
-    async def get_budget(self, month: Optional[str] = None) -> Optional[Budget]:
-        resolved_month = self._resolve_month(month)
-        stmt = select(Budget).where(Budget.month == resolved_month).limit(1)
+        today = get_current_date()
+        if pt == "day":
+            return pt, today.strftime("%Y-%m-%d")
+        elif pt == "week":
+            return pt, f"{today.year}-W{today.isocalendar()[1]:02d}"
+        else:
+            return pt, today.strftime("%Y-%m")
+
+    async def get_budget(self, period_type: str = "month", period_key: Optional[str] = None) -> Optional[Budget]:
+        pt, pk = self._resolve_period(period_type, period_key)
+        stmt = select(Budget).where(Budget.period_type == pt, Budget.period_key == pk).limit(1)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_budgets(self) -> List[Budget]:
-        stmt = select(Budget).order_by(Budget.month.desc())
+    async def list_budgets(self, period_type: Optional[str] = None) -> List[Budget]:
+        stmt = select(Budget)
+        if period_type:
+            stmt = stmt.where(Budget.period_type == period_type)
+        stmt = stmt.order_by(Budget.period_key.desc(), Budget.created_at.desc())
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def upsert_budget(self, amount: Decimal, month: Optional[str] = None) -> Budget:
-        resolved_month = self._resolve_month(month)
-        budget = await self.get_budget(resolved_month)
+    async def upsert_budget(
+        self, amount: Decimal, period_type: str = "month", period_key: Optional[str] = None
+    ) -> Budget:
+        pt, pk = self._resolve_period(period_type, period_key)
+        budget = await self.get_budget(pt, pk)
+        month_val = pk if pt == "month" else None
         if budget:
             budget.amount = amount
+            budget.month = month_val
         else:
             budget = Budget(
                 id=uuid.uuid4(),
-                month=resolved_month,
+                period_type=pt,
+                period_key=pk,
+                month=month_val,
                 amount=amount,
             )
             self.db.add(budget)
         await self.db.flush()
         return budget
 
-    async def delete_budget(self, month: Optional[str] = None) -> bool:
-        resolved_month = self._resolve_month(month)
-        budget = await self.get_budget(resolved_month)
+    async def delete_budget(self, period_type: str = "month", period_key: Optional[str] = None) -> bool:
+        pt, pk = self._resolve_period(period_type, period_key)
+        budget = await self.get_budget(pt, pk)
         if budget:
             await self.db.delete(budget)
             await self.db.flush()

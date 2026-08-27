@@ -11,7 +11,8 @@ import {
   Trash2,
   Calendar,
   Edit2,
-  Plus,
+  Clock,
+  Sun,
 } from "lucide-react";
 import { useBudget, useBudgetsList, useBudgetMutation } from "../hooks/useBudget";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
@@ -20,21 +21,79 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
-import { BudgetRead } from "@/lib/api/budget";
+import { BudgetPeriodType, BudgetRead } from "@/lib/api/budget";
+
+// Helpers for default period keys
+function getDefaultPeriodKey(type: BudgetPeriodType): string {
+  const d = new Date();
+  if (type === "day") {
+    return d.toISOString().slice(0, 10);
+  } else if (type === "week") {
+    // ISO week format YYYY-Www
+    const target = new Date(d.valueOf());
+    const dayNr = (d.getDay() + 6) % 7;
+    target.setDate(target.getDate() - dayNr + 3);
+    const firstThursday = target.valueOf();
+    target.setMonth(0, 1);
+    if (target.getDay() !== 4) {
+      target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
+    }
+    const weekNr = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+    return `${d.getFullYear()}-W${String(weekNr).padStart(2, "0")}`;
+  } else {
+    return d.toISOString().slice(0, 7);
+  }
+}
+
+function formatPeriodLabel(type: BudgetPeriodType, key?: string): string {
+  if (!key) return "";
+  if (type === "day") {
+    const parts = key.split("-");
+    if (parts.length === 3) {
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    }
+    return key;
+  } else if (type === "week") {
+    const parts = key.split("-W");
+    if (parts.length === 2) {
+      return `Week ${parts[1]}, ${parts[0]}`;
+    }
+    return key;
+  } else {
+    const parts = key.split("-");
+    if (parts.length === 2) {
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+      return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    }
+    return key;
+  }
+}
 
 export default function BudgetConfigView() {
   const { success, error: toastError } = useToast();
 
-  // Helper for current month in YYYY-MM
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  // Active Granularity: "month" | "week" | "day"
+  const [periodType, setPeriodType] = useState<BudgetPeriodType>("month");
 
-  // Selected month state
-  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
+  // Selected period key (e.g. 2026-08, 2026-W35, 2026-08-27)
+  const [periodKey, setPeriodKey] = useState<string>(() => getDefaultPeriodKey("month"));
+
+  // History table filter
+  const [historyFilter, setHistoryFilter] = useState<"all" | BudgetPeriodType>("all");
+
+  // Update period key when granularity tab changes if user hasn't typed a custom one
+  const handleTypeChange = (newType: BudgetPeriodType) => {
+    setPeriodType(newType);
+    setPeriodKey(getDefaultPeriodKey(newType));
+  };
 
   // Queries & Mutations
-  const { data: budget, isLoading: loadingBudget } = useBudget(selectedMonth);
+  const { data: budget, isLoading: loadingBudget } = useBudget(periodType, periodKey);
   const { data: allBudgets = [], isLoading: loadingAllBudgets } = useBudgetsList();
-  const { data: dashboard, isLoading: loadingDashboard } = useDashboard("current_month");
+  const { data: dashboard, isLoading: loadingDashboard } = useDashboard(
+    periodType === "week" ? "current_week" : "current_month"
+  );
   const { upsertBudget, isSaving, deleteBudget, isDeleting } = useBudgetMutation();
 
   // Local Form State
@@ -42,16 +101,16 @@ export default function BudgetConfigView() {
   const [error, setError] = useState("");
 
   // Delete modal state
-  const [deleteTargetMonth, setDeleteTargetMonth] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: BudgetPeriodType; key: string } | null>(null);
 
-  // Sync loaded budget value when selectedMonth or budget data changes
+  // Sync loaded budget value to form
   useEffect(() => {
     if (budget && budget.amount !== null && budget.amount !== undefined) {
       setAmount(budget.amount);
     } else {
       setAmount("");
     }
-  }, [budget, selectedMonth]);
+  }, [budget, periodType, periodKey]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,43 +123,43 @@ export default function BudgetConfigView() {
     }
 
     try {
-      await upsertBudget({ amount: parsedAmount, month: selectedMonth });
-      success(`Budget for ${formatMonthLabel(selectedMonth)} saved successfully`);
+      await upsertBudget({
+        amount: parsedAmount,
+        period_type: periodType,
+        period_key: periodKey,
+        month: periodType === "month" ? periodKey : undefined,
+      });
+      success(`Budget for ${formatPeriodLabel(periodType, periodKey)} saved successfully`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save budget";
       toastError(msg);
     }
   };
 
-  const handleDelete = async (monthToDelete: string) => {
+  const handleDelete = async (type: BudgetPeriodType, key: string) => {
     try {
-      await deleteBudget(monthToDelete);
-      if (monthToDelete === selectedMonth) {
+      await deleteBudget({ period_type: type, period_key: key });
+      if (type === periodType && key === periodKey) {
         setAmount("");
       }
-      setDeleteTargetMonth(null);
-      success(`Budget for ${formatMonthLabel(monthToDelete)} deleted successfully`);
+      setDeleteTarget(null);
+      success(`Budget for ${formatPeriodLabel(type, key)} deleted successfully`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to delete budget";
       toastError(msg);
     }
   };
 
-  const formatMonthLabel = (monthStr?: string | null) => {
-    if (!monthStr) return "";
-    const [y, m] = monthStr.split("-");
-    const d = new Date(parseInt(y), parseInt(m) - 1, 1);
-    return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  };
-
   const isLoading = loadingBudget || loadingDashboard;
-
   const currentLimit = budget?.amount ? parseFloat(budget.amount) : 0;
   const currentSpent = dashboard?.total_spent ? parseFloat(dashboard.total_spent) : 0;
-  const isCurrentMonth = selectedMonth === currentMonthStr;
   const isOverBudget = currentLimit > 0 && currentSpent > currentLimit;
   const isNearBudget = currentLimit > 0 && !isOverBudget && currentSpent >= currentLimit * 0.8;
   const pct = currentLimit > 0 ? Math.min((currentSpent / currentLimit) * 100, 100) : 0;
+
+  const filteredBudgets = historyFilter === "all"
+    ? allBudgets
+    : allBudgets.filter((b) => b.period_type === historyFilter);
 
   return (
     <div className="page-container space-y-6">
@@ -109,20 +168,36 @@ export default function BudgetConfigView() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-glow">Budget Planner</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure, manage, and track spending targets for any month.
+            Configure spending limits for any month, week, or day.
           </p>
         </div>
 
-        {/* Month Selector Picker */}
-        <div className="flex items-center gap-2 bg-card border border-border px-3 py-2 rounded-lg shadow-sm">
-          <Calendar className="h-4 w-4 text-primary" />
-          <span className="text-xs font-semibold text-muted-foreground">Target Month:</span>
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-transparent text-sm font-semibold text-foreground outline-none cursor-pointer"
-          />
+        {/* Granularity Tabs */}
+        <div className="flex bg-zinc-900 border border-border p-1 rounded-lg">
+          {(
+            [
+              { type: "month", label: "Monthly", icon: Calendar },
+              { type: "week", label: "Weekly", icon: Clock },
+              { type: "day", label: "Daily", icon: Sun },
+            ] as const
+          ).map((item) => {
+            const Icon = item.icon;
+            const isSelected = periodType === item.type;
+            return (
+              <button
+                key={item.type}
+                onClick={() => handleTypeChange(item.type)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-primary text-primary-foreground shadow"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -132,20 +207,35 @@ export default function BudgetConfigView() {
           <CardHeader>
             <div className="flex items-center space-x-2">
               <PiggyBank className="h-5 w-5 text-primary" />
-              <CardTitle>Set Budget</CardTitle>
+              <CardTitle className="capitalize">Set {periodType} Budget</CardTitle>
             </div>
             <CardDescription>
-              Configuring budget for <strong>{formatMonthLabel(selectedMonth)}</strong>
+              Configuring limit for <strong>{formatPeriodLabel(periodType, periodKey)}</strong>
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Dynamic Period Picker */}
+              <div className="flex flex-col space-y-1.5 w-full">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Select {periodType}
+                </label>
+                <input
+                  type={periodType === "month" ? "month" : periodType === "week" ? "week" : "date"}
+                  value={periodKey}
+                  onChange={(e) => setPeriodKey(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-zinc-900/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
+                  required
+                />
+              </div>
+
+              {/* Amount Input */}
               <Input
-                label={`Limit for ${formatMonthLabel(selectedMonth)} ($)`}
+                label="Spending Limit ($)"
                 type="number"
                 step="1"
                 min="0"
-                placeholder="e.g. 1500"
+                placeholder={periodType === "day" ? "e.g. 50" : periodType === "week" ? "e.g. 350" : "e.g. 1500"}
                 value={amount}
                 onChange={(e) => {
                   setAmount(e.target.value);
@@ -163,8 +253,8 @@ export default function BudgetConfigView() {
                 <input
                   type="range"
                   min="0"
-                  max={Math.max(5000, parseInt(amount) || 5000)}
-                  step="50"
+                  max={Math.max(periodType === "day" ? 500 : 5000, parseInt(amount) || 1000)}
+                  step={periodType === "day" ? "10" : "50"}
                   value={amount ? parseInt(amount) || 0 : 0}
                   onChange={(e) => {
                     setAmount(e.target.value);
@@ -172,11 +262,6 @@ export default function BudgetConfigView() {
                   }}
                   className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
-                <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span>$0</span>
-                  <span>${(Math.max(5000, parseInt(amount) || 5000) / 2).toLocaleString()}</span>
-                  <span>${Math.max(5000, parseInt(amount) || 5000).toLocaleString()}</span>
-                </div>
               </div>
 
               {/* Action buttons */}
@@ -199,10 +284,10 @@ export default function BudgetConfigView() {
                 {currentLimit > 0 && (
                   <button
                     type="button"
-                    onClick={() => setDeleteTargetMonth(selectedMonth)}
+                    onClick={() => setDeleteTarget({ type: periodType, key: periodKey })}
                     disabled={isSaving || isDeleting}
                     className="inline-flex items-center justify-center gap-1.5 h-10 px-3 text-sm font-medium rounded-lg border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-                    title="Delete this month's budget"
+                    title="Delete this budget"
                   >
                     <Trash2 className="h-4 w-4" />
                     Delete
@@ -216,7 +301,7 @@ export default function BudgetConfigView() {
         {/* Current status metrics */}
         <Card variant="glass" className="md:col-span-2">
           <CardHeader>
-            <CardTitle>Spending Status for {formatMonthLabel(selectedMonth)}</CardTitle>
+            <CardTitle>Spending Status for {formatPeriodLabel(periodType, periodKey)}</CardTitle>
             <CardDescription>Live audit of your active target</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -229,123 +314,122 @@ export default function BudgetConfigView() {
               <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
                 <Info className="h-10 w-10 mb-2 opacity-40 text-primary" />
                 <p className="text-sm font-semibold text-foreground">
-                  No budget set for {formatMonthLabel(selectedMonth)}
+                  No {periodType} budget set for {formatPeriodLabel(periodType, periodKey)}
                 </p>
                 <p className="text-xs mt-1 max-w-xs">
-                  Use the configuration form on the left to set a monthly allowance limit.
+                  Use the configuration form on the left to set a limit.
                 </p>
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Visual warning boxes for current month */}
-                {isCurrentMonth && (
-                  <>
-                    {isOverBudget ? (
-                      <div className="flex items-center space-x-3 text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20">
-                        <AlertTriangle className="h-6 w-6 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-bold">Over Budget limit!</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            You have exceeded your limit by <strong>${(currentSpent - currentLimit).toFixed(2)}</strong>.
-                          </p>
-                        </div>
-                      </div>
-                    ) : isNearBudget ? (
-                      <div className="flex items-center space-x-3 text-amber-500 bg-amber-500/10 p-4 rounded-lg border border-amber-500/20">
-                        <AlertTriangle className="h-6 w-6 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-bold">Approaching budget limit</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            You have consumed over 80% of your allowance. You have <strong>${(currentLimit - currentSpent).toFixed(2)}</strong> remaining.
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center space-x-3 text-emerald-500 bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20">
-                        <CheckCircle className="h-6 w-6 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-bold">Budget on track</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Your spending is safe under your target. You have <strong>${(currentLimit - currentSpent).toFixed(2)}</strong> remaining.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </>
+                {/* Visual warning boxes */}
+                {isOverBudget ? (
+                  <div className="flex items-center space-x-3 text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20">
+                    <AlertTriangle className="h-6 w-6 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold">Over Budget limit!</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Exceeded by <strong>${(currentSpent - currentLimit).toFixed(2)}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                ) : isNearBudget ? (
+                  <div className="flex items-center space-x-3 text-amber-500 bg-amber-500/10 p-4 rounded-lg border border-amber-500/20">
+                    <AlertTriangle className="h-6 w-6 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold">Approaching limit</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Consumed over 80% of allowance. <strong>${(currentLimit - currentSpent).toFixed(2)}</strong> left.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-3 text-emerald-500 bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20">
+                    <CheckCircle className="h-6 w-6 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold">Budget on track</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Spending is on track. <strong>${(currentLimit - currentSpent).toFixed(2)}</strong> left.
+                      </p>
+                    </div>
+                  </div>
                 )}
 
-                {/* Spent metrics grid */}
+                {/* Metrics grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 pt-2">
                   <div className="space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Budget Limit
+                      Target Limit
                     </p>
                     <p className="text-2xl font-extrabold tracking-tight">${currentLimit.toFixed(2)}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {isCurrentMonth ? "Total Spent" : "Month Target"}
+                      Current Spent
                     </p>
-                    <p className="text-2xl font-extrabold tracking-tight">
-                      {isCurrentMonth ? `$${currentSpent.toFixed(2)}` : formatMonthLabel(selectedMonth)}
-                    </p>
+                    <p className="text-2xl font-extrabold tracking-tight">${currentSpent.toFixed(2)}</p>
                   </div>
                   <div className="col-span-2 sm:col-span-1 space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {isCurrentMonth ? "Allowance Remaining" : "Status"}
+                      Allowance Left
                     </p>
                     <p className="text-2xl font-extrabold tracking-tight text-emerald-500">
-                      {isCurrentMonth
-                        ? `$${(currentLimit - currentSpent > 0 ? currentLimit - currentSpent : 0).toFixed(2)}`
-                        : "Active"}
+                      ${(currentLimit - currentSpent > 0 ? currentLimit - currentSpent : 0).toFixed(2)}
                     </p>
                   </div>
                 </div>
 
-                {/* Progress bar for current month */}
-                {isCurrentMonth && (
-                  <div className="space-y-2 pt-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Spent Meter</span>
-                      <span className="font-semibold text-foreground">{pct.toFixed(0)}% consumed</span>
-                    </div>
-                    <div className="h-3 w-full bg-zinc-800 rounded-full overflow-hidden">
-                      <motion.div
-                        className={`h-full rounded-full ${
-                          isOverBudget
-                            ? "bg-destructive"
-                            : isNearBudget
-                            ? "bg-amber-500"
-                            : "bg-emerald-500"
-                        }`}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${pct}%` }}
-                        transition={{ duration: 0.6 }}
-                      />
-                    </div>
+                {/* Progress bar */}
+                <div className="space-y-2 pt-2">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Spent Meter</span>
+                    <span className="font-semibold text-foreground">{pct.toFixed(0)}% consumed</span>
                   </div>
-                )}
+                  <div className="h-3 w-full bg-zinc-800 rounded-full overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full ${
+                        isOverBudget
+                          ? "bg-destructive"
+                          : isNearBudget
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.6 }}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* All Configured Monthly Budgets History Table */}
+      {/* All Configured Budgets Table */}
       <Card variant="glass" className="w-full">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <CardTitle>All Configured Monthly Budgets</CardTitle>
-            <CardDescription>History and upcoming monthly allowances</CardDescription>
+            <CardTitle>Configured Budgets</CardTitle>
+            <CardDescription>All your active daily, weekly, and monthly spending targets</CardDescription>
           </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => setSelectedMonth(currentMonthStr)}
-            className="text-xs cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1" /> Current Month
-          </Button>
+
+          {/* History filter buttons */}
+          <div className="flex bg-zinc-900 border border-border p-1 rounded-lg">
+            {(["all", "month", "week", "day"] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setHistoryFilter(filter)}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer capitalize ${
+                  historyFilter === filter
+                    ? "bg-primary text-primary-foreground shadow"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {filter === "all" ? "All Targets" : `${filter}ly`}
+              </button>
+            ))}
+          </div>
         </CardHeader>
         <CardContent>
           {loadingAllBudgets ? (
@@ -354,69 +438,73 @@ export default function BudgetConfigView() {
                 <div key={i} className="h-12 bg-zinc-800 rounded" />
               ))}
             </div>
-          ) : allBudgets.length === 0 ? (
+          ) : filteredBudgets.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground text-sm">
-              No budgets configured yet. Use the form above to add your first monthly budget.
+              No budgets found. Configure your first target using the form above.
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {allBudgets.map((b) => (
-                <div
-                  key={b.id || b.month}
-                  className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0"
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-foreground">
-                        {formatMonthLabel(b.month)}
-                      </span>
-                      {b.month === currentMonthStr && (
-                        <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold uppercase">
-                          Current
+              {filteredBudgets.map((b) => {
+                const bType = (b.period_type || "month") as BudgetPeriodType;
+                const bKey = b.period_key || b.month || "";
+                return (
+                  <div
+                    key={b.id || `${bType}-${bKey}`}
+                    className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-foreground">
+                          {formatPeriodLabel(bType, bKey)}
                         </span>
-                      )}
-                      {b.month === selectedMonth && (
-                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">
-                          Selected
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                            bType === "day"
+                              ? "bg-amber-500/20 text-amber-400"
+                              : bType === "week"
+                              ? "bg-sky-500/20 text-sky-400"
+                              : "bg-primary/20 text-primary"
+                          }`}
+                        >
+                          {bType}
                         </span>
-                      )}
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        Key: {bKey}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      Month code: {b.month}
-                    </p>
-                  </div>
 
-                  <div className="flex items-center gap-4">
-                    <span className="font-extrabold text-base text-foreground">
-                      ${parseFloat(b.amount || "0").toFixed(2)}
-                    </span>
-                    <div className="flex items-center space-x-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (b.month) setSelectedMonth(b.month);
-                        }}
-                        className="text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer h-8 w-8 p-0"
-                        title="Edit this budget"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (b.month) setDeleteTargetMonth(b.month);
-                        }}
-                        className="text-destructive hover:bg-destructive/10 hover:text-red-500 cursor-pointer h-8 w-8 p-0"
-                        title="Delete this budget"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="flex items-center gap-4">
+                      <span className="font-extrabold text-base text-foreground">
+                        ${parseFloat(b.amount || "0").toFixed(2)}
+                      </span>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setPeriodType(bType);
+                            setPeriodKey(bKey);
+                          }}
+                          className="text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer h-8 w-8 p-0"
+                          title="Edit this budget"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleteTarget({ type: bType, key: bKey })}
+                          className="text-destructive hover:bg-destructive/10 hover:text-red-500 cursor-pointer h-8 w-8 p-0"
+                          title="Delete this budget"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -424,25 +512,26 @@ export default function BudgetConfigView() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog
-        isOpen={!!deleteTargetMonth}
-        onClose={() => setDeleteTargetMonth(null)}
-        title="Delete Monthly Budget"
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Budget"
       >
         <div className="space-y-4">
           <div className="flex items-center space-x-3 text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
             <AlertTriangle className="h-5 w-5 flex-shrink-0" />
             <p className="text-xs font-medium">
-              This will remove the spending target limit for <strong>{formatMonthLabel(deleteTargetMonth)}</strong>.
+              This will remove the {deleteTarget?.type} spending target for{" "}
+              <strong>{deleteTarget ? formatPeriodLabel(deleteTarget.type, deleteTarget.key) : ""}</strong>.
             </p>
           </div>
           <p className="text-sm text-foreground">
-            Are you sure you want to delete the budget configuration for <strong>"{formatMonthLabel(deleteTargetMonth)}"</strong>?
+            Are you sure you want to delete this budget configuration?
           </p>
           <div className="flex space-x-3 pt-2">
             <Button
               variant="secondary"
               className="flex-1 cursor-pointer"
-              onClick={() => setDeleteTargetMonth(null)}
+              onClick={() => setDeleteTarget(null)}
               disabled={isDeleting}
             >
               Cancel
@@ -450,7 +539,7 @@ export default function BudgetConfigView() {
             <Button
               variant="danger"
               className="flex-1 cursor-pointer"
-              onClick={() => deleteTargetMonth && handleDelete(deleteTargetMonth)}
+              onClick={() => deleteTarget && handleDelete(deleteTarget.type, deleteTarget.key)}
               isLoading={isDeleting}
             >
               Delete
