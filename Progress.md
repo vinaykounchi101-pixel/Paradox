@@ -147,6 +147,11 @@ All frontend API call paths were audited against backend router definitions. **N
 | `f1270d1` | `fix: add vercel.json to configure Next.js framework and output directory` |
 | `19b985c` | `docs: update progress.md and technical debt with deployment notes` |
 | `3af1998` | `feat: run alembic migrations automatically on startup via lifespan event` |
+| `425d6b2` | `feat(ui): add 3D elements - perspective grid, spinning logo cube, tilt cards, 3D bar chart, flip counter` |
+| `30e4df3` | `fix(ui): add h-screen sticky to sidebar so theme toggle is always visible` |
+| `6f4b6be` | `feat(ui): premium category picker with inline creation, equal-height dashboard cards` |
+| `7f3729d` | `fix(ui): fix budget save button, add clear budget, fix double category on inline creation` |
+| `986de6a` | `feat: complete budget CRUD with delete endpoint, enable unrestricted category/payment-method editing and deletion` |
 
 ---
 
