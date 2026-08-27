@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp,
   Receipt,
@@ -16,8 +16,9 @@ import {
 import { useDashboard } from "../hooks/useDashboard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart } from "./BarChart";
+import { BarChart3D } from "./BarChart3D";
 import { TrendGraph } from "./TrendGraph";
+import { TiltCard } from "@/components/common/TiltCard";
 
 export default function DashboardView() {
   const [period, setPeriod] = useState<"current_month" | "last_30_days" | "current_week">("current_month");
@@ -98,102 +99,120 @@ export default function DashboardView() {
       {/* Top row cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Spent card */}
-        <Card variant="glass" className="relative overflow-hidden group">
-          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 h-24 w-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Total Spent
-            </CardTitle>
-            <TrendingDown className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="text-4xl font-extrabold tracking-tight">${total_spent}</div>
-            <p className="text-xs text-muted-foreground mt-2">
-              For the selected {period.replace("_", " ")}
-            </p>
-          </CardContent>
-        </Card>
+        <TiltCard>
+          <Card variant="glass" className="relative overflow-hidden group">
+            <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 h-24 w-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Total Spent
+              </CardTitle>
+              <TrendingDown className="h-4 w-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent className="pt-2">
+              {/* 3D flip-counter on value change */}
+              <div className="text-4xl font-extrabold tracking-tight overflow-hidden h-12 flex items-center">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={total_spent + period}
+                    initial={{ rotateX: -90, opacity: 0, y: 20 }}
+                    animate={{ rotateX: 0, opacity: 1, y: 0 }}
+                    exit={{ rotateX: 90, opacity: 0, y: -20 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    style={{ display: "inline-block", transformStyle: "preserve-3d" }}
+                  >
+                    ${total_spent}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                For the selected {period.replace("_", " ")}
+              </p>
+            </CardContent>
+          </Card>
+        </TiltCard>
 
         {/* Budget Status card */}
-        <Card
-          variant="glass"
-          className={`relative overflow-hidden ${
-            isOverBudget
-              ? "border-destructive/30 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
-              : isNearBudget
-              ? "border-amber-500/30"
-              : ""
-          }`}
-        >
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Monthly Budget
-            </CardTitle>
-            {limit === null ? (
-              <Percent className="h-4 w-4 text-muted-foreground" />
-            ) : isOverBudget ? (
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-            ) : (
-              <TrendingUp className="h-4 w-4 text-primary" />
-            )}
-          </CardHeader>
-          <CardContent className="pt-2">
-            {limit === null ? (
-              <div className="space-y-3">
-                <div className="text-lg font-bold text-muted-foreground">No budget set</div>
-                <Link href="/budget">
-                  <Button size="sm" variant="secondary" className="cursor-pointer">
-                    Set Budget
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-3xl font-extrabold tracking-tight">${spent.toFixed(2)}</span>
-                  <span className="text-sm text-muted-foreground">of ${limit.toFixed(2)} limit</span>
+        <TiltCard>
+          <Card
+            variant="glass"
+            className={`relative overflow-hidden ${
+              isOverBudget
+                ? "border-destructive/30 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                : isNearBudget
+                ? "border-amber-500/30"
+                : ""
+            }`}
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Monthly Budget
+              </CardTitle>
+              {limit === null ? (
+                <Percent className="h-4 w-4 text-muted-foreground" />
+              ) : isOverBudget ? (
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+              ) : (
+                <TrendingUp className="h-4 w-4 text-primary" />
+              )}
+            </CardHeader>
+            <CardContent className="pt-2">
+              {limit === null ? (
+                <div className="space-y-3">
+                  <div className="text-lg font-bold text-muted-foreground">No budget set</div>
+                  <Link href="/budget">
+                    <Button size="sm" variant="secondary" className="cursor-pointer">
+                      Set Budget
+                    </Button>
+                  </Link>
                 </div>
-                
-                {/* Progress bar */}
-                <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
-                  <motion.div
-                    className={`h-full rounded-full ${
-                      isOverBudget
-                        ? "bg-destructive"
-                        : isNearBudget
-                        ? "bg-amber-500"
-                        : "bg-emerald-500"
-                    }`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.6 }}
-                  />
-                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-3xl font-extrabold tracking-tight">${spent.toFixed(2)}</span>
+                    <span className="text-sm text-muted-foreground">of ${limit.toFixed(2)} limit</span>
+                  </div>
+                  
+                  {/* Progress bar */}
+                  <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full ${
+                        isOverBudget
+                          ? "bg-destructive"
+                          : isNearBudget
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.6 }}
+                    />
+                  </div>
 
-                <div className="flex items-center justify-between text-xs">
-                  <span
-                    className={
-                      isOverBudget
-                        ? "text-destructive font-semibold"
+                  <div className="flex items-center justify-between text-xs">
+                    <span
+                      className={
+                        isOverBudget
+                          ? "text-destructive font-semibold"
+                          : isNearBudget
+                          ? "text-amber-500 font-semibold"
+                          : "text-emerald-500 font-semibold"
+                      }
+                    >
+                      {isOverBudget
+                        ? `Budget Exceeded by $${(spent - limit).toFixed(2)}`
                         : isNearBudget
-                        ? "text-amber-500 font-semibold"
-                        : "text-emerald-500 font-semibold"
-                    }
-                  >
-                    {isOverBudget
-                      ? `Budget Exceeded by $${(spent - limit).toFixed(2)}`
-                      : isNearBudget
-                      ? `Approaching Limit (${pct.toFixed(0)}% spent)`
-                      : `On Track (${pct.toFixed(0)}% spent)`}
-                  </span>
-                  <span className="text-muted-foreground">
-                    ${(limit - spent > 0 ? limit - spent : 0).toFixed(2)} left
-                  </span>
+                        ? `Approaching Limit (${pct.toFixed(0)}% spent)`
+                        : `On Track (${pct.toFixed(0)}% spent)`}
+                    </span>
+                    <span className="text-muted-foreground">
+                      ${(limit - spent > 0 ? limit - spent : 0).toFixed(2)} left
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </TiltCard>
       </div>
 
       {/* Grid: Analytics Section (Trend Curve & Donut Chart) */}
@@ -212,7 +231,7 @@ export default function DashboardView() {
           </CardContent>
         </Card>
 
-        {/* Category Breakdown Bar Chart (1 column) */}
+        {/* Category Breakdown 3D Bar Chart (1 column) */}
         <Card variant="glass" className="lg:col-span-1">
           <CardHeader>
             <div className="flex items-center space-x-2">
@@ -222,7 +241,7 @@ export default function DashboardView() {
             <CardDescription>Breakdown by category totals</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarChart data={category_breakdown} />
+            <BarChart3D data={category_breakdown} />
           </CardContent>
         </Card>
       </div>

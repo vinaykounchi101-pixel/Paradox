@@ -8,6 +8,7 @@ import { LayoutDashboard, Receipt, Tags, PiggyBank, Wallet, Sun, Moon } from "lu
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useTheme } from "@/components/common/ThemeProvider";
+import { BackgroundGrid } from "@/components/common/BackgroundGrid";
 
 interface ShellProps {
   children: React.ReactNode;
@@ -25,13 +26,26 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+    <div className="relative min-h-screen bg-background flex flex-col md:flex-row">
+      {/* Animated 3D perspective grid background */}
+      <BackgroundGrid />
       {/* Desktop Sidebar Navigation */}
-      <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border p-6 flex-shrink-0">
-        {/* Brand/Logo */}
+      <aside className="relative z-10 hidden md:flex flex-col w-64 bg-card border-r border-border p-6 flex-shrink-0">
+        {/* Brand/Logo — 3D spinning cube */}
         <div className="flex items-center space-x-3 mb-8">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-            <Wallet className="h-5 w-5 text-primary-foreground" />
+          <div className="logo-cube-scene">
+            <div className="logo-cube">
+              <div className="logo-cube-face front">
+                <Wallet className="h-4 w-4 text-white" />
+              </div>
+              <div className="logo-cube-face back">
+                <span className="text-white text-xs font-black">P</span>
+              </div>
+              <div className="logo-cube-face right" />
+              <div className="logo-cube-face left" />
+              <div className="logo-cube-face top" />
+              <div className="logo-cube-face bottom" />
+            </div>
           </div>
           <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent">
             Paradox
@@ -118,7 +132,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 pb-20 md:pb-0 overflow-y-auto">
+      <main className="relative z-10 flex-1 flex flex-col min-w-0 pb-20 md:pb-0 overflow-y-auto">
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 8 }}
