@@ -10,6 +10,8 @@ Follow these rules :
 6. Ask for permission wherever required
 7. Before starting any work give me a call "Roger That" 
     and when the work is done give me call "Over n Out"
+8. Whenever i say "bye" you have to commit and push everything and update progress file and technical file 
+    and also store everything from that session to your own repo memory and after its done say "Signing off".
 
 ## Additional Project Rules
 

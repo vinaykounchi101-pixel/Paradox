@@ -1,6 +1,6 @@
 # Progress & Technical Architecture Report: Paradox Project
 
-This document provides a comprehensive summary of all architectural implementations, feature additions, database migrations, Progressive Web App (PWA) configurations, testing results, and deployment states for **Paradox Phase 1 MVP**.
+This document provides a comprehensive summary of all architectural implementations, feature additions, database migrations, Progressive Web App (PWA) configurations, testing suites, Postman API collections, and deployment states for **Paradox Phase 1 MVP**.
 
 ---
 
@@ -9,7 +9,7 @@ This document provides a comprehensive summary of all architectural implementati
 - **Zero Inline Hardcoding**: All configurations, URLs, categories, budgets, and tokens are dynamically managed or environment-driven.
 - **Secrets & Environment Isolation**: `.env` and `.env.local` are strictly ignored by Git and never committed or directly accessed by tools.
 - **Precision Monetary Values**: Uses fixed-precision `Numeric(12, 2)` (Python `Decimal`) with database `CHECK (amount > 0)` and `CHECK (amount >= 0)` constraints.
-- **Communication Conventions**: Follows pair-programming callout rules (`"Roger That"` before starting work, `"Over n Out"` upon completion).
+- **Communication Conventions**: Follows pair-programming callout rules (`"Roger That"` before starting work, `"Over n Out"` upon completion, and `"Signing off"` upon session closure).
 
 ---
 
@@ -53,7 +53,10 @@ Paradox/
 │   │   ├── lib/api/             # Typed API client services
 │   │   └── styles/              # Global CSS & Design System tokens
 │   └── vercel.json              # Vercel deployment framework configuration
-└── docs/                        # PRD, SRS, and Design System specifications
+├── docs/                        # PRD, SRS, Design System, and POSTMAN_TESTING_GUIDE.md
+├── Paradox.postman_collection.json # Full Postman collection (v2.1.0) with automated variable chaining
+├── Paradox.postman_environment.json # Postman local environment configuration
+└── Paradox.postman_production_environment.json # Postman production/Render environment configuration
 ```
 
 ---
@@ -77,7 +80,7 @@ Paradox/
 - **Budgeting Granularities**:
   - **Monthly**: Target identified by `YYYY-MM` (e.g. `2026-08`).
   - **Weekly**: Target identified by ISO week `YYYY-Www` (e.g. `2026-W35`).
-  - **Daily**: Target identified by date `YYYY-MM-DD` (e.g. `2026-08-27`).
+  - **Daily**: Target identified by date `YYYY-MM-DD` (e.g. `2026-08-28`).
 - **REST Endpoints**:
   - `GET /api/v1/budget?period_type=...&period_key=...`
   - `GET /api/v1/budget/all?period_type=...`
@@ -119,7 +122,15 @@ Paradox/
 
 ---
 
-## 7. Automated Testing & Verification
+## 7. API Testing & Postman Test Suites
+- **Postman Collection (v2.1.0)**: `Paradox.postman_collection.json`
+  - 100% endpoint coverage across 6 modules: `health`, `dashboard`, `categories`, `payment-methods`, `expenses`, `budget`.
+  - Built-in dynamic ID capture scripts for automated execution chaining.
+- **Postman Environments**:
+  - `Paradox.postman_environment.json`: Local backend (`http://localhost:8000`).
+  - `Paradox.postman_production_environment.json`: Live Render service (`https://paradox-api.onrender.com`).
+- **Documentation**: `docs/POSTMAN_TESTING_GUIDE.md`
+  - Step-by-step import instructions, testing workflow, Newman CLI instructions, and HTTP status code reference.
 - **Backend Tests (`pytest`)**:
   - `tests/unit/test_budget_granularity.py`: Passed (100% assertions for month, week, day schemas, validation, and serializers).
   - `tests/unit/test_budget_status.py`: Passed (Budget threshold math & warning ranges).
@@ -127,7 +138,6 @@ Paradox/
   - **Result**: `3 passed in 0.76s`.
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors.
-  - All routes (`/`, `/dashboard`, `/expenses`, `/categories`, `/budget`, `/manifest.webmanifest`) generated cleanly.
 
 ---
 
@@ -139,5 +149,8 @@ Paradox/
 ---
 
 ## 9. Next Session Handoff Notes
-- All requested features (3D elements, unrestricted categories, multi-granularity budgets, PWA, and hamburger menu navigation) are fully implemented, tested, and pushed to production.
-- For local testing: Run backend with `.venv\Scripts\uvicorn app.main:app` and frontend with `npm run dev`.
+- All requested features (3D elements, unrestricted categories, multi-granularity budgets, PWA, hamburger menu navigation, and full Postman testing suite) are fully implemented and verified.
+- For local testing:
+  - Backend: Run `.venv\Scripts\uvicorn app.main:app --port 8000` from `backend/`.
+  - Frontend: Run `npm run dev` from `frontend/`.
+  - Postman CLI: Run `npx newman run Paradox.postman_collection.json -e Paradox.postman_environment.json`.

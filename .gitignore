@@ -8,3 +8,9 @@ Thumbs.db
 *.njsproj
 *.sln
 *.swp
+
+# Environment secrets
+.env
+.env.local
+.env.*.local
+

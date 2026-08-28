@@ -1,0 +1,932 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+		"name": "Paradox API Collection",
+		"description": "Comprehensive Postman collection for testing the Paradox Personal Expense Tracker REST API (FastAPI backend).\n\n### Usage\n1. Import this collection into Postman.\n2. Ensure the `baseUrl` variable is set to your running backend (defaults to `http://localhost:8000`).\n3. Dynamic variables (`expenseId`, `customCategoryId`, `customPaymentMethodId`) will be automatically populated by test scripts upon creating items.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health & Diagnostics",
+			"item": [
+				{
+					"name": "Health Check (DB Connectivity)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"health"
+							]
+						},
+						"description": "Checks the liveness of the service and confirms database connectivity (SELECT 1)."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Dashboard & Analytics",
+			"item": [
+				{
+					"name": "Get Dashboard (Current Month)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/dashboard?period=current_month",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"dashboard"
+							],
+							"query": [
+								{
+									"key": "period",
+									"value": "current_month",
+									"description": "Granularity: current_month, last_30_days, current_week"
+								}
+							]
+						},
+						"description": "Aggregated stats including total spending, budget status, category breakdown, top categories, 6-period trend, and recent transactions."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Dashboard (Current Week)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/dashboard?period=current_week",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"dashboard"
+							],
+							"query": [
+								{
+									"key": "period",
+									"value": "current_week"
+								}
+							]
+						},
+						"description": "Weekly aggregated dashboard statistics."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Dashboard (Last 30 Days)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/dashboard?period=last_30_days",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"dashboard"
+							],
+							"query": [
+								{
+									"key": "period",
+									"value": "last_30_days"
+								}
+							]
+						},
+						"description": "Rolling 30-day dashboard summary."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Categories",
+			"item": [
+				{
+					"name": "List All Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/categories",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories"
+							]
+						},
+						"description": "Retrieves all categories (system starter defaults and custom user-created categories)."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Custom Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.id) {",
+									"        pm.collectionVariables.set('customCategoryId', jsonData.data.id);",
+									"        pm.collectionVariables.set('categoryId', jsonData.data.id);",
+									"        console.log('Saved customCategoryId:', jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Travel & Leisure\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/categories",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories"
+							]
+						},
+						"description": "Creates a new custom category. The generated ID is automatically stored in `customCategoryId`."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Category by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories",
+								"{{categoryId}}"
+							]
+						},
+						"description": "Retrieves details of a specific category."
+					},
+					"response": []
+				},
+				{
+					"name": "Rename Category",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Travel, Flights & Leisure\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories",
+								"{{categoryId}}"
+							]
+						},
+						"description": "Renames a category by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Custom Category",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/categories/{{customCategoryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"categories",
+								"{{customCategoryId}}"
+							]
+						},
+						"description": "Deletes a custom category. Referencing expenses are automatically and atomically reassigned to 'Uncategorized'."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. Payment Methods",
+			"item": [
+				{
+					"name": "List All Payment Methods",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payment-methods",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"payment-methods"
+							]
+						},
+						"description": "Lists all payment methods (Cash, Credit Card, Debit Card, etc.)."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Custom Payment Method",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.id) {",
+									"        pm.collectionVariables.set('customPaymentMethodId', jsonData.data.id);",
+									"        pm.collectionVariables.set('paymentMethodId', jsonData.data.id);",
+									"        console.log('Saved customPaymentMethodId:', jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Crypto Wallet\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payment-methods",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"payment-methods"
+							]
+						},
+						"description": "Creates a new custom payment method. The generated ID is automatically saved in `customPaymentMethodId`."
+					},
+					"response": []
+				},
+				{
+					"name": "Rename Payment Method",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Crypto / Web3 Wallet\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payment-methods/{{paymentMethodId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"payment-methods",
+								"{{paymentMethodId}}"
+							]
+						},
+						"description": "Renames a payment method."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Custom Payment Method",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payment-methods/{{customPaymentMethodId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"payment-methods",
+								"{{customPaymentMethodId}}"
+							]
+						},
+						"description": "Deletes a custom payment method. Referencing expenses are automatically reassigned to 'Other'."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "5. Expenses",
+			"item": [
+				{
+					"name": "Create Expense",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.id) {",
+									"        pm.collectionVariables.set('expenseId', jsonData.data.id);",
+									"        console.log('Saved expenseId:', jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 42.50,\n    \"category_id\": \"{{categoryId}}\",\n    \"payment_method_id\": \"{{paymentMethodId}}\",\n    \"date\": \"2026-08-28\",\n    \"description\": \"Team lunch at gourmet cafe\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/expenses",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"expenses"
+							]
+						},
+						"description": "Logs a new expense transaction. Captured ID is automatically stored in `expenseId`."
+					},
+					"response": []
+				},
+				{
+					"name": "List Expenses (Paginated & Sorted)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/expenses?page=1&page_size=20&sort_by=date&sort_order=desc",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"expenses"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "20"
+								},
+								{
+									"key": "sort_by",
+									"value": "date",
+									"description": "date | amount | category"
+								},
+								{
+									"key": "sort_order",
+									"value": "desc",
+									"description": "asc | desc"
+								}
+							]
+						},
+						"description": "Paginated list of all expense records."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Expenses (Free Text)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/expenses?search=lunch&page=1&page_size=20",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"expenses"
+							],
+							"query": [
+								{
+									"key": "search",
+									"value": "lunch"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Searches expenses by description substring."
+					},
+					"response": []
+				},
+				{
+					"name": "Filter Expenses by Category",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/expenses?category_id={{categoryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"expenses"
+							],
+							"query": [
+								{
+									"key": "category_id",
+									"value": "{{categoryId}}"
+								}
+							]
+						},
+						"description": "Single-dimension category filtering."
+					},
+					"response": []
+				},
+				{
+					"name": "Filter Expenses by Date Range",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/expenses?date_from=2026-08-01&date_to=2026-08-31",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"expenses"
+							],
+							"query": [
+								{
+									"key": "date_from",
+									"value": "2026-08-01"
+								},
+								{
+									"key": "date_to",
+									"value": "2026-08-31"
+								}
+							]
+						},
+						"description": "Single-dimension date range filtering."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Single Expense",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"expenses",
+								"{{expenseId}}"
+							]
+						},
+						"description": "Retrieves details of a single expense by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Expense (Partial PATCH)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 49.99,\n    \"description\": \"Team lunch at gourmet cafe + dessert\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"expenses",
+								"{{expenseId}}"
+							]
+						},
+						"description": "Partially updates an expense record."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Expense",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"expenses",
+								"{{expenseId}}"
+							]
+						},
+						"description": "Deletes an expense transaction."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "6. Budget Planning (Multi-Granularity)",
+			"item": [
+				{
+					"name": "Get Monthly Budget",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget?period_type=month&period_key=2026-08",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget"
+							],
+							"query": [
+								{
+									"key": "period_type",
+									"value": "month"
+								},
+								{
+									"key": "period_key",
+									"value": "2026-08"
+								}
+							]
+						},
+						"description": "Retrieves monthly budget target."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Weekly Budget",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget?period_type=week&period_key=2026-W35",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget"
+							],
+							"query": [
+								{
+									"key": "period_type",
+									"value": "week"
+								},
+								{
+									"key": "period_key",
+									"value": "2026-W35"
+								}
+							]
+						},
+						"description": "Retrieves weekly budget target."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Daily Budget",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget?period_type=day&period_key=2026-08-28",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget"
+							],
+							"query": [
+								{
+									"key": "period_type",
+									"value": "day"
+								},
+								{
+									"key": "period_key",
+									"value": "2026-08-28"
+								}
+							]
+						},
+						"description": "Retrieves daily budget target."
+					},
+					"response": []
+				},
+				{
+					"name": "List All Configured Budgets",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget/all",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget",
+								"all"
+							]
+						},
+						"description": "Retrieves all saved budget records across all granularities."
+					},
+					"response": []
+				},
+				{
+					"name": "List Budgets Filtered by Granularity",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget/all?period_type=month",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget",
+								"all"
+							],
+							"query": [
+								{
+									"key": "period_type",
+									"value": "month",
+									"description": "month | week | day"
+								}
+							]
+						},
+						"description": "Lists budgets filtered specifically by month, week, or day."
+					},
+					"response": []
+				},
+				{
+					"name": "Upsert Monthly Budget",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 3500.00,\n    \"period_type\": \"month\",\n    \"period_key\": \"2026-08\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget"
+							]
+						},
+						"description": "Sets or updates the monthly budget."
+					},
+					"response": []
+				},
+				{
+					"name": "Upsert Weekly Budget",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 800.00,\n    \"period_type\": \"week\",\n    \"period_key\": \"2026-W35\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget"
+							]
+						},
+						"description": "Sets or updates the weekly budget."
+					},
+					"response": []
+				},
+				{
+					"name": "Upsert Daily Budget",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 120.00,\n    \"period_type\": \"day\",\n    \"period_key\": \"2026-08-28\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget"
+							]
+						},
+						"description": "Sets or updates the daily budget."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Budget",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/budget?period_type=month&period_key=2026-08",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"budget"
+							],
+							"query": [
+								{
+									"key": "period_type",
+									"value": "month"
+								},
+								{
+									"key": "period_key",
+									"value": "2026-08"
+								}
+							]
+						},
+						"description": "Removes a configured budget limit."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "categoryId",
+			"value": "11111111-1111-1111-1111-111111111111",
+			"type": "string"
+		},
+		{
+			"key": "paymentMethodId",
+			"value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+			"type": "string"
+		},
+		{
+			"key": "expenseId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "customCategoryId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "customPaymentMethodId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
