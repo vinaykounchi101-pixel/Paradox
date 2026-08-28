@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
 		"name": "Paradox API Collection",
-		"description": "Comprehensive Postman collection for testing the Paradox Personal Expense Tracker REST API (FastAPI backend).\n\n### Usage\n1. Import this collection into Postman.\n2. Ensure the `baseUrl` variable is set to your running backend (defaults to `http://localhost:8000`).\n3. Dynamic variables (`expenseId`, `customCategoryId`, `customPaymentMethodId`) will be automatically populated by test scripts upon creating items.",
+		"description": "Comprehensive Postman collection for testing the Paradox Personal Expense Tracker REST API (FastAPI backend).\n\n### Automated Variable Chaining & Assertions\n- Supports both standalone runs and 1-Click Collection Runner execution.\n- Automatically captures and chains dynamic IDs (`expenseId`, `customCategoryId`, `customPaymentMethodId`).\n- Includes built-in assertions on status codes and response schemas.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -11,6 +11,24 @@
 			"item": [
 				{
 					"name": "Health Check (DB Connectivity)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test('Database connectivity is healthy', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.status).to.eql('ok');",
+									"    pm.expect(json.database).to.eql('connected');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -36,6 +54,27 @@
 			"item": [
 				{
 					"name": "Get Dashboard (Current Month)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test('Dashboard contains required analytics fields', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.data).to.have.property('period');",
+									"    pm.expect(json.data).to.have.property('total_spent');",
+									"    pm.expect(json.data).to.have.property('budget');",
+									"    pm.expect(json.data).to.have.property('category_breakdown');",
+									"    pm.expect(json.data).to.have.property('trend');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -63,6 +102,19 @@
 				},
 				{
 					"name": "Get Dashboard (Current Week)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -89,6 +141,19 @@
 				},
 				{
 					"name": "Get Dashboard (Last 30 Days)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -120,6 +185,27 @@
 			"item": [
 				{
 					"name": "List All Categories",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test('Categories list returned as array', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(Array.isArray(json.data)).to.be.true;",
+									"    if (json.data.length > 0) {",
+									"        pm.collectionVariables.set('categoryId', json.data[0].id);",
+									"        pm.environment.set('categoryId', json.data[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -145,13 +231,15 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"if (pm.response.code === 201) {",
-									"    var jsonData = pm.response.json();",
-									"    if (jsonData.data && jsonData.data.id) {",
-									"        pm.collectionVariables.set('customCategoryId', jsonData.data.id);",
-									"        pm.collectionVariables.set('categoryId', jsonData.data.id);",
-									"        console.log('Saved customCategoryId:', jsonData.data.id);",
-									"    }",
+									"pm.test('Status code is 201 Created or 200 OK', function () {",
+									"    pm.expect([200, 201]).to.include(pm.response.code);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.id) {",
+									"    pm.collectionVariables.set('customCategoryId', jsonData.data.id);",
+									"    pm.collectionVariables.set('categoryId', jsonData.data.id);",
+									"    pm.environment.set('customCategoryId', jsonData.data.id);",
+									"    pm.environment.set('categoryId', jsonData.data.id);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -168,7 +256,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Travel & Leisure\"\n}"
+							"raw": "{\n    \"name\": \"Travel & Leisure {{$randomInt}}\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/categories",
@@ -187,6 +275,19 @@
 				},
 				{
 					"name": "Get Category by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -208,6 +309,19 @@
 				},
 				{
 					"name": "Rename Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "PATCH",
 						"header": [
@@ -218,7 +332,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Travel, Flights & Leisure\"\n}"
+							"raw": "{\n    \"name\": \"Holiday & Fun {{$randomInt}}\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
@@ -238,6 +352,19 @@
 				},
 				{
 					"name": "Delete Custom Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 204 No Content', function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "DELETE",
 						"header": [],
@@ -264,6 +391,27 @@
 			"item": [
 				{
 					"name": "List All Payment Methods",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test('Payment methods list returned', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(Array.isArray(json.data)).to.be.true;",
+									"    if (json.data.length > 0) {",
+									"        pm.collectionVariables.set('paymentMethodId', json.data[0].id);",
+									"        pm.environment.set('paymentMethodId', json.data[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -289,13 +437,15 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"if (pm.response.code === 201) {",
-									"    var jsonData = pm.response.json();",
-									"    if (jsonData.data && jsonData.data.id) {",
-									"        pm.collectionVariables.set('customPaymentMethodId', jsonData.data.id);",
-									"        pm.collectionVariables.set('paymentMethodId', jsonData.data.id);",
-									"        console.log('Saved customPaymentMethodId:', jsonData.data.id);",
-									"    }",
+									"pm.test('Status code is 201 Created or 200 OK', function () {",
+									"    pm.expect([200, 201]).to.include(pm.response.code);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.id) {",
+									"    pm.collectionVariables.set('customPaymentMethodId', jsonData.data.id);",
+									"    pm.collectionVariables.set('paymentMethodId', jsonData.data.id);",
+									"    pm.environment.set('customPaymentMethodId', jsonData.data.id);",
+									"    pm.environment.set('paymentMethodId', jsonData.data.id);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -312,7 +462,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Crypto Wallet\"\n}"
+							"raw": "{\n    \"name\": \"Crypto Wallet {{$randomInt}}\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/payment-methods",
@@ -331,6 +481,19 @@
 				},
 				{
 					"name": "Rename Payment Method",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "PATCH",
 						"header": [
@@ -341,7 +504,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Crypto / Web3 Wallet\"\n}"
+							"raw": "{\n    \"name\": \"Web3 Wallet {{$randomInt}}\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/payment-methods/{{paymentMethodId}}",
@@ -361,6 +524,19 @@
 				},
 				{
 					"name": "Delete Custom Payment Method",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 204 No Content', function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "DELETE",
 						"header": [],
@@ -392,12 +568,13 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"if (pm.response.code === 201) {",
-									"    var jsonData = pm.response.json();",
-									"    if (jsonData.data && jsonData.data.id) {",
-									"        pm.collectionVariables.set('expenseId', jsonData.data.id);",
-									"        console.log('Saved expenseId:', jsonData.data.id);",
-									"    }",
+									"pm.test('Status code is 201 Created', function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.id) {",
+									"    pm.collectionVariables.set('expenseId', jsonData.data.id);",
+									"    pm.environment.set('expenseId', jsonData.data.id);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -414,7 +591,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"amount\": 42.50,\n    \"category_id\": \"{{categoryId}}\",\n    \"payment_method_id\": \"{{paymentMethodId}}\",\n    \"date\": \"2026-08-28\",\n    \"description\": \"Team lunch at gourmet cafe\"\n}"
+							"raw": "{\n    \"amount\": 42.50,\n    \"category_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"payment_method_id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n    \"date\": \"2026-08-28\",\n    \"description\": \"Team lunch at gourmet cafe\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/expenses",
@@ -433,6 +610,25 @@
 				},
 				{
 					"name": "List Expenses (Paginated & Sorted)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test('Pagination metadata present', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property('meta');",
+									"    pm.expect(json.meta).to.have.property('page');",
+									"    pm.expect(json.meta).to.have.property('total_items');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -473,6 +669,19 @@
 				},
 				{
 					"name": "Search Expenses (Free Text)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -507,11 +716,24 @@
 				},
 				{
 					"name": "Filter Expenses by Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/expenses?category_id={{categoryId}}",
+							"raw": "{{baseUrl}}/api/v1/expenses?category_id=11111111-1111-1111-1111-111111111111",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -523,7 +745,7 @@
 							"query": [
 								{
 									"key": "category_id",
-									"value": "{{categoryId}}"
+									"value": "11111111-1111-1111-1111-111111111111"
 								}
 							]
 						},
@@ -533,6 +755,19 @@
 				},
 				{
 					"name": "Filter Expenses by Date Range",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -563,6 +798,19 @@
 				},
 				{
 					"name": "Get Single Expense",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -584,6 +832,19 @@
 				},
 				{
 					"name": "Update Expense (Partial PATCH)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "PATCH",
 						"header": [
@@ -614,6 +875,19 @@
 				},
 				{
 					"name": "Delete Expense",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 204 No Content', function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "DELETE",
 						"header": [],
@@ -640,6 +914,19 @@
 			"item": [
 				{
 					"name": "Get Monthly Budget",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -670,6 +957,19 @@
 				},
 				{
 					"name": "Get Weekly Budget",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -700,6 +1000,19 @@
 				},
 				{
 					"name": "Get Daily Budget",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -730,6 +1043,19 @@
 				},
 				{
 					"name": "List All Configured Budgets",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -751,6 +1077,19 @@
 				},
 				{
 					"name": "List Budgets Filtered by Granularity",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -779,6 +1118,19 @@
 				},
 				{
 					"name": "Upsert Monthly Budget",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "PUT",
 						"header": [
@@ -808,6 +1160,19 @@
 				},
 				{
 					"name": "Upsert Weekly Budget",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "PUT",
 						"header": [
@@ -837,6 +1202,19 @@
 				},
 				{
 					"name": "Upsert Daily Budget",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "PUT",
 						"header": [
@@ -866,6 +1244,19 @@
 				},
 				{
 					"name": "Delete Budget",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 204 No Content', function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "DELETE",
 						"header": [],
