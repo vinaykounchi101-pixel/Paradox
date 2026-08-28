@@ -1,6 +1,6 @@
 # Progress & Technical Architecture Report: Paradox Project
 
-This document provides a comprehensive summary of all architectural implementations, feature additions, database migrations, Progressive Web App (PWA) configurations, testing suites, Postman API collections, and deployment states for **Paradox Phase 1 MVP**.
+This document provides a comprehensive summary of all architectural implementations, feature additions, database migrations, Progressive Web App (PWA) configurations, testing suites, Postman API collections, UI enhancements, and deployment states for **Paradox Phase 1 MVP**.
 
 ---
 
@@ -44,13 +44,13 @@ Paradox/
 │   │   ├── components/
 │   │   │   ├── common/          # PwaRegister, BackgroundGrid, ThemeProvider, QueryProvider
 │   │   │   ├── layout/          # Shell navigation with Hamburger Drawer & Topbar
-│   │   │   └── ui/              # Button, Card, TiltCard, Dialog, Toast, CategoryPicker, BarChart3D
+│   │   │   └── ui/              # Button, Card, TiltCard, Dialog, Toast, CategoryPicker, PaymentMethodDropdown, BarChart3D
 │   │   ├── features/            # Feature-scoped hooks, components, and views
 │   │   │   ├── dashboard/
 │   │   │   ├── expenses/
 │   │   │   ├── categories/
 │   │   │   └── budget/
-│   │   ├── lib/api/             # Typed API client services
+│   │   ├── lib/api/             # Typed API client services (with precise error extraction)
 │   │   └── styles/              # Global CSS & Design System tokens
 │   └── vercel.json              # Vercel deployment framework configuration
 ├── docs/                        # PRD, SRS, Design System, and POSTMAN_TESTING_GUIDE.md
@@ -94,31 +94,27 @@ Paradox/
 
 ---
 
-## 5. Progressive Web App (PWA) Implementation
-- **Manifest (`public/manifest.json` & `app/manifest.ts`)**:
-  - Configured with `display: "standalone"`, `start_url: "/"`, theme `#6366f1`, and background `#09090b`.
-- **App Icons**:
-  - High-resolution SVG icons: `icon-192.svg`, `icon-512.svg`, and `icon-maskable.svg`.
-- **Service Worker (`public/sw.js`)**:
-  - Network-first caching strategy for navigation and HTML documents to eliminate `ERR_FAILED` or stale-cache locks.
-  - Cache-first strategy for static image assets and icons.
-  - Excludes API requests (`/api/*`) and Next.js internal data (`/_next/data/*`).
-- **PWA Auto-Registration (`PwaRegister.tsx`)**:
-  - Checks for HTTPS and browser capability on window load, handling update lifecycles automatically.
+## 5. UI, PWA & Component Upgrades
+- **Progressive Web App (PWA)**:
+  - Configured with `display: "standalone"`, `start_url: "/"`, theme `#6366f1`, background `#09090b`.
+  - Resilient network-first Service Worker ([`sw.js`](file:///E:/Projects/Paradox/frontend/public/sw.js)) & auto-registration.
+- **Hamburger Navigation Drawer**:
+  - Backdrop blur overlay, smooth Framer Motion spring slide-in panel, theme toggle, and 3D rotating Paradox cube.
+- **Custom Payment Method Dropdown (`PaymentMethodDropdown.tsx`)**:
+  - Animated dropdown menu with context-aware icons (Cash, Credit/Debit Card, Bank Transfer, Digital/Crypto Wallet, UPI/Mobile).
+  - Clean active checkmark indicators and outside-click dismissal.
+- **Smart Modal State Sync & Fallback**:
+  - Safely falls back to valid default categories/payment methods if an edited expense references a previously deleted custom entity.
 
 ---
 
-## 6. UI & Navigation (Hamburger Drawer Layout)
-- **Top Navigation Bar**:
-  - Sticky glass header with 3D perspective animated grid background.
-  - Rotating 3D Paradox logo cube + gradient title.
-  - Animated Hamburger Menu toggle (`Menu` ➔ `X`).
-  - Dark / Light mode toggle and session avatar.
-- **Slide-Out Hamburger Drawer**:
-  - Full backdrop blur overlay (`backdrop-blur-sm bg-black/60`).
-  - Smooth Framer Motion spring slide-in panel.
-  - Direct navigation links with icons, descriptions, and active spring highlight indicators.
-  - Dark/Light mode switcher and Live PWA online status badge.
+## 6. Backend Fixes & Schema Integrity
+- **Pydantic Schema Scope Shadowing Fix (`ExpenseUpdate`)**:
+  - Aliased `from datetime import date as date_type` in `backend/app/schemas/expense.py` to prevent the field name `date` from shadowing the Python type annotation, resolving `Input should be None` validation errors during expense editing.
+- **Async SQLAlchemy Model Refresh Fix**:
+  - Added explicit `await self.db.refresh(instance)` and `execution_options(populate_existing=True)` across `ExpenseRepository`, `CategoryRepository`, `PaymentMethodRepository`, and `BudgetRepository` to eliminate lazy-loading `MissingGreenlet` exceptions during serialization of `updated_at`.
+- **API Error Unpacking (`client.ts`)**:
+  - Enhanced frontend API client to unpack `errorJson.error.message` and field validation arrays for accurate toast feedback.
 
 ---
 
@@ -126,18 +122,15 @@ Paradox/
 - **Postman Collection (v2.1.0)**: `Paradox.postman_collection.json`
   - 100% endpoint coverage across 6 modules: `health`, `dashboard`, `categories`, `payment-methods`, `expenses`, `budget`.
   - Built-in dynamic ID capture scripts for automated execution chaining.
-- **Async SQLAlchemy Model Refresh Fix**:
-  - Applied explicit `await self.db.refresh(instance)` across `CategoryRepository`, `PaymentMethodRepository`, and `BudgetRepository` to eliminate lazy-loading `MissingGreenlet` exceptions during serialization of `updated_at`.
-- **Postman Environments**:
-  - `Paradox.postman_environment.json`: Local backend (`http://localhost:8000`).
-  - `Paradox.postman_production_environment.json`: Live Render service (`https://paradox-api.onrender.com`).
-- **Documentation**: `docs/POSTMAN_TESTING_GUIDE.md`
-  - Step-by-step import instructions, testing workflow, Newman CLI instructions, and HTTP status code reference.
+  - Dynamic `{{$randomInt}}` naming to eliminate duplicate name conflicts (`409`).
+  - 35 automated assertion scripts (`pm.test`).
+- **Newman CLI Verification**:
+  - **Result**: `30 requests executed, 35 assertions passed, 0 failed, 0 errors in 2.3s` (100% green).
 - **Backend Tests (`pytest`)**:
-  - `tests/unit/test_budget_granularity.py`: Passed (100% assertions for month, week, day schemas, validation, and serializers).
-  - `tests/unit/test_budget_status.py`: Passed (Budget threshold math & warning ranges).
-  - `tests/unit/test_money.py`: Passed (Decimal precision verification).
-  - **Result**: `3 passed in 0.51s`.
+  - `tests/unit/test_budget_granularity.py`: Passed.
+  - `tests/unit/test_budget_status.py`: Passed.
+  - `tests/unit/test_money.py`: Passed.
+  - **Result**: `3 passed in 0.56s`.
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors.
 
@@ -146,13 +139,12 @@ Paradox/
 ## 8. Deployment Information
 - **Live Frontend**: [https://paradox-neon.vercel.app/](https://paradox-neon.vercel.app/)
 - **Live Backend**: Render Web Service connected to Supabase PostgreSQL.
-- **Latest Commit Pushed**: `cfe61d5` (All features, tests, migrations, PWA assets, and Postman suites synchronized with `origin/main`).
 
 ---
 
 ## 9. Next Session Handoff Notes
-- All requested features (3D elements, unrestricted categories, multi-granularity budgets, PWA, hamburger navigation, Postman suites, and repository model refresh fixes) are fully implemented and verified.
+- All requested features, Postman suites, repository model refresh fixes, ExpenseUpdate schema fixes, and the custom PaymentMethodDropdown component are fully implemented, verified, and pushed.
 - For local testing:
   - Backend: Run `.venv\Scripts\uvicorn app.main:app --port 8000` from `backend/`.
   - Frontend: Run `npm run dev` from `frontend/`.
-  - Postman CLI: Run `npx newman run Paradox.postman_collection.json -e Paradox.postman_environment.json`.
+  - Postman: Open Collection Runner and execute `Paradox API Collection` (or `npx newman run Paradox.postman_collection.json -e Paradox.postman_environment.json`).

@@ -22,6 +22,7 @@ class ExpenseRepository:
                 selectinload(Expense.category),
                 selectinload(Expense.payment_method)
             )
+            .execution_options(populate_existing=True)
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -29,12 +30,13 @@ class ExpenseRepository:
     async def create(self, expense: Expense) -> Expense:
         self.db.add(expense)
         await self.db.flush()
-        # Refresh to load relationships
+        await self.db.refresh(expense)
         return await self.get_by_id(expense.id)
 
     async def update(self, expense: Expense) -> Expense:
         self.db.add(expense)
         await self.db.flush()
+        await self.db.refresh(expense)
         return await self.get_by_id(expense.id)
 
     async def delete(self, expense: Expense) -> None:

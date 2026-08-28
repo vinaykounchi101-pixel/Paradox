@@ -1,6 +1,6 @@
 import uuid
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import date as date_type, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
@@ -13,7 +13,7 @@ class ExpenseBase(BaseModel):
     amount: Decimal = Field(..., gt=0, max_digits=12, decimal_places=2)
     category_id: uuid.UUID
     payment_method_id: uuid.UUID
-    date: date
+    date: date_type
     description: Optional[str] = Field(None, max_length=255)
 
     @field_validator("description")
@@ -32,7 +32,7 @@ class ExpenseUpdate(BaseModel):
     amount: Optional[Decimal] = Field(None, gt=0, max_digits=12, decimal_places=2)
     category_id: Optional[uuid.UUID] = None
     payment_method_id: Optional[uuid.UUID] = None
-    date: Optional[date] = None
+    date: Optional[date_type] = None
     description: Optional[str] = Field(None, max_length=255)
 
     @field_validator("description")

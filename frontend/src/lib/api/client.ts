@@ -40,8 +40,14 @@ async function request<T>(
 
     try {
       const errorJson = await response.json();
-      errorMessage = errorJson.message || errorJson.detail || errorMessage;
-      if (Array.isArray(errorJson.details)) {
+      errorMessage =
+        errorJson.error?.message ||
+        errorJson.message ||
+        errorJson.detail ||
+        errorMessage;
+      if (Array.isArray(errorJson.error?.details)) {
+        errorDetails = errorJson.error.details;
+      } else if (Array.isArray(errorJson.details)) {
         errorDetails = errorJson.details;
       } else if (Array.isArray(errorJson.detail)) {
         errorDetails = errorJson.detail;

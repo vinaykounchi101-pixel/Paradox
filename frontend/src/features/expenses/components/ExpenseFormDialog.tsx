@@ -9,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { PaymentMethodDropdown } from "@/components/ui/PaymentMethodDropdown";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
 import { useToast } from "@/components/ui/toast";
 import { ExpenseRead } from "@/lib/api/expenses";
@@ -43,19 +44,25 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
 
   const [errors, setErrors] = useState<Partial<Record<keyof ExpenseFormValues, string>>>({});
 
-  // Initialise localCategories when the dialog opens, then manage locally.
-  // Do NOT sync on every categories change — that causes duplicates when a
-  // newly-created category triggers a cache invalidation refetch.
+  // Synchronize form fields whenever modal opens or selected expense changes
   useEffect(() => {
     if (isOpen) {
-      // Reset local categories to server list on open
       setLocalCategories(categories);
 
       if (expense) {
-        setAmount(expense.amount);
-        setCategoryId(expense.category_id);
-        setPaymentMethodId(expense.payment_method_id);
-        setDate(expense.date);
+        setAmount(String(expense.amount));
+
+        // Ensure category exists in current categories list, else fallback to valid default
+        const validCat = categories.find((c) => c.id === expense.category_id);
+        const defaultCat = categories.find((c) => c.is_default) || categories[0];
+        setCategoryId(validCat ? validCat.id : defaultCat?.id || "");
+
+        // Ensure payment method exists in current paymentMethods list, else fallback to valid default
+        const validPm = paymentMethods.find((p) => p.id === expense.payment_method_id);
+        const defaultPm = paymentMethods.find((p) => p.is_default) || paymentMethods[0];
+        setPaymentMethodId(validPm ? validPm.id : defaultPm?.id || "");
+
+        setDate(expense.date ? expense.date.split("T")[0] : "");
         setDescription(expense.description || "");
       } else {
         setAmount("");
@@ -68,14 +75,12 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
       }
       setErrors({});
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); // intentionally only on open — not on categories change
+  }, [isOpen, expense, categories, paymentMethods]);
 
   // Called by CategoryPicker when user creates a new category inline
   const handleCreateCategory = async (name: string): Promise<CategoryRead> => {
     const response = await createCategory({ name });
     const created: CategoryRead = response.data;
-    // Optimistically add to local list so the picker shows it immediately
     setLocalCategories((prev) => [...prev, created]);
     return created;
   };
@@ -174,26 +179,15 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
           error={errors.category_id}
         />
 
-        {/* Payment Method selector */}
-        <Select
+        {/* Payment Method Custom Animated Dropdown Menu */}
+        <PaymentMethodDropdown
           label="Payment Method"
+          paymentMethods={paymentMethods}
           value={paymentMethodId}
-          onChange={(e) => setPaymentMethodId(e.target.value)}
+          onChange={setPaymentMethodId}
+          isLoading={loadingPms}
           error={errors.payment_method_id}
-          required
-        >
-          {loadingPms ? (
-            <option disabled>Loading payment methods...</option>
-          ) : paymentMethods.length === 0 ? (
-            <option disabled>No payment methods available</option>
-          ) : (
-            paymentMethods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))
-          )}
-        </Select>
+        />
 
         {/* Description field */}
         <Input
