@@ -126,6 +126,8 @@ Paradox/
 - **Postman Collection (v2.1.0)**: `Paradox.postman_collection.json`
   - 100% endpoint coverage across 6 modules: `health`, `dashboard`, `categories`, `payment-methods`, `expenses`, `budget`.
   - Built-in dynamic ID capture scripts for automated execution chaining.
+- **Async SQLAlchemy Model Refresh Fix**:
+  - Applied explicit `await self.db.refresh(instance)` across `CategoryRepository`, `PaymentMethodRepository`, and `BudgetRepository` to eliminate lazy-loading `MissingGreenlet` exceptions during serialization of `updated_at`.
 - **Postman Environments**:
   - `Paradox.postman_environment.json`: Local backend (`http://localhost:8000`).
   - `Paradox.postman_production_environment.json`: Live Render service (`https://paradox-api.onrender.com`).
@@ -135,7 +137,7 @@ Paradox/
   - `tests/unit/test_budget_granularity.py`: Passed (100% assertions for month, week, day schemas, validation, and serializers).
   - `tests/unit/test_budget_status.py`: Passed (Budget threshold math & warning ranges).
   - `tests/unit/test_money.py`: Passed (Decimal precision verification).
-  - **Result**: `3 passed in 0.76s`.
+  - **Result**: `3 passed in 0.51s`.
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors.
 
@@ -144,12 +146,12 @@ Paradox/
 ## 8. Deployment Information
 - **Live Frontend**: [https://paradox-neon.vercel.app/](https://paradox-neon.vercel.app/)
 - **Live Backend**: Render Web Service connected to Supabase PostgreSQL.
-- **Latest Commit Pushed**: `43a4bcb` (All features, tests, migrations, and PWA assets synchronized with `origin/main`).
+- **Latest Commit Pushed**: `cfe61d5` (All features, tests, migrations, PWA assets, and Postman suites synchronized with `origin/main`).
 
 ---
 
 ## 9. Next Session Handoff Notes
-- All requested features (3D elements, unrestricted categories, multi-granularity budgets, PWA, hamburger menu navigation, and full Postman testing suite) are fully implemented and verified.
+- All requested features (3D elements, unrestricted categories, multi-granularity budgets, PWA, hamburger navigation, Postman suites, and repository model refresh fixes) are fully implemented and verified.
 - For local testing:
   - Backend: Run `.venv\Scripts\uvicorn app.main:app --port 8000` from `backend/`.
   - Frontend: Run `npm run dev` from `frontend/`.

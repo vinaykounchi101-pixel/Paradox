@@ -59,6 +59,7 @@ class BudgetRepository:
             )
             self.db.add(budget)
         await self.db.flush()
+        await self.db.refresh(budget)
         return budget
 
     async def delete_budget(self, period_type: str = "month", period_key: Optional[str] = None) -> bool:

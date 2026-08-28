@@ -12,5 +12,8 @@ Thumbs.db
 # Environment secrets
 .env
 .env.local
-.env.*.local
+# Postman local workspace cache
+.postman/
+postman/
+
 

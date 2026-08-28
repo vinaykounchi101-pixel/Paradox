@@ -32,12 +32,14 @@ class PaymentMethodRepository:
         pm = PaymentMethod(name=name, is_default=False)
         self.db.add(pm)
         await self.db.flush()
+        await self.db.refresh(pm)
         return pm
 
     async def update(self, pm: PaymentMethod, name: str) -> PaymentMethod:
         pm.name = name
         self.db.add(pm)
         await self.db.flush()
+        await self.db.refresh(pm)
         return pm
 
     async def delete_payment_method(self, id: uuid.UUID) -> None:

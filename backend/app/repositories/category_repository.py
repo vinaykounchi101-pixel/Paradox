@@ -33,12 +33,14 @@ class CategoryRepository:
         category = Category(name=name, is_default=False)
         self.db.add(category)
         await self.db.flush()
+        await self.db.refresh(category)
         return category
 
     async def update(self, category: Category, name: str) -> Category:
         category.name = name
         self.db.add(category)
         await self.db.flush()
+        await self.db.refresh(category)
         return category
 
     async def delete_category(self, id: uuid.UUID) -> None:
