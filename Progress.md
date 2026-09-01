@@ -109,23 +109,25 @@ Paradox/
 ## 6. Testing & Build Verification
 - **Backend Tests (`pytest`)**:
   - `tests/unit/test_auth.py`: Password hashing, JWT sign/decode, token rotation, registration/login flows. (PASSED)
-  - `tests/unit/test_user_isolation.py`: Cross-tenant data isolation and user scoping. (PASSED)
+  - `tests/unit/test_email.py`: SMTP email service dispatching, unconfigured safety, and payload formatting. (PASSED)
+  - `tests/unit/test_user_isolation.py`: Cross-tenant data isolation and dynamic date scoping. (PASSED)
   - `tests/unit/test_budget_granularity.py`: Budget schemas across all granularities. (PASSED)
   - `tests/unit/test_budget_status.py`: 90% / 100% budget threshold calculations. (PASSED)
   - `tests/unit/test_money.py`: Monetary rounding and decimal precision. (PASSED)
-  - **Result**: `13 passed in 1.70s` (100% green).
+  - **Result**: `15 passed in 1.78s` (100% green).
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 13 routes.
 
 ---
 
 ## 7. Next Session Handoff Notes
-- Authentication and Multi-Tenant User Isolation are completely implemented, verified, and integrated end-to-end.
+- Authentication, Multi-Tenant User Isolation, and SMTP Password Recovery are completely implemented, verified, and integrated end-to-end.
+- **Gmail SMTP Integration**:
+  - `EmailService` ([`backend/app/services/email_service.py`](file:///e:/Projects/Paradox/backend/app/services/email_service.py)) supports live dispatching of password reset emails via Gmail SMTP (`smtp.gmail.com:587`).
+  - Auto-sanitizes Google App Password spacing.
+  - Forgot password endpoint and UI return `404 NOT_FOUND` with clear feedback when an unregistered email is entered.
 - **Google OAuth 2.0 / OpenID Connect**:
-  - Implemented dual-mode backend verification: Local cryptographically signed JWKS validation (`google-auth`) with automatic Google TokenInfo endpoint fallback (`https://oauth2.googleapis.com/tokeninfo`).
-  - Frontend Google Identity Services button with clean client ID handling and dimensions.
-- **Developer Utilities**:
-  - User seeding script `backend/app/db/seed_user_data.py` to populate categorized expenses and multi-granularity budgets for any registered user.
+  - Dual-mode backend verification (JWKS + TokenInfo fallback) and frontend Google Identity Services integration.
 - For local testing:
   - PostgreSQL: `E:\PSQL\bin\postgres.exe -D "E:\PSQL\data"`
   - Backend: `.venv\Scripts\uvicorn app.main:app --port 8000`

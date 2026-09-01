@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     # Application URLs
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # SMTP Email Configuration
+    SMTP_HOST: Union[str, None] = None
+    SMTP_PORT: int = 587
+    SMTP_TLS: bool = True
+    SMTP_USER: Union[str, None] = None
+    SMTP_PASSWORD: Union[str, None] = None
+    SMTP_FROM_EMAIL: Union[str, None] = None
+    SMTP_FROM_NAME: str = "Paradox Expense Tracker"
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_url(cls, v: str) -> str:

@@ -73,6 +73,8 @@ async def test_dashboard_service_user_isolation():
     dashboard_b = await service.get_dashboard_data(user_id=user_b_id, period="current_month")
 
     # Verify query strictly uses user_b_id
-    service.expense_repo.get_expenses_for_period.assert_called_with(user_b_id, date(2026, 8, 1), date.today())
+    today = date.today()
+    start_of_month = date(today.year, today.month, 1)
+    service.expense_repo.get_expenses_for_period.assert_called_with(user_b_id, start_of_month, today)
     assert dashboard_b.total_spent == Decimal("0.00")
     assert len(dashboard_b.recent_expenses) == 0

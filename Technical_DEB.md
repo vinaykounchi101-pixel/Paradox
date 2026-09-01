@@ -16,11 +16,13 @@ This document details technical debt items, architectural tradeoffs, short-term 
 
 ---
 
-## 2. Production Email Dispatch Provider (Future Enhancement)
-* **Debt / Tradeoff**: Currently, the `/api/v1/auth/forgot-password` endpoint generates cryptographically secure single-use reset tokens and logs the reset token/link in server logs for local development.
-* **Impact**: In production, an external transactional email provider (such as Resend, SendGrid, Amazon SES, or Postmark) is required to deliver the reset emails to end users.
-* **Future Work**:
-  - Integrate an email dispatch service module driven by environment variables (`SMTP_HOST`, `RESEND_API_KEY`, etc.).
+## 2. Production Email Dispatch Provider (RESOLVED via SMTP)
+* **Status**: **RESOLVED**.
+* **Resolution**:
+  - Implemented `EmailService` ([`backend/app/services/email_service.py`](file:///e:/Projects/Paradox/backend/app/services/email_service.py)) with environment-driven SMTP support (`SMTP_HOST`, `SMTP_PORT`, `SMTP_TLS`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`).
+  - Supports Gmail App Passwords with auto-sanitization of spaces, STARTTLS (port 587), and SSL (port 465).
+  - Formats branded responsive HTML templates matching the Paradox dark design system, with plain-text fallback.
+  - Automatically dispatches password reset emails asynchronously without blocking the event loop.
 
 ---
 

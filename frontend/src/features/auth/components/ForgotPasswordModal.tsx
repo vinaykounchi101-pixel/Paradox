@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { authApi } from "@/lib/api/auth";
 import { useToast } from "@/components/ui/toast";
-import { Mail, ArrowRight, Loader2, X, CheckCircle2 } from "lucide-react";
+import { Mail, ArrowRight, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -22,13 +23,16 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
     e.preventDefault();
     if (!email) return;
 
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
       await authApi.forgotPassword({ email });
       setIsSubmitted(true);
       addToast("Password reset instructions sent!", "success");
     } catch (err: any) {
-      addToast(err.message || "Failed to process request.", "error");
+      const msg = err.message || "No account found with this email address.";
+      setErrorMessage(msg);
+      addToast(msg, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -37,6 +41,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
   const handleClose = () => {
     setEmail("");
     setIsSubmitted(false);
+    setErrorMessage(null);
     onClose();
   };
 
@@ -57,8 +62,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
             </div>
             <h2 className="text-xl font-bold text-foreground mb-2">Check Your Email</h2>
             <p className="text-sm text-foreground-muted mb-6">
-              If an account with <span className="font-semibold text-foreground">{email}</span> exists,
-              we have sent instructions to reset your password.
+              We have sent instructions to reset your password to <span className="font-semibold text-foreground">{email}</span>.
             </p>
             <button
               onClick={handleClose}
@@ -70,9 +74,16 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
         ) : (
           <div>
             <h2 className="text-xl font-bold text-foreground mb-2">Reset Password</h2>
-            <p className="text-sm text-foreground-muted mb-6">
+            <p className="text-sm text-foreground-muted mb-4">
               Enter your email address and we will send you a link to reset your password.
             </p>
+
+            {errorMessage && (
+              <div className="mb-4 p-3 rounded-xl bg-danger/10 border border-danger/20 flex items-start gap-2.5 text-danger text-sm animate-fade-in">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span className="font-medium text-xs leading-relaxed">{errorMessage}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -87,7 +98,10 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errorMessage) setErrorMessage(null);
+                    }}
                     placeholder="you@example.com"
                     className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all duration-200"
                   />

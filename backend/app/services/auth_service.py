@@ -18,6 +18,7 @@ from app.core.security import (
 )
 from app.db.models.user import User
 from app.repositories.auth_repository import AuthRepository
+from app.services.email_service import email_service
 from app.schemas.auth import (
     ChangePasswordRequest,
     GoogleLoginRequest,
@@ -190,11 +191,10 @@ class AuthService:
         await self.auth_repo.revoke_all_user_refresh_tokens(user_id)
 
     async def forgot_password(self, email: str) -> Optional[str]:
-        """Generate a password reset token for valid user."""
+        """Generate a password reset token for valid user and dispatch email."""
         user = await self.auth_repo.get_user_by_email(email)
         if not user:
-            # Return None to avoid email enumeration
-            return None
+            raise NotFoundError("No user account found with this email address.")
 
         raw_token, token_hash = generate_password_reset_token()
         expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -205,8 +205,14 @@ class AuthService:
             expires_at=expires_at,
         )
 
-        # In production, dispatch email via provider. In local/dev, return reset token.
-        logger.info("Password reset token generated for user %s: %s", user.email, raw_token)
+        # Dispatch via SMTP
+        await email_service.send_password_reset_email(
+            to_email=user.email,
+            display_name=user.display_name or "User",
+            reset_token=raw_token,
+        )
+
+        logger.info("Password reset token generated and dispatched for user: %s", user.email)
         return raw_token
 
     async def reset_password(self, data: ResetPasswordRequest) -> None:

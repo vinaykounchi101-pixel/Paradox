@@ -4,25 +4,29 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { authApi } from "@/lib/api/auth";
 import { useToast } from "@/components/ui/toast";
-import { Mail, ArrowRight, Loader2, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Mail, ArrowRight, Loader2, CheckCircle2, ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const { addToast } = useToast();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
       await authApi.forgotPassword({ email });
       setIsSubmitted(true);
-      addToast("Password reset link generated!", "success");
+      addToast("Password reset instructions sent to your email!", "success");
     } catch (err: any) {
-      addToast(err.message || "Failed to submit request.", "error");
+      const msg = err.message || "No account found with this email address.";
+      setErrorMessage(msg);
+      addToast(msg, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -38,8 +42,8 @@ export default function ForgotPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground mb-2">Check Your Email</h1>
             <p className="text-sm text-foreground-muted mb-8">
-              If an account with <span className="font-semibold text-foreground">{email}</span> exists,
-              we have sent instructions to reset your password.
+              We have sent password reset instructions to <span className="font-semibold text-foreground">{email}</span>.
+              Please check your inbox and spam folder.
             </p>
             <Link
               href="/login"
@@ -58,6 +62,15 @@ export default function ForgotPasswordPage() {
               </p>
             </div>
 
+            {errorMessage && (
+              <div className="mb-5 p-3.5 rounded-xl bg-danger/10 border border-danger/20 flex items-start gap-3 text-danger text-sm animate-fade-in">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium">{errorMessage}</p>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-2">
@@ -71,7 +84,10 @@ export default function ForgotPasswordPage() {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errorMessage) setErrorMessage(null);
+                    }}
                     placeholder="you@example.com"
                     className="w-full pl-10 pr-4 py-2.5 bg-background/50 border border-border/80 rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all duration-200"
                   />
