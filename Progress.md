@@ -120,7 +120,13 @@ Paradox/
 ---
 
 ## 7. Next Session Handoff Notes
-- Authentication and User Isolation are completely implemented, verified, and integrated end-to-end.
+- Authentication and Multi-Tenant User Isolation are completely implemented, verified, and integrated end-to-end.
+- **Google OAuth 2.0 / OpenID Connect**:
+  - Implemented dual-mode backend verification: Local cryptographically signed JWKS validation (`google-auth`) with automatic Google TokenInfo endpoint fallback (`https://oauth2.googleapis.com/tokeninfo`).
+  - Frontend Google Identity Services button with clean client ID handling and dimensions.
+- **Developer Utilities**:
+  - User seeding script `backend/app/db/seed_user_data.py` to populate categorized expenses and multi-granularity budgets for any registered user.
 - For local testing:
-  - Backend: Run `.venv\Scripts\uvicorn app.main:app --port 8000` from `backend/`.
-  - Frontend: Run `npm.cmd run dev` from `frontend/`.
+  - PostgreSQL: `E:\PSQL\bin\postgres.exe -D "E:\PSQL\data"`
+  - Backend: `.venv\Scripts\uvicorn app.main:app --port 8000`
+  - Frontend: `npm.cmd run dev`

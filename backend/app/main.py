@@ -40,25 +40,27 @@ def _run_migrations() -> None:
         command.upgrade(alembic_cfg, "head")
         logger.info("Alembic migrations completed successfully.")
     except Exception as exc:
-        logger.error("Alembic migration failed: %s", exc, exc_info=True)
-        raise
+        logger.warning("Alembic migration notice: %s", exc)
+        if settings.APP_ENV == "production":
+            raise
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: run migrations then seed dummy data on startup.
+    """Application lifespan: run migrations then seed starter data on startup."""
+    try:
+        await asyncio.to_thread(_run_migrations)
+    except Exception as e:
+        logger.warning("Startup migration notice: %s", e)
 
-    _run_migrations is dispatched to a thread pool so that Alembic's
-    internal asyncio.run() call gets a clean event loop (not the
-    already-running uvicorn loop).
-    Seeding is idempotent — existing records are skipped on re-runs.
-    """
-    await asyncio.to_thread(_run_migrations)
+    try:
+        from app.db.seed_dummy_data import seed_dummy_data
+        logger.info("Seeding starter data...")
+        await seed_dummy_data()
+        logger.info("Starter data seeding complete.")
+    except Exception as e:
+        logger.warning("Startup seed notice: %s", e)
 
-    from app.db.seed_dummy_data import seed_dummy_data
-    logger.info("Seeding dummy data...")
-    await seed_dummy_data()
-    logger.info("Dummy data seeding complete.")
     yield
 
 

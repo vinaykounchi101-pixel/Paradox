@@ -11,7 +11,7 @@ declare global {
         id: {
           initialize: (config: any) => void;
           renderButton: (parent: HTMLElement, options: any) => void;
-          prompt: () => void;
+          prompt: (momentListener?: (notification: any) => void) => void;
         };
       };
     };
@@ -31,48 +31,74 @@ export function GoogleSignInButton({
   const { addToast } = useToast();
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+  // Clean client ID string if quoted or contains whitespace
+  const rawClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const clientId = rawClientId?.trim().replace(/^["']|["']$/g, "");
 
   useEffect(() => {
     if (!clientId) {
       return;
     }
 
+    let isMounted = true;
+
     // Load Google Identity Services script if not present
-    if (!window.google) {
-      const script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client";
-      script.async = true;
-      script.defer = true;
-      script.onload = initializeGoogle;
-      document.body.appendChild(script);
+    if (!window.google?.accounts?.id) {
+      const existingScript = document.getElementById("google-gsi-script");
+      if (!existingScript) {
+        const script = document.createElement("script");
+        script.id = "google-gsi-script";
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          if (isMounted) initializeGoogle();
+        };
+        script.onerror = () => {
+          console.error("Failed to load Google Identity Services SDK.");
+        };
+        document.head.appendChild(script);
+      } else {
+        existingScript.addEventListener("load", () => {
+          if (isMounted) initializeGoogle();
+        });
+      }
     } else {
       initializeGoogle();
     }
 
     function initializeGoogle() {
-      if (!window.google || !buttonRef.current || !clientId) return;
+      if (!window.google?.accounts?.id || !buttonRef.current || !clientId || !isMounted) return;
 
       try {
         window.google.accounts.id.initialize({
           client_id: clientId,
           callback: handleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          itp_support: true,
         });
 
-        window.google.accounts.id.renderButton(buttonRef.current, {
-          theme: "filled_black",
-          size: "large",
-          shape: "pill",
-          text,
-          width: "100%",
-        });
+        if (buttonRef.current) {
+          buttonRef.current.innerHTML = "";
+          window.google.accounts.id.renderButton(buttonRef.current, {
+            type: "standard",
+            theme: "filled_black",
+            size: "large",
+            shape: "pill",
+            text,
+            width: 360,
+            logo_alignment: "left",
+          });
+        }
       } catch (err) {
-        console.error("Failed to initialize Google Sign-In:", err);
+        console.error("Error initializing Google Sign-In button:", err);
       }
     }
 
     async function handleCredentialResponse(response: { credential: string }) {
-      if (!response.credential) return;
+      if (!response.credential || !isMounted) return;
 
       setIsLoading(true);
       try {
@@ -80,26 +106,33 @@ export function GoogleSignInButton({
         addToast("Successfully signed in with Google!", "success");
         onSuccess?.();
       } catch (err: any) {
-        addToast(err.message || "Failed to sign in with Google", "error");
+        const msg = err.message || "Failed to authenticate with Google.";
+        addToast(msg, "error");
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [clientId, loginWithGoogle, onSuccess, text, addToast]);
 
   const handleManualClick = () => {
     if (!clientId) {
       addToast(
-        "Google Sign-In is not configured. Please set NEXT_PUBLIC_GOOGLE_CLIENT_ID in your environment variables.",
-        "info"
+        "Google Client ID is missing. Please set NEXT_PUBLIC_GOOGLE_CLIENT_ID in frontend/.env.local and restart frontend server.",
+        "error"
       );
     }
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full flex flex-col items-center justify-center">
       {clientId ? (
-        <div ref={buttonRef} className="w-full flex justify-center min-h-[44px]" />
+        <div className="w-full flex justify-center">
+          <div ref={buttonRef} className="min-h-[44px] flex items-center justify-center w-full" />
+        </div>
       ) : (
         <button
           type="button"

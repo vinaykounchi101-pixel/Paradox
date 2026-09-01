@@ -5,9 +5,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env", ".env.local"),
+        env_file=(".env", ".env.local", "../.env", "../.env.local"),
+        env_file_encoding="utf-8",
         env_ignore_empty=True,
-        case_sensitive=True,
+        case_sensitive=False,
+        extra="ignore",
     )
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/paradox"
