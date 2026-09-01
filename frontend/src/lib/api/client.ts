@@ -1,26 +1,82 @@
 export interface ApiErrorDetail {
-  loc: (string | number)[];
-  msg: string;
-  type: string;
+  loc?: (string | number)[];
+  field?: string;
+  msg?: string;
+  message?: string;
+  type?: string;
 }
 
 export class ApiError extends Error {
   status: number;
+  code?: string;
   details?: ApiErrorDetail[];
 
-  constructor(message: string, status: number, details?: ApiErrorDetail[]) {
+  constructor(message: string, status: number, code?: string, details?: ApiErrorDetail[]) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
     this.details = details;
   }
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
+// In-Memory Access Token Storage
+let inMemoryAccessToken: string | null = null;
+
+export const setAccessToken = (token: string | null) => {
+  inMemoryAccessToken = token;
+};
+
+export const getAccessToken = (): string | null => {
+  return inMemoryAccessToken;
+};
+
+// Variable & promise to coordinate concurrent token refresh attempts
+let refreshPromise: Promise<string | null> | null = null;
+
+async function attemptRefreshToken(): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // Sends the HttpOnly paradox_refresh_token cookie
+      });
+
+      if (!res.ok) {
+        setAccessToken(null);
+        return null;
+      }
+
+      const data = await res.json();
+      const newToken = data.access_token || data.data?.access_token;
+      if (newToken) {
+        setAccessToken(newToken);
+        return newToken;
+      }
+      setAccessToken(null);
+      return null;
+    } catch {
+      setAccessToken(null);
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 async function request<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  isRetry: boolean = false
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const headers = new Headers(options.headers);
@@ -29,13 +85,33 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(url, {
+  // Attach Bearer Access Token if available
+  if (inMemoryAccessToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${inMemoryAccessToken}`);
+  }
+
+  const fetchOptions: RequestInit = {
     ...options,
     headers,
-  });
+    credentials: "include", // Always include cookies for session rotation & refresh
+  };
+
+  const response = await fetch(url, fetchOptions);
+
+  // Handle 401 Unauthorized with Automatic Refresh & Request Retry
+  if (response.status === 401 && !isRetry && !path.startsWith("/auth/login") && !path.startsWith("/auth/refresh")) {
+    const newAccessToken = await attemptRefreshToken();
+    if (newAccessToken) {
+      // Retry original request with fresh access token
+      const retryHeaders = new Headers(options.headers);
+      retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
+      return request<T>(path, { ...options, headers: retryHeaders }, true);
+    }
+  }
 
   if (!response.ok) {
     let errorMessage = "An error occurred";
+    let errorCode = "INTERNAL_ERROR";
     let errorDetails: ApiErrorDetail[] | undefined;
 
     try {
@@ -45,6 +121,7 @@ async function request<T>(
         errorJson.message ||
         errorJson.detail ||
         errorMessage;
+      errorCode = errorJson.error?.code || errorCode;
       if (Array.isArray(errorJson.error?.details)) {
         errorDetails = errorJson.error.details;
       } else if (Array.isArray(errorJson.details)) {
@@ -56,7 +133,7 @@ async function request<T>(
       errorMessage = response.statusText || errorMessage;
     }
 
-    throw new ApiError(errorMessage, response.status, errorDetails);
+    throw new ApiError(errorMessage, response.status, errorCode, errorDetails);
   }
 
   if (response.status === 204) {

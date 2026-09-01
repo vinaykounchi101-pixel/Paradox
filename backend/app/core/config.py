@@ -19,6 +19,19 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     APP_TIMEZONE: str = "UTC"
 
+    # Security & JWT Configuration
+    JWT_SECRET_KEY: str = "paradox-jwt-secret-key-change-in-production-min-32-chars"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Google OAuth 2.0 / OpenID Connect
+    GOOGLE_CLIENT_ID: Union[str, None] = None
+    GOOGLE_CLIENT_SECRET: Union[str, None] = None
+
+    # Application URLs
+    FRONTEND_URL: str = "http://localhost:3000"
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_url(cls, v: str) -> str:

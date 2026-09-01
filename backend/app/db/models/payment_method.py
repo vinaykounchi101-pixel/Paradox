@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -17,10 +17,15 @@ class PaymentMethod(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(
         String(60),
         nullable=False,
-        unique=True,
     )
     is_default: Mapped[bool] = mapped_column(
         Boolean,
@@ -38,3 +43,5 @@ class PaymentMethod(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    user = relationship("User")

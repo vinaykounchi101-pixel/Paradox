@@ -3,9 +3,9 @@ from decimal import Decimal
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import CheckConstraint, DateTime, Numeric, String, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -17,6 +17,12 @@ class Budget(Base):
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     period_type: Mapped[str] = mapped_column(
         String(10),
@@ -48,7 +54,9 @@ class Budget(Base):
         onupdate=func.now(),
     )
 
+    user = relationship("User")
+
     __table_args__ = (
         CheckConstraint("amount >= 0", name="chk_budget_amount_non_negative"),
-        UniqueConstraint("period_type", "period_key", name="uq_budget_period"),
+        UniqueConstraint("user_id", "period_type", "period_key", name="uq_user_budget_period"),
     )

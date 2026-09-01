@@ -15,6 +15,7 @@ export interface ToastMessage {
 
 interface ToastContextType {
   toast: (message: string, type?: ToastType, duration?: number) => void;
+  addToast: (message: string, type?: ToastType, duration?: number) => void;
   success: (message: string, duration?: number) => void;
   error: (message: string, duration?: number) => void;
 }
@@ -42,11 +43,12 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [removeToast]
   );
 
+  const addToast = toast;
   const success = useCallback((msg: string, dur?: number) => toast(msg, "success", dur), [toast]);
   const error = useCallback((msg: string, dur?: number) => toast(msg, "error", dur), [toast]);
 
   return (
-    <ToastContext.Provider value={{ toast, success, error }}>
+    <ToastContext.Provider value={{ toast, addToast, success, error }}>
       {children}
       
       {/* Toast Portal Container */}

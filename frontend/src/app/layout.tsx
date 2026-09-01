@@ -3,6 +3,7 @@ import React from "react";
 import QueryProvider from "@/components/common/QueryProvider";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { ToastProvider } from "@/components/ui/toast";
+import { AuthProvider } from "@/features/auth/context/AuthContext";
 import { Shell } from "@/components/layout/shell";
 import { PwaRegister } from "@/components/common/PwaRegister";
 import "@/styles/globals.css";
@@ -48,7 +49,9 @@ export default function RootLayout({
         <QueryProvider>
           <ThemeProvider>
             <ToastProvider>
-              <Shell>{children}</Shell>
+              <AuthProvider>
+                <Shell>{children}</Shell>
+              </AuthProvider>
             </ToastProvider>
           </ThemeProvider>
         </QueryProvider>

@@ -14,13 +14,13 @@ class ExpenseRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_by_id(self, id: uuid.UUID) -> Optional[Expense]:
+    async def get_by_id(self, id: uuid.UUID, user_id: uuid.UUID) -> Optional[Expense]:
         stmt = (
             select(Expense)
-            .where(Expense.id == id)
+            .where(Expense.id == id, Expense.user_id == user_id)
             .options(
                 selectinload(Expense.category),
-                selectinload(Expense.payment_method)
+                selectinload(Expense.payment_method),
             )
             .execution_options(populate_existing=True)
         )
@@ -31,13 +31,13 @@ class ExpenseRepository:
         self.db.add(expense)
         await self.db.flush()
         await self.db.refresh(expense)
-        return await self.get_by_id(expense.id)
+        return await self.get_by_id(expense.id, expense.user_id)  # type: ignore[return-value]
 
     async def update(self, expense: Expense) -> Expense:
         self.db.add(expense)
         await self.db.flush()
         await self.db.refresh(expense)
-        return await self.get_by_id(expense.id)
+        return await self.get_by_id(expense.id, expense.user_id)  # type: ignore[return-value]
 
     async def delete(self, expense: Expense) -> None:
         await self.db.delete(expense)
@@ -45,6 +45,7 @@ class ExpenseRepository:
 
     async def list_expenses(
         self,
+        user_id: uuid.UUID,
         search: Optional[str] = None,
         category_id: Optional[uuid.UUID] = None,
         date_from: Optional[date] = None,
@@ -54,15 +55,20 @@ class ExpenseRepository:
         page: int = 1,
         page_size: int = 20,
     ) -> Tuple[List[Expense], int]:
-        # Build base query
+        # Build base query scoped to user_id
         stmt = (
             select(Expense)
+            .where(Expense.user_id == user_id)
             .options(
                 selectinload(Expense.category),
-                selectinload(Expense.payment_method)
+                selectinload(Expense.payment_method),
             )
         )
-        count_stmt = select(func.count()).select_from(Expense)
+        count_stmt = (
+            select(func.count())
+            .select_from(Expense)
+            .where(Expense.user_id == user_id)
+        )
 
         # 1. Apply free-text search on description
         if search:
@@ -112,12 +118,17 @@ class ExpenseRepository:
 
     async def get_expenses_for_period(
         self,
+        user_id: uuid.UUID,
         date_from: date,
         date_to: date,
     ) -> List[Expense]:
         stmt = (
             select(Expense)
-            .where(Expense.date >= date_from, Expense.date <= date_to)
+            .where(
+                Expense.user_id == user_id,
+                Expense.date >= date_from,
+                Expense.date <= date_to,
+            )
             .options(selectinload(Expense.category))
         )
         result = await self.db.execute(stmt)

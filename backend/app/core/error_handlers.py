@@ -5,9 +5,12 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.exceptions import (
+    AuthenticationError,
+    AuthorizationError,
     ConflictError,
     NotFoundError,
     ParadoxException,
+    RateLimitError,
     UnprocessableRequestError,
     ValidationError,
 )
@@ -16,6 +19,33 @@ logger = logging.getLogger(__name__)
 
 
 def register_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(AuthenticationError)
+    async def authentication_handler(
+        request: Request, exc: AuthenticationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"error": {"code": exc.code, "message": exc.message, "details": []}},
+        )
+
+    @app.exception_handler(AuthorizationError)
+    async def authorization_handler(
+        request: Request, exc: AuthorizationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"error": {"code": exc.code, "message": exc.message, "details": []}},
+        )
+
+    @app.exception_handler(RateLimitError)
+    async def rate_limit_handler(
+        request: Request, exc: RateLimitError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"error": {"code": exc.code, "message": exc.message, "details": []}},
+        )
+
     @app.exception_handler(NotFoundError)
     async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
         return JSONResponse(

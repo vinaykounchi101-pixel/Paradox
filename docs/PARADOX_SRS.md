@@ -1,11 +1,11 @@
 # Paradox — Software Requirements Specification (SRS)
 
-**Document Version:** 1.1
-**Status:** Final — Ready for Implementation (Phase 1 / MVP)
+**Document Version:** 2.0
+**Status:** Final — Ready for Implementation (Authentication & Multi-Tenant User Isolation)
 **Product:** Paradox
 **Source of Truth (Product):** `PARADOX_PRD_FINAL.md` (v1.0)
-**Source of Truth (Technical Decisions):** `PARADOX_SRS_CLAUDE_PROMPT.md`
-**Guiding Principle:** Validate Paradox with one real user before adding unnecessary complexity.
+**Source of Truth (Technical Decisions):** `PARADOX_SRS_CLAUDE_PROMPT.md` & Production Auth Specification
+**Guiding Principle:** Secure, robust, multi-tenant user data isolation with zero trust in frontend identity, maintaining simplicity and performance.
 
 ---
 
@@ -15,9 +15,9 @@
 |---|---|
 | Document Type | Software Requirements Specification |
 | Product | Paradox — Personal Expense Tracker |
-| Phase Covered | Phase 1 — Single-User Core MVP |
+| Phase Covered | Phase 1 + Authentication & Row-Level Data Isolation |
 | Authoritative Product Spec | PARADOX_PRD_FINAL.md |
-| Authoritative Technical Decisions | PARADOX_SRS_CLAUDE_PROMPT.md |
+| Authoritative Technical Decisions | PARADOX_SRS_CLAUDE_PROMPT.md & Auth Spec |
 | Intended Consumer | Development team / AI coding agent (e.g. Antigravity) |
 | Out-of-date Policy | Any change to product scope must first be reflected in the PRD, then propagated here |
 
@@ -26,7 +26,8 @@
 | Version | Change Summary |
 |---|---|
 | 1.0 | Initial complete SRS for Phase 1. |
-| 1.1 | Narrowed V1 expense filtering to a single dimension (date OR category, not combined — Section 3.4.1); added explicit default-vs-custom create/edit/delete rule tables for categories (3.2.1) and payment methods (3.3.1); added frontend server-state management approach (11.8, TanStack Query); added CI/CD pipeline (20.6); expanded baseline security threat-category coverage (14.1: XSS, SQL injection, CSRF, secure headers, CORS, secret management); added database connection pooling, concurrency-control scoping, and idempotent-seeding clarifications (6.5); reinforced the three-layer validation principle (9.1); added Design System cross-reference (11.1) without duplicating visual rules; strengthened environment-file/secret-handling language (19.3); confirmed Zod as an explicit frontend dependency for schema validation (2.2, 9.2). No existing architecture, folder structure, API surface (beyond the filter narrowing above), testing strategy, deployment decisions, Docker decisions, or `.gitignore` structure were altered. |
+| 1.1 | Narrowed V1 expense filtering to a single dimension (date OR category, not combined — Section 3.4.1); added explicit default-vs-custom create/edit/delete rule tables for categories (3.2.1) and payment methods (3.3.1); added frontend server-state management approach (11.8, TanStack Query); added CI/CD pipeline (20.6); expanded baseline security threat-category coverage (14.1: XSS, SQL injection, CSRF, secure headers, CORS, secret management); added database connection pooling, concurrency-control scoping, and idempotent-seeding clarifications (6.5); reinforced the three-layer validation principle (9.1); added Design System cross-reference (11.1) without duplicating visual rules; strengthened environment-file/secret-handling language (19.3); confirmed Zod as an explicit frontend dependency for schema validation (2.2, 9.2). |
+| 2.0 | Added production-ready Authentication Layer & Row-Level Multi-Tenant Data Isolation. Specified JWT authentication with short-lived access tokens (15 mins) and long-lived rotated refresh tokens (7–30 days) stored in HttpOnly, Secure, SameSite cookies with server-side SHA-256 token hashing; Google Sign-In via OAuth 2.0 / OpenID Connect with backend token verification and account linking; user registration, email/password login, forgot/reset password, change password, single session logout, and logout from all devices; added `refresh_tokens` and `password_reset_tokens` tables; updated `users`, `expenses`, `budgets`, `categories`, and `payment_methods` with mandatory `user_id` foreign keys and composite period constraints; established authoritative backend authorization (`get_current_user` SecurityContext) with zero trust in client-supplied user identifiers across all endpoints; added authentication rate limiting and CSRF protection. |
 
 ---
 
@@ -36,47 +37,56 @@
 
 This SRS defines **how** Paradox will be technically implemented. It translates the product-level requirements defined in the PRD into a concrete, implementation-ready technical specification: architecture, database schema, API contracts, validation rules, business logic, frontend behavior, security, error handling, testing, and deployment.
 
-This document is written so that a developer or an AI coding agent can implement Phase 1 of Paradox **without having to guess or invent requirements**. Anything not explicitly defined here or in the PRD is out of scope for this phase.
+This document is written so that a developer or an AI coding agent can implement Paradox **without having to guess or invent requirements**. Anything not explicitly defined here or in the PRD is out of scope.
 
 ## 1.2 Scope
 
-This SRS covers **Phase 1 — Single-User Core MVP** only, as defined in PRD Section 14. It documents:
+This SRS covers **Paradox with Secure Production-Ready Authentication & Multi-Tenant User Isolation**. It documents:
 
-- Expense creation, viewing, editing, deletion
-- Starter and custom categories
-- Payment methods
-- Search, filter, sort, pagination of expenses
-- Spending summaries and category breakdowns
-- One overall monthly budget
-- A single dashboard endpoint/screen
-- Loading, empty, validation, and error states
-- Single fixed currency
-- Responsive web frontend
+- User Registration, Email/Password Login, and Google OAuth 2.0 / OpenID Connect Sign-In
+- JWT-based authentication: Short-lived access tokens (15 mins) and HttpOnly rotated refresh tokens (7–30 days)
+- Server-side refresh token revocation, secure single-session logout, and logout from all devices
+- Forgot password, reset password, and change password flows
+- Strict row-level multi-tenant user data isolation across all resources
+- Expense creation, viewing, editing, deletion scoped strictly to the authenticated user
+- Starter and custom categories with user-scoping for custom entries
+- Payment methods with user-scoping for custom entries
+- Search, filter, sort, pagination of user expenses
+- Spending summaries and category breakdowns scoped to the authenticated user
+- Multi-granularity budgets (Monthly, Weekly, Daily) scoped to the authenticated user
+- A single aggregated dashboard endpoint/screen scoped to the authenticated user
+- Loading, empty, validation, and error states across all auth and app screens
+- Responsive web frontend with route protection and automatic token refresh
 - Local development and deployment topology
 
-This SRS does **not** cover multi-user authentication systems, multiple budgets, recurring expenses, notifications, multi-currency, bank integrations, or any other item listed as out of scope in PRD Section 13 / Section 6. Where such items are relevant to avoid an obvious future rewrite, they are documented as **Future Compatibility Considerations** (Section 26) and are explicitly **not** MVP requirements.
+This SRS does **not** cover RBAC/admin roles (each user has equal ownership over only their own data), notifications/reminders, bank integrations, or multi-currency.
 
 ## 1.3 Definitions, Acronyms, and Abbreviations
 
 | Term | Meaning |
 |---|---|
-| MVP | Minimum Viable Product (Phase 1 of the PRD roadmap) |
+| MVP | Minimum Viable Product |
 | PRD | Product Requirements Document (`PARADOX_PRD_FINAL.md`) |
 | SRS | This document |
 | FR-xx | Functional Requirement ID from the PRD |
 | API | Application Programming Interface |
-| ORM | Object-Relational Mapper |
+| ORM | Object-Relational Mapper (SQLAlchemy 2.0) |
 | CRUD | Create, Read, Update, Delete |
 | DTO | Data Transfer Object (represented via Pydantic schemas) |
-| JWT | JSON Web Token (reserved for future multi-user auth, not used in V1) |
-| Starter Category | A default category seeded at application initialization |
-| Single User | The one real person Paradox is validated with in Phase 1 |
+| JWT | JSON Web Token (used for stateless API authorization) |
+| Access Token | Short-lived signed JWT (10–15 min lifetime) passed in `Authorization: Bearer <token>` |
+| Refresh Token | Cryptographically secure random token stored in an `HttpOnly`, `Secure`, `SameSite` cookie, used to obtain new access tokens |
+| Token Rotation | Invalidation of the prior refresh token and issuance of a new pair on every refresh request |
+| Starter Entity | A default category or payment method seeded at application initialization, shared across all users |
+| Custom Entity | A user-created category or payment method owned exclusively by that user |
+| User Isolation | Architectural enforcement ensuring User A can only view, mutate, or delete User A's data |
 
 ## 1.4 References
 
 - `PARADOX_PRD_FINAL.md` — Product Requirements Document v1.0
-- `PARADOX_SRS_CLAUDE_PROMPT.md` — Finalized technical decisions used to author this SRS
-- FastAPI, SQLAlchemy 2.0, Alembic, Pydantic, Next.js, Framer Motion official documentation (implementation reference only; not reproduced here)
+- `PARADOX_SRS_CLAUDE_PROMPT.md` — Finalized technical decisions used to author initial SRS
+- RFC 7519 (JSON Web Token), RFC 6749 (OAuth 2.0), OpenID Connect Core 1.0
+- FastAPI, SQLAlchemy 2.0, Alembic, Pydantic, Next.js, Framer Motion official documentation
 
 ## 1.5 Intended Audience
 
@@ -87,10 +97,10 @@ This SRS does **not** cover multi-user authentication systems, multiple budgets,
 
 ## 1.6 Document Conventions
 
-- Requirement IDs use the prefix `SRS-` followed by a section-scoped number (e.g., `SRS-API-01`).
-- Every technical requirement traces to a PRD `FR-xx` where applicable (see Section 22).
-- "Must" denotes a mandatory (P0-equivalent) requirement. "Should" denotes a strongly recommended (P1-equivalent) requirement. "May" denotes an optional, non-blocking enhancement.
+- Requirement IDs use the prefix `SRS-` followed by a section-scoped number (e.g., `SRS-FN-AUTH-01`, `SRS-API-01`).
+- "Must" denotes a mandatory requirement. "Should" denotes a strongly recommended requirement. "May" denotes an optional enhancement.
 - All monetary values are represented using fixed-precision decimal types — never floating point — throughout the stack.
+- All authorization decisions are made strictly on the backend using the validated SecurityContext (`current_user.id`).
 
 ---
 
@@ -98,55 +108,72 @@ This SRS does **not** cover multi-user authentication systems, multiple budgets,
 
 ## 2.1 Product Summary
 
-Paradox is a single-user personal expense-tracking web application implementing the core loop **Record → Organize → Review → Understand → Adjust** (PRD Section 8). Phase 1 delivers a complete, reliable, and simple experience for recording expenses, organizing them by category and payment method, reviewing spending history, understanding spending through summaries and a dashboard, and comparing spending against one overall monthly budget.
+Paradox is a personal expense-tracking web application implementing the core loop **Record → Organize → Review → Understand → Adjust** with secure user authentication and strict data isolation. Each user registers, logs in (or uses Google Sign-In), and manages their own independent financial data — expenses, custom categories, custom payment methods, budgets, and dashboards.
 
 ## 2.2 High-Level Architecture
 
-Paradox uses a **decoupled frontend/backend architecture** communicating over a versioned REST API:
+Paradox uses a **decoupled frontend/backend architecture** communicating over a versioned REST API with JWT Bearer authorization and HttpOnly cookie refresh:
 
 ```
-┌─────────────────────┐        HTTPS / REST / JSON        ┌──────────────────────┐
-│   Next.js Frontend   │ ───────────────────────────────▶ │   FastAPI Backend     │
-│   (App Router, TS)   │ ◀─────────────────────────────── │  (Router→Service→Repo)│
-└─────────────────────┘        /api/v1/*                  └──────────┬───────────┘
-                                                                       │ SQLAlchemy 2.0 (async)
-                                                                       ▼
-                                                             ┌──────────────────┐
-                                                             │   PostgreSQL      │
-                                                             │  (Alembic-managed)│
-                                                             └──────────────────┘
+┌─────────────────────┐      HTTPS / REST / JSON + Bearer JWT     ┌──────────────────────┐
+│   Next.js Frontend   │ ───────────────────────────────────────▶ │   FastAPI Backend     │
+│  (AuthContext, TS)  │ ◀─────────────────────────────────────── │ (Router→Service→Repo) │
+└─────────────────────┘      HttpOnly Refresh Token Cookie        └──────────┬───────────┘
+                                                                             │ SQLAlchemy 2.0 (async)
+                                                                             ▼
+                                                                   ┌──────────────────┐
+                                                                   │   PostgreSQL      │
+                                                                   │ (User-Scoped DB) │
+                                                                   └──────────────────┘
 ```
 
-- **Frontend**: Next.js (App Router) + TypeScript + Framer Motion + Zod (client-side schema validation), responsible for UI rendering, client-side validation, and calling the backend REST API.
-- **Backend**: Python + FastAPI, responsible for business logic, validation, persistence, and API contracts, structured as **Router → Service → Repository → Database**.
-- **Database**: PostgreSQL, accessed exclusively through SQLAlchemy 2.0 (async, via `asyncpg`), with schema evolution managed by Alembic.
+- **Frontend**: Next.js (App Router) + TypeScript + Framer Motion + Zod + TanStack Query + AuthContext, managing client-side routing, protected routes, form validation, in-memory access token storage, and automatic token refresh interceptors.
+- **Backend**: Python + FastAPI, responsible for auth verification, JWT token issuance/rotation, business logic, validation, persistence, and API contracts, structured as **Router → Service → Repository → Database**.
+- **Database**: PostgreSQL, accessed exclusively through SQLAlchemy 2.0 (async, via `asyncpg`), with schema evolution managed by Alembic. All application entities are strictly foreign-keyed to `users.id`.
 - **Communication**: REST over JSON, versioned at the routing/contract layer as `/api/v1/...`.
 
 ## 2.3 System Boundaries
 
-**In scope (Phase 1):**
-- Web frontend (responsive; no native mobile app)
+**In scope:**
+- User Authentication (Sign Up, Email/Password Login, Google OAuth 2.0 / OpenID Connect, Logout, Multi-Device Logout, Password Recovery/Reset, Change Password)
+- JWT Access Token (15 min) + HttpOnly SameSite Refresh Token Rotation (7–30 days) with database token hashing
+- Strict row-level multi-tenant user data isolation across all entities
+- Web frontend (responsive; PWA-enabled; route guards)
 - Single backend service
-- Single PostgreSQL database
-- Single fixed currency, single user
+- Single PostgreSQL database with Alembic migrations
+- Single fixed currency per user account
 
-**Out of scope (Phase 1):**
-- Authentication/authorization enforcement (see Section 13 for the documented boundary)
-- Multi-tenant data isolation
-- External bank/financial integrations
-- Notifications/reminders
-
+**Out of scope:**
+- Role-Based Access Control (RBAC) / Admin systems (all users have equal ownership over only their own data)
+- External bank/financial sync integrations
+- SMS notifications
 ## 2.4 Assumptions and Dependencies
 
-- Local development does not require Docker; Docker is only used for backend deployment (Section 20).
-- The application is used by exactly one real user for the duration of Phase 1; a `User` entity may exist in the schema for future compatibility but is not exposed through authentication flows in V1.
-- One fixed currency is assumed application-wide; no currency field/conversion logic is required in V1.
+- Local development does not require Docker; Docker is used for backend deployment (Section 20).
+- Google OAuth credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) are configured in backend environment variables; Google Client ID is configured in frontend environment variables.
+- One fixed currency is assumed application-wide; all calculations use Python `Decimal`.
+- Each user account is completely isolated; there are no shared expense records or cross-user permissions.
 
 ---
 
 # 3. Functional Requirements
 
-Each functional requirement below implements one or more PRD `FR-xx` items (PRD Section 11). IDs are grouped by module.
+Each functional requirement below implements the product capabilities. IDs are grouped by module.
+
+## 3.0 Authentication & User Isolation
+
+| ID | Requirement | Traces to |
+|---|---|---|
+| SRS-FN-AUTH-01 | The system must allow new users to register with `email`, `password`, and optional `display_name`. Passwords must be hashed via BCrypt/Argon2 before persistence. | Auth Spec |
+| SRS-FN-AUTH-02 | The system must allow users to log in with verified `email` and `password`, returning a short-lived Access Token (15 mins) and setting a rotated Refresh Token in an `HttpOnly`, `Secure`, `SameSite` cookie (7–30 days). | Auth Spec |
+| SRS-FN-AUTH-03 | The system must support Google Sign-In via OAuth 2.0 / OpenID Connect, validating Google ID tokens on the backend, auto-provisioning new users or linking existing accounts, and issuing standard app session tokens. | Auth Spec |
+| SRS-FN-AUTH-04 | The system must rotate refresh tokens upon invocation of `/api/v1/auth/refresh`, revoking the prior token hash and issuing a new access token and new refresh cookie. | Auth Spec |
+| SRS-FN-AUTH-05 | The system must allow users to log out securely, clearing the client cookie and marking the active refresh token hash as revoked in the database. | Auth Spec |
+| SRS-FN-AUTH-06 | The system must support "Logout from all devices", invalidating all active refresh tokens for the authenticated user across all sessions. | Auth Spec |
+| SRS-FN-AUTH-07 | The system must support password recovery: requesting a password reset token via `/api/v1/auth/forgot-password` and securely consuming it via `/api/v1/auth/reset-password`. | Auth Spec |
+| SRS-FN-AUTH-08 | The system must allow an authenticated user to change their password via `/api/v1/auth/change-password` by verifying their current password. | Auth Spec |
+| SRS-FN-AUTH-09 | The system must enforce strict row-level user data isolation on every endpoint: User A can only read, create, update, or delete User A's expenses, budgets, custom categories, and custom payment methods. | Auth Spec |
+| SRS-FN-AUTH-10 | Attempting to access, modify, or delete a resource belonging to another user must return `404 Not Found` (or `403 Forbidden`) and must never leak entity existence or content. | Auth Spec |
 
 ## 3.1 Expense Management
 
@@ -253,70 +280,104 @@ Per finalized product decision, **V1 supports filtering the expense list by date
 
 # 4. Use Cases
 
-## 4.1 UC-01: Add Expense
+## 4.0A UC-00A: User Registration
+- **Actor**: Anonymous visitor
+- **Main Flow**:
+  1. User navigates to `/register`.
+  2. User provides email, password (min 8 chars, mixed complexity), and display name.
+  3. Frontend validates format via Zod and calls `POST /api/v1/auth/register`.
+  4. Backend hashes password using BCrypt/Argon2, creates the user record, and issues an Access Token + HttpOnly Refresh Token cookie.
+  5. User is redirected to `/dashboard` with active session.
 
-- **Actor**: The single user
-- **Preconditions**: At least one category and one payment method exist (guaranteed by starter seed data).
+## 4.0B UC-00B: User Login (Email / Password)
+- **Actor**: Anonymous visitor
+- **Main Flow**:
+  1. User navigates to `/login` and enters email and password.
+  2. Frontend calls `POST /api/v1/auth/login`.
+  3. Backend verifies password hash, issues a 15-minute Access Token, and sets a rotated Refresh Token cookie.
+  4. Frontend stores Access Token in-memory and redirects to `/dashboard`.
+
+## 4.0C UC-00C: Google Sign-In (OAuth 2.0 / OpenID Connect)
+- **Actor**: Anonymous visitor
+- **Main Flow**:
+  1. User clicks "Sign in with Google" on the login/register screen.
+  2. Google authentication modal returns a cryptographically signed Google ID Token (credential).
+  3. Frontend sends ID Token to backend `POST /api/v1/auth/google`.
+  4. Backend validates token signature with Google's public certs, retrieves verified email/Google ID, provisions a new account or links an existing account, and issues standard app session tokens.
+
+## 4.0D UC-00D: Automatic Token Refresh & Rotation
+- **Actor**: Authenticated user (background client interceptor)
+- **Main Flow**:
+  1. Frontend API client detects an expired Access Token (`401 Unauthorized` or preemptive expiry timer).
+  2. Client calls `POST /api/v1/auth/refresh` (cookie sent automatically).
+  3. Backend verifies token hash against database, marks previous token as used/revoked, stores new rotated token hash, and returns a fresh Access Token + updated cookie.
+  4. Client retries the failed API request seamlessly.
+
+## 4.0E UC-00E: Forgot & Reset Password
+- **Actor**: Unauthenticated user
+- **Main Flow**:
+  1. User requests password reset at `/forgot-password` providing email.
+  2. Backend generates a secure cryptographic reset token and stores hash with expiration.
+  3. User navigates to `/reset-password?token=...`, enters a new password, and submits `POST /api/v1/auth/reset-password`.
+  4. Backend verifies token, updates user's password hash, revokes all active refresh sessions, and confirms reset.
+
+## 4.0F UC-00F: Secure Logout & Multi-Device Revocation
+- **Actor**: Authenticated user
+- **Main Flow**:
+  1. User clicks "Logout" (single device) or "Logout from all devices".
+  2. Frontend calls `POST /api/v1/auth/logout` or `POST /api/v1/auth/logout-all` with Bearer token.
+  3. Backend marks corresponding refresh token hash(es) as revoked in the database and clears the refresh cookie.
+  4. Frontend purges in-memory Access Token and redirects to `/login`.
+
+## 4.1 UC-01: Add Expense
+- **Actor**: Authenticated user (User A)
+- **Preconditions**: User is logged in; at least one category and payment method exist.
 - **Main Flow**:
   1. User opens the "Add Expense" form.
-  2. User enters amount, selects category, selects payment method, selects/confirms date (defaults to today), optionally enters a description.
-  3. Frontend validates input locally.
-  4. Frontend calls `POST /api/v1/expenses`.
-  5. Backend validates and persists the expense.
-  6. Frontend displays success feedback and updates relevant views (list, dashboard, budget) without requiring a full page reload.
-- **Alternate Flow**: Validation fails (client or server) → field-level error is shown; valid fields are preserved.
-- **Postcondition**: A new expense exists and is reflected in all dependent aggregates (totals, category breakdown, budget, dashboard).
+  2. User enters amount, selects category, selects payment method, confirms date, and optional description.
+  3. Frontend sends `POST /api/v1/expenses` with `Authorization: Bearer <token>`.
+  4. Backend derives `current_user.id` from JWT, validates data, and persists expense with `user_id = current_user.id`.
+  5. UI updates list, dashboard, and budget views.
+- **Postcondition**: Expense belongs strictly to User A.
 
 ## 4.2 UC-02: View / Search / Filter / Sort Expenses
-
-- **Actor**: The single user
+- **Actor**: Authenticated user (User A)
 - **Main Flow**:
-  1. User navigates to the expense list.
-  2. User optionally applies search text, date range, category, payment method, or amount filters, and a sort order.
-  3. Frontend calls `GET /api/v1/expenses` with corresponding query parameters.
-  4. Backend returns a paginated, filtered, sorted result set.
-  5. Frontend renders the results, or an empty state if no results match.
+  1. User navigates to `/expenses`.
+  2. Frontend calls `GET /api/v1/expenses` with active filters.
+  3. Backend queries `expenses` filtered strictly by `user_id == current_user.id`. User B's expenses are never included.
+  4. Frontend renders User A's expense list.
 
 ## 4.3 UC-03: Edit Expense
-
-- **Actor**: The single user
+- **Actor**: Authenticated user (User A)
 - **Main Flow**:
-  1. User selects an existing expense.
-  2. Form pre-fills with current values.
-  3. User edits one or more fields.
-  4. Frontend calls `PATCH /api/v1/expenses/{expense_id}`.
-  5. Backend validates and persists changes; dependent aggregates recompute on next fetch.
+  1. User edits an expense and submits `PATCH /api/v1/expenses/{id}`.
+  2. Backend verifies `expense.user_id == current_user.id`. If matching, updates record.
+  3. If another user (User B) attempts to edit User A's expense ID, backend returns `404 Not Found`.
 
 ## 4.4 UC-04: Delete Expense
-
-- **Actor**: The single user
+- **Actor**: Authenticated user (User A)
 - **Main Flow**:
-  1. User initiates delete on an expense.
-  2. Frontend shows a confirmation prompt (destructive action).
-  3. On confirmation, frontend calls `DELETE /api/v1/expenses/{expense_id}`.
-  4. Backend removes the record; dependent aggregates recompute on next fetch.
+  1. User initiates delete and confirms dialog.
+  2. Frontend calls `DELETE /api/v1/expenses/{id}`.
+  3. Backend verifies `expense.user_id == current_user.id` and removes record. If ID belongs to another user, returns `404 Not Found`.
 
 ## 4.5 UC-05: Manage Categories
-
-- **Actor**: The single user
-- **Main Flow**: Create category (unique name) → rename category → attempt delete (blocked for starter categories; for custom categories, referenced expenses are reassigned to `Uncategorized` per Section 10.3, then the category is removed).
+- **Actor**: Authenticated user (User A)
+- **Main Flow**: User creates/renames custom categories (`user_id = current_user.id`). User can see system starter categories (`user_id = NULL, is_default = true`) and their own custom categories. User cannot view or mutate User B's custom categories.
 
 ## 4.6 UC-06: Manage Payment Methods
+- **Actor**: Authenticated user (User A)
+- **Main Flow**: Same isolation and default protection rules as categories.
 
-- Same shape as UC-05, applied to payment methods.
-
-## 4.7 UC-07: Set / Update Monthly Budget
-
-- **Actor**: The single user
+## 4.7 UC-07: Set / Update Budget
+- **Actor**: Authenticated user (User A)
 - **Main Flow**:
-  1. User navigates to Budget screen.
-  2. User enters or edits the overall monthly budget amount.
-  3. Frontend calls `PUT /api/v1/budget` (idempotent upsert of the singular budget resource).
-  4. Backend persists the value; budget status becomes available on `GET /api/v1/budget` and the dashboard.
+  1. User selects period granularity (Month/Week/Day) and target key.
+  2. User enters budget amount and submits `PUT /api/v1/budget`.
+  3. Backend upserts budget record strictly scoped to `(user_id, period_type, period_key)`.
 
 ## 4.8 UC-08: View Dashboard
-
-- **Actor**: The single user
 - **Main Flow**:
   1. User opens the dashboard (default landing screen).
   2. Frontend calls `GET /api/v1/dashboard`.
@@ -395,76 +456,114 @@ PostgreSQL
 
 ## 6.2 Entities
 
-### 6.2.1 `users` (present for future compatibility only — not used by any V1 auth flow)
+### 6.2.1 `users`
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | UUID | PK, default `gen_random_uuid()` |
-| display_name | VARCHAR(100) | NOT NULL, default `'Primary User'` |
+| email | VARCHAR(255) | NOT NULL, UNIQUE, index |
+| password_hash | VARCHAR(255) | NULL (nullable for OAuth-only users) |
+| google_id | VARCHAR(255) | NULL, UNIQUE, index |
+| display_name | VARCHAR(100) | NOT NULL, default `'User'` |
+| avatar_url | VARCHAR(512) | NULL |
+| is_verified | BOOLEAN | NOT NULL, default `true` |
 | created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 | updated_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 
-> V1 seeds exactly one row in `users` at initialization and does not expose any user-management endpoint. No foreign key from `expenses`/`budgets` to `users` is enforced as a hard business requirement in V1 routing/business logic, but the column exists (nullable-safe default to the single seeded user) to avoid a breaking schema change in Phase 3.
+### 6.2.2 `refresh_tokens`
 
-### 6.2.2 `categories`
+| Column | Type | Constraints |
+|---|---|---|
+| id | UUID | PK, default `gen_random_uuid()` |
+| user_id | UUID | NOT NULL, FK → `users.id` (`ON DELETE CASCADE`) |
+| token_hash | VARCHAR(255) | NOT NULL, index |
+| expires_at | TIMESTAMPTZ | NOT NULL |
+| is_revoked | BOOLEAN | NOT NULL, default `false` |
+| user_agent | VARCHAR(255) | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
+| updated_at | TIMESTAMPTZ | NOT NULL, default `now()` |
+
+**Rules**: Stores only the cryptographic hash (SHA-256) of active/revoked refresh tokens. When rotated, the old token hash is marked `is_revoked = true` or replaced. During logout/revocation, tokens for the target session or all user sessions are marked revoked.
+
+### 6.2.3 `password_reset_tokens`
+
+| Column | Type | Constraints |
+|---|---|---|
+| id | UUID | PK, default `gen_random_uuid()` |
+| user_id | UUID | NOT NULL, FK → `users.id` (`ON DELETE CASCADE`) |
+| token_hash | VARCHAR(255) | NOT NULL, index |
+| expires_at | TIMESTAMPTZ | NOT NULL |
+| is_used | BOOLEAN | NOT NULL, default `false` |
+| created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
+
+### 6.2.4 `categories`
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | UUID | PK |
-| name | VARCHAR(60) | NOT NULL, UNIQUE |
+| user_id | UUID | NULL, FK → `users.id` (`ON DELETE CASCADE`) |
+| name | VARCHAR(60) | NOT NULL |
 | is_default | BOOLEAN | NOT NULL, default `false` |
 | created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 | updated_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 
-**Rules**: Rows with `is_default = true` (starter categories, including the reserved `Uncategorized` fallback) cannot be deleted at the service layer, regardless of any client request. Rename is permitted on all rows.
+**Rules**: Starter categories have `is_default = true` and `user_id = NULL`. Custom categories have `is_default = false` and `user_id = current_user.id`. Starter categories cannot be deleted.
 
-### 6.2.3 `payment_methods`
+### 6.2.5 `payment_methods`
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | UUID | PK |
-| name | VARCHAR(60) | NOT NULL, UNIQUE |
+| user_id | UUID | NULL, FK → `users.id` (`ON DELETE CASCADE`) |
+| name | VARCHAR(60) | NOT NULL |
 | is_default | BOOLEAN | NOT NULL, default `false` |
 | created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 | updated_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 
-Same protection rules as `categories`.
+Same protection and ownership rules as `categories`.
 
-### 6.2.4 `expenses`
+### 6.2.6 `expenses`
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | UUID | PK |
+| user_id | UUID | NOT NULL, FK → `users.id` (`ON DELETE CASCADE`) |
 | amount | NUMERIC(12,2) | NOT NULL, `CHECK (amount > 0)` |
-| category_id | UUID | NOT NULL, FK → `categories.id` (`ON DELETE RESTRICT` at DB level; reassignment is handled by the service layer *before* deletion — see 10.3) |
-| payment_method_id | UUID | NOT NULL, FK → `payment_methods.id` (`ON DELETE RESTRICT`, same reassignment pattern) |
-| date | DATE | NOT NULL, application-level `CHECK`: not later than current date (enforced in service layer; DB-level check avoided since "current date" is not constant at migration time) |
+| category_id | UUID | NOT NULL, FK → `categories.id` (`ON DELETE RESTRICT`) |
+| payment_method_id | UUID | NOT NULL, FK → `payment_methods.id` (`ON DELETE RESTRICT`) |
+| date | DATE | NOT NULL, application-level `CHECK`: not later than current date |
 | description | VARCHAR(255) | NULL |
 | created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 | updated_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 
-**Indexes**: `idx_expenses_date`, `idx_expenses_category_id`, `idx_expenses_payment_method_id`, composite `idx_expenses_date_category` to support common dashboard/summary queries.
+**Indexes**: `idx_expenses_user_id`, `idx_expenses_date`, `idx_expenses_category_id`, `idx_expenses_payment_method_id`, composite `idx_expenses_user_date` (`user_id`, `date`), composite `idx_expenses_user_category` (`user_id`, `category_id`).
 
-### 6.2.5 `budgets`
-
-Singular resource, modeled as a table to preserve auditability and forward compatibility, but exposed through the API as a single logical resource (`GET/PUT /api/v1/budget`).
+### 6.2.7 `budgets`
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | UUID | PK |
+| user_id | UUID | NOT NULL, FK → `users.id` (`ON DELETE CASCADE`) |
+| period_type | VARCHAR(10) | NOT NULL, default `'month'` |
+| period_key | VARCHAR(20) | NOT NULL, index |
+| month | VARCHAR(7) | NULL |
 | amount | NUMERIC(12,2) | NOT NULL, `CHECK (amount >= 0)` |
 | created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 | updated_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 
-**Rule**: The service layer guarantees at most one row exists in V1 (upsert semantics on `PUT /api/v1/budget`). This avoids premature introduction of multiple/period-scoped budgets, per PRD Section 9.9 and Assumption in Section 18 ("One overall monthly budget is sufficient").
+**Constraints**: `CHECK (amount >= 0)`, `UniqueConstraint("user_id", "period_type", "period_key", name="uq_user_budget_period")`.
 
 ## 6.3 Entity Relationship Summary
 
 ```
+users (1) ──< (many) expenses
+users (1) ──< (many) budgets
+users (1) ──< (many) custom categories
+users (1) ──< (many) custom payment_methods
+users (1) ──< (many) refresh_tokens
+users (1) ──< (many) password_reset_tokens
 categories (1) ──< (many) expenses
 payment_methods (1) ──< (many) expenses
-budgets: standalone singular resource, no FK to expenses (computed comparison happens in service layer)
-users: standalone seed row, reserved for future FK relationships (Phase 3+)
 ```
 
 ## 6.4 Referential Integrity Rule (Category/Payment Method Deletion)
@@ -499,18 +598,139 @@ This satisfies FR-08 ("Category removal must not make existing expense records u
 
 # 7. API Specification
 
-## 7.1 Conventions
+## 7.1 Conventions & Authorization
 
 - Base path: `/api/v1`
 - All request/response bodies are JSON.
-- All monetary fields are serialized as strings with two decimal places (e.g., `"amount": "42.50"`) to avoid floating-point precision loss in transit; the frontend parses these as decimal-safe values.
+- All monetary fields are serialized as strings with two decimal places (e.g., `"amount": "42.50"`).
 - All dates are ISO-8601 (`YYYY-MM-DD`); all timestamps are ISO-8601 UTC with `Z` suffix.
 - Resource identifiers are UUID strings.
+- **Protected Endpoints**: Require header `Authorization: Bearer <access_token>`. Missing, invalid, or expired tokens return `401 Unauthorized`.
+- **User Scoping**: Every protected endpoint strictly accesses and mutates only resources belonging to `current_user.id` derived from the validated JWT. Attempting to query, mutate, or delete another user's entity returns `404 Not Found`.
 
-## 7.2 Expenses
+## 7.2 Authentication Endpoints (`/api/v1/auth`)
+
+### `POST /api/v1/auth/register`
+- **Purpose**: Register a new user account.
+- **Request body**:
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!",
+  "display_name": "Alex"
+}
+```
+- **Validation**: `email` valid format; `password` min 8 chars with complexity; `display_name` optional (1–100 chars).
+- **Success**: `201 Created`, returns `UserRead` + `access_token` and sets `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth` cookie `paradox_refresh_token`.
+```json
+{
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "display_name": "Alex",
+    "avatar_url": null,
+    "created_at": "2026-08-31T12:00:00Z"
+  },
+  "access_token": "eyJhbGciOi...",
+  "token_type": "bearer",
+  "expires_in": 900
+}
+```
+- **Errors**: `409 Conflict` if email already registered; `422` validation error.
+
+### `POST /api/v1/auth/login`
+- **Purpose**: Authenticate existing user with email and password.
+- **Request body**:
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+```
+- **Success**: `200 OK`, returns `TokenResponse` (same shape as register) and sets rotated `paradox_refresh_token` cookie.
+- **Errors**: `401 Unauthorized` ("Invalid email or password"); `429 Too Many Requests` (rate limited).
+
+### `POST /api/v1/auth/google`
+- **Purpose**: Authenticate via Google OAuth 2.0 / OpenID Connect.
+- **Request body**:
+```json
+{
+  "id_token": "eyJhbGciOiJSUzI1NiIs..."
+}
+```
+- **Validation**: Backend cryptographically verifies `id_token` against Google public keys and validates audience against `GOOGLE_CLIENT_ID`.
+- **Behavior**: Retrieves verified `email`, `sub` (Google ID), `name`, `picture`. If user exists, links Google ID if not set; if new, provisions account. Issues application access token + refresh cookie.
+- **Success**: `200 OK`, returns `TokenResponse` + sets refresh cookie.
+- **Errors**: `401 Unauthorized` if Google ID token is invalid or expired.
+
+### `POST /api/v1/auth/refresh`
+- **Purpose**: Rotate refresh token and issue a new access token.
+- **Request**: Cookie `paradox_refresh_token`.
+- **Behavior**: Hashes cookie value (SHA-256), finds active token in `refresh_tokens` table, marks old token revoked/used, creates new token hash, sets new refresh cookie, and returns fresh access token.
+- **Success**: `200 OK`, returns `{ "access_token": "...", "token_type": "bearer", "expires_in": 900 }`.
+- **Errors**: `401 Unauthorized` if refresh token is missing, expired, or revoked.
+
+### `POST /api/v1/auth/logout`
+- **Purpose**: Securely log out current device session.
+- **Headers**: Optional `Authorization: Bearer <token>`, Cookie `paradox_refresh_token`.
+- **Behavior**: Marks active refresh token hash as `is_revoked = true` in DB and clears `paradox_refresh_token` cookie with max-age=0.
+- **Success**: `200 OK` or `204 No Content`.
+
+### `POST /api/v1/auth/logout-all`
+- **Purpose**: Revoke all active sessions for the authenticated user across all devices.
+- **Headers**: `Authorization: Bearer <token>`.
+- **Behavior**: Marks all refresh tokens for `current_user.id` as `is_revoked = true` and clears client cookie.
+- **Success**: `200 OK`, `{ "message": "Successfully logged out from all devices" }`.
+- **Errors**: `401 Unauthorized`.
+
+### `GET /api/v1/auth/me`
+- **Purpose**: Retrieve the profile of the currently authenticated user.
+- **Headers**: `Authorization: Bearer <token>`.
+- **Success**: `200 OK`, returns `UserRead`.
+- **Errors**: `401 Unauthorized`.
+
+### `POST /api/v1/auth/forgot-password`
+- **Purpose**: Request a password reset token.
+- **Request body**: `{ "email": "user@example.com" }`
+- **Behavior**: Generates a secure random reset token, stores SHA-256 hash in `password_reset_tokens` with 1-hour expiry. (In development/testing, token may be logged or returned in safe non-prod environments; in production, emailed). Returns generic success to prevent email enumeration.
+- **Success**: `200 OK`, `{ "message": "If this email is registered, a password reset link has been sent." }`.
+- **Errors**: `429 Too Many Requests` (rate limited).
+
+### `POST /api/v1/auth/reset-password`
+- **Purpose**: Set a new password using a valid reset token.
+- **Request body**:
+```json
+{
+  "token": "reset_token_string",
+  "new_password": "NewSecurePassword123!"
+}
+```
+- **Validation**: Token exists, `is_used = false`, not expired; `new_password` meets strength rules.
+- **Behavior**: Hashes new password, updates user, marks token used, and revokes all active refresh tokens for the user.
+- **Success**: `200 OK`, `{ "message": "Password has been successfully reset." }`.
+- **Errors**: `400 Bad Request` or `401 Unauthorized` if token is invalid or expired.
+
+### `POST /api/v1/auth/change-password`
+- **Purpose**: Change password for currently authenticated user.
+- **Headers**: `Authorization: Bearer <token>`.
+- **Request body**:
+```json
+{
+  "current_password": "OldPassword123!",
+  "new_password": "NewPassword123!"
+}
+```
+- **Success**: `200 OK`, `{ "message": "Password changed successfully." }`.
+- **Errors**: `400 Bad Request` if current password incorrect; `401 Unauthorized`.
+
+---
+
+## 7.3 Expenses
+
+All expense endpoints require `Authorization: Bearer <token>` and operate strictly on rows where `expenses.user_id == current_user.id`.
 
 ### `POST /api/v1/expenses`
-- **Purpose**: Create a new expense.
+- **Purpose**: Create a new expense for the authenticated user.
 - **Request body**:
 ```json
 {
@@ -521,116 +741,113 @@ This satisfies FR-08 ("Category removal must not make existing expense records u
   "description": "Lunch"
 }
 ```
-- **Validation**: `amount > 0`; `date <= today`; `category_id` and `payment_method_id` must reference existing rows; `description` optional, max 255 chars.
-- **Success**: `201 Created`, returns the created expense (`ExpenseRead`).
-- **Errors**: `422` validation error; `404` if referenced category/payment method does not exist.
+- **Validation**: `amount > 0`; `date <= today`; `category_id` and `payment_method_id` must reference valid categories/methods (system default or user-owned); `description` optional (≤ 255 chars).
+- **Success**: `201 Created`, returns `ExpenseRead` (with `user_id = current_user.id`).
+- **Errors**: `401 Unauthorized`; `422 Validation Error`; `404` if referenced category/method not found.
 
 ### `GET /api/v1/expenses`
-- **Purpose**: List expenses with search, filter, sort, pagination.
-- **Query parameters**:
-
-| Param | Type | Notes |
-|---|---|---|
-| `search` | string | matches `description` (case-insensitive substring); always combinable with any filter/sort/pagination |
-| `category_id` | UUID | single-dimension filter (V1) — mutually exclusive with `date_from`/`date_to` (Section 3.4.1) |
-| `date_from` | date | inclusive; single-dimension filter (V1) — mutually exclusive with `category_id` |
-| `date_to` | date | inclusive; single-dimension filter (V1) — mutually exclusive with `category_id` |
-| `sort_by` | enum: `date`, `amount`, `category` | default `date` |
-| `sort_order` | enum: `asc`, `desc` | default `desc` |
-| `page` | int | default `1` |
-| `page_size` | int | default `20`, max `100` |
-
-> `payment_method_id`, `amount_min`, and `amount_max` are **not** V1 query parameters (see Section 3.4.1). Introducing them is a future-phase, non-MVP change.
-
-- **Success**: `200 OK`, returns a paginated envelope (Section 8.3).
-- **Errors**: `422` on invalid query parameters — e.g., `date_from > date_to`, or **both** `category_id` and a date-range parameter supplied in the same request (Section 3.4.1).
+- **Purpose**: List authenticated user's expenses with search, filter, sort, pagination.
+- **Query parameters**: `search`, `category_id`, `date_from`, `date_to`, `sort_by` (`date` | `amount` | `category`), `sort_order` (`asc` | `desc`), `page`, `page_size`.
+- **Success**: `200 OK`, returns paginated envelope scoped strictly to `current_user.id`.
 
 ### `GET /api/v1/expenses/{expense_id}`
-- **Purpose**: Retrieve a single expense.
+- **Purpose**: Retrieve a single expense by ID.
 - **Success**: `200 OK`.
-- **Errors**: `404` if not found.
+- **Errors**: `404 Not Found` if expense does not exist or belongs to another user (never leaks data).
 
 ### `PATCH /api/v1/expenses/{expense_id}`
-- **Purpose**: Partially update an expense.
-- **Request body**: any subset of `amount`, `category_id`, `payment_method_id`, `date`, `description`.
-- **Validation**: same rules as creation, applied to the resulting merged record.
+- **Purpose**: Partially update an expense owned by the authenticated user.
 - **Success**: `200 OK`, returns updated expense.
-- **Errors**: `404` not found; `422` validation.
+- **Errors**: `404 Not Found` if expense belongs to another user; `422 Validation Error`.
 
 ### `DELETE /api/v1/expenses/{expense_id}`
-- **Purpose**: Delete an expense.
+- **Purpose**: Delete an expense owned by the authenticated user.
 - **Success**: `204 No Content`.
-- **Errors**: `404` not found.
+- **Errors**: `404 Not Found` if expense belongs to another user.
 
-## 7.3 Categories
+---
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/api/v1/categories` | Create custom category (`name`, unique, non-empty, ≤ 60 chars) |
-| GET | `/api/v1/categories` | List all categories (starter + custom), includes `is_default` |
-| GET | `/api/v1/categories/{category_id}` | Retrieve one category |
-| PATCH | `/api/v1/categories/{category_id}` | Rename a category (starter or custom) |
-| DELETE | `/api/v1/categories/{category_id}` | Delete a custom category; `409 Conflict` if `is_default = true` |
+## 7.4 Categories
 
-Deleting a referenced custom category triggers the reassignment rule in Section 6.4 and returns `204 No Content` on success.
+### `POST /api/v1/categories`
+- **Purpose**: Create a custom category owned by the authenticated user (`user_id = current_user.id`, `is_default = false`).
+- **Request body**: `{ "name": "Travel" }`
+- **Success**: `201 Created`.
+- **Errors**: `409 Conflict` if category with same name exists for this user.
 
-## 7.4 Payment Methods
+### `GET /api/v1/categories`
+- **Purpose**: List system starter categories (`is_default = true`) plus custom categories owned by `current_user.id`.
+- **Success**: `200 OK`, array of categories.
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/api/v1/payment-methods` | Create custom payment method |
-| GET | `/api/v1/payment-methods` | List all payment methods |
-| PATCH | `/api/v1/payment-methods/{payment_method_id}` | Rename |
-| DELETE | `/api/v1/payment-methods/{payment_method_id}` | Delete (same protection/reassignment rules as categories) |
+### `GET /api/v1/categories/{category_id}`
+- **Purpose**: Retrieve a category if default or owned by user.
+- **Success**: `200 OK`.
+- **Errors**: `404 Not Found`.
 
-> Note: per the finalized prompt, no single-resource `GET /{id}` was specified for payment methods; `GET /api/v1/payment-methods` (list) is sufficient for V1 and is retained as specified.
+### `PATCH /api/v1/categories/{category_id}`
+- **Purpose**: Rename a category (if starter, or custom owned by user).
+- **Success**: `200 OK`.
+- **Errors**: `404 Not Found` if custom category belongs to another user.
 
-## 7.5 Budget
+### `DELETE /api/v1/categories/{category_id}`
+- **Purpose**: Delete a custom category owned by the authenticated user. If expenses reference it, they are reassigned to `Uncategorized` inside the transaction.
+- **Errors**: `409 Conflict` if `is_default = true`; `404 Not Found` if owned by another user.
+
+---
+
+## 7.5 Payment Methods
+
+Follows the identical pattern as Categories:
+- `POST /api/v1/payment-methods`: Create custom payment method for `current_user.id`.
+- `GET /api/v1/payment-methods`: List system defaults + user custom payment methods.
+- `PATCH /api/v1/payment-methods/{id}`: Rename.
+- `DELETE /api/v1/payment-methods/{id}`: Delete custom method; reassigns referencing expenses to `Other`.
+
+---
+
+## 7.6 Budget (Multi-Granularity)
 
 ### `GET /api/v1/budget`
-- Returns the current singular budget resource: `{ "amount": "2000.00", "updated_at": "..." }`. If no budget has ever been set, returns `200 OK` with `amount: null` (documented empty state, not a `404`, since budget is a singular always-addressable resource).
+- **Purpose**: Retrieve budget for a specific period granularity (`month` | `week` | `day`) and `period_key` for `current_user.id`.
+- **Query params**: `period_type` (default `month`), `period_key` (e.g. `2026-08`, `2026-W35`, `2026-08-31`).
+- **Success**: `200 OK`, returns budget resource or `amount: null` if unconfigured.
+
+### `GET /api/v1/budget/all`
+- **Purpose**: List all configured budgets for the authenticated user (optional `period_type` filter).
+- **Success**: `200 OK`, array of budgets.
 
 ### `PUT /api/v1/budget`
-- **Request body**: `{ "amount": "2000.00" }`
-- **Validation**: `amount >= 0`.
-- **Behavior**: Upsert — creates the budget row if none exists, otherwise updates the existing one.
-- **Success**: `200 OK`, returns the updated budget resource.
-
-## 7.6 Dashboard
-
-### `GET /api/v1/dashboard`
-- **Purpose**: Single aggregated read model for the dashboard screen.
-- **Query parameters**: `period` (optional, enum: `current_month` default, `last_30_days`, `current_week`) — scopes totals/trend/top-categories; recent expenses are always the most recent N regardless of `period`.
-- **Response body**:
+- **Purpose**: Upsert budget target for `current_user.id`.
+- **Request body**:
 ```json
 {
-  "period": "current_month",
-  "total_spent": "845.00",
-  "budget": {
-    "amount": "2000.00",
-    "spent": "845.00",
-    "remaining": "1155.00",
-    "status": "under_budget"
-  },
-  "category_breakdown": [
-    { "category_id": "uuid", "category_name": "Food", "total": "320.00", "percentage": 37.9 }
-  ],
-  "top_categories": [
-    { "category_id": "uuid", "category_name": "Food", "total": "320.00" }
-  ],
-  "trend": [
-    { "label": "Week 1", "total": "210.00" }
-  ],
-  "recent_expenses": [ { "...": "ExpenseRead objects, limited to 5" } ]
+  "period_type": "month",
+  "period_key": "2026-08",
+  "amount": "2500.00"
 }
 ```
-- **Success**: `200 OK`. Empty-safe: with zero expenses, all totals are `"0.00"`, arrays are empty, and `budget.status` is omitted or `null` if no budget is set — never fabricated data (FR-23).
+- **Success**: `200 OK`, returns updated budget.
 
-## 7.7 System
+### `DELETE /api/v1/budget`
+- **Purpose**: Delete a configured budget for a given `period_type` and `period_key`.
+- **Success**: `204 No Content`.
+
+---
+
+## 7.7 Dashboard
+
+### `GET /api/v1/dashboard`
+- **Purpose**: Single aggregated read model for dashboard screen strictly filtered by `user_id == current_user.id`.
+- **Query parameters**: `period` (`current_month` default, `last_30_days`, `current_week`).
+- **Success**: `200 OK`. Empty-safe when user has no expenses (totals `"0.00"`, empty lists).
+
+---
+
+## 7.8 System
 
 ### `GET /api/v1/health`
-- **Purpose**: Liveness/readiness check for deployment platforms (Render) and monitoring.
-- **Response**: `{ "status": "ok", "database": "connected" }` with `200 OK`, or `503 Service Unavailable` with `"database": "unreachable"` if the DB connection check fails.
+- **Purpose**: Liveness/readiness check (public endpoint, no auth required).
+- **Response**: `{ "status": "ok", "database": "connected" }` with `200 OK`.
 
 ---
 
@@ -687,10 +904,13 @@ See Section 15 for the full error taxonomy.
 | 200 | Successful GET/PATCH/PUT |
 | 201 | Successful POST (resource created) |
 | 204 | Successful DELETE (no content) |
-| 400 | Malformed request (rare; prefer 422) |
-| 404 | Resource not found |
-| 409 | Conflict (e.g., duplicate category name, deleting a protected starter entity) |
-| 422 | Validation error (schema or business rule) |
+| 400 | Malformed request (e.g. invalid current password) |
+| 401 | Unauthorized (missing, invalid, expired, or revoked token / bad credentials) |
+| 403 | Forbidden (valid token, but access to requested action is denied) |
+| 404 | Resource not found (or entity belongs to another user) |
+| 409 | Conflict (e.g. duplicate email, duplicate category name, deleting protected starter entity) |
+| 422 | Validation error (schema or business rule failure) |
+| 429 | Too Many Requests (rate limited login or password reset endpoint) |
 | 500 | Unhandled server error |
 | 503 | Health check failure |
 
@@ -710,6 +930,8 @@ Three layers, each with a distinct responsibility, none a substitute for the oth
 
 - Frontend validation is implemented using **Zod** schemas (`src/features/<domain>/schemas/`), shared between form validation and TypeScript typing via `z.infer`. Zod is a frontend dependency declared in `frontend/package.json`.
 - Required-field validation before submission is allowed.
+- Email fields validate RFC 5322 compliance client-side.
+- Password fields enforce minimum 8 characters and complexity (numbers, mixed case, special characters).
 - Numeric/monetary inputs must reject non-numeric characters and enforce a positive-value constraint client-side.
 - Date pickers must disallow selecting a future date at the UI level.
 - Field-level error messages render adjacent to the relevant input.
@@ -719,20 +941,27 @@ Three layers, each with a distinct responsibility, none a substitute for the oth
 ## 9.3 Backend Validation
 
 - All request bodies are validated via Pydantic schemas (`app/schemas/*`) before reaching the service layer.
-- Business rules not expressible purely in schema terms (e.g., "category must exist", "date not in the future" relative to server clock) are enforced in the service layer.
+- Email normalization (lowercased, trimmed) and password hashing verification are handled in the security/service layer.
+- Business rules not expressible purely in schema terms (e.g., "category must exist and belong to user or be default", "date not in the future" relative to server clock) are enforced in the service layer.
 - Database-level constraints (`CHECK`, `NOT NULL`, `UNIQUE`, foreign keys) provide a final integrity backstop independent of application code correctness.
 
 ## 9.4 Field-Level Rules Summary
 
 | Field | Rule |
 |---|---|
-| `expense.amount` | Required; decimal > 0; max 2 decimal places; reasonable upper bound (e.g., < 10,000,000) to catch obvious data-entry errors |
+| `user.email` | Required; valid email format; trimmed; lowercased; max 255 chars; unique in database |
+| `user.password` | Required on registration/reset/change; min 8 characters; max 128 characters; hashed with BCrypt/Argon2 |
+| `user.display_name` | Optional; 1 to 100 characters; trimmed |
+| `auth.token` | Required for reset-password / Google OAuth verification; non-empty string |
+| `expense.amount` | Required; decimal > 0; max 2 decimal places; reasonable upper bound (e.g., < 10,000,000) |
 | `expense.date` | Required; valid ISO date; must not be after current server date |
-| `expense.category_id` | Required; must reference an existing category |
-| `expense.payment_method_id` | Required; must reference an existing payment method |
+| `expense.category_id` | Required; must reference an existing starter or user-owned category |
+| `expense.payment_method_id` | Required; must reference an existing starter or user-owned payment method |
 | `expense.description` | Optional; max 255 characters |
-| `category.name` / `payment_method.name` | Required; non-empty after trim; max 60 characters; unique (case-insensitive) |
+| `category.name` / `payment_method.name` | Required; non-empty after trim; max 60 characters; unique per user |
 | `budget.amount` | Required; decimal ≥ 0; max 2 decimal places |
+| `budget.period_type` | Required; enum: `'month'`, `'week'`, `'day'` |
+| `budget.period_key` | Required; regex validated (`YYYY-MM`, `YYYY-Www`, `YYYY-MM-DD`) |
 
 ---
 
@@ -865,83 +1094,128 @@ The backend must follow the structure defined in Section 23.1 exactly, with the 
 
 | Module | Responsibility |
 |---|---|
-| `app/main.py` | FastAPI app instantiation, middleware registration, router inclusion |
+| `app/main.py` | FastAPI app instantiation, middleware registration (CORS, Rate Limiting), router inclusion |
 | `app/api/router.py` | Aggregates all resource routers under `/api/v1` |
-| `app/api/deps.py` | Shared dependencies (DB session provider, pagination params, etc.) |
-| `app/core/config.py` | Environment-driven settings (Pydantic `BaseSettings`) |
-| `app/core/exceptions.py` | Domain exception classes (e.g., `NotFoundError`, `ValidationError`, `ConflictError`) |
+| `app/api/auth.py` | Authentication router (`/register`, `/login`, `/google`, `/refresh`, `/logout`, `/logout-all`, `/me`, `/forgot-password`, `/reset-password`, `/change-password`) |
+| `app/api/deps.py` | Shared dependencies (`get_db`, `get_current_user` for JWT security context, pagination params) |
+| `app/core/config.py` | Environment-driven settings (Pydantic `BaseSettings`) including JWT secrets and OAuth keys |
+| `app/core/security.py` | Cryptographic utilities (BCrypt password hashing, JWT encoding/decoding, SHA-256 token hashing, Google ID token verification) |
+| `app/core/exceptions.py` | Domain exception classes (`NotFoundError`, `ValidationError`, `ConflictError`, `AuthenticationError`, `AuthorizationError`, `RateLimitError`) |
 | `app/core/error_handlers.py` | FastAPI exception handlers translating domain exceptions to the standard error envelope (Section 8.4) |
-| `app/core/logging.py` | Structured logging configuration |
-| `app/core/security.py` | Reserved for future auth-related utilities (not exercised by V1 endpoints) |
+| `app/core/logging.py` | Structured logging configuration (sanitizing tokens/passwords) |
 | `app/db/session.py` | Async SQLAlchemy engine/session factory |
 | `app/db/base.py` | Declarative base and model registry for Alembic autogeneration |
-| `app/db/models/*` | SQLAlchemy ORM entities |
-| `app/schemas/*` | Pydantic request/response models per resource |
-| `app/services/*` | Business logic per resource |
-| `app/repositories/*` | Database access per resource |
+| `app/db/models/*` | SQLAlchemy ORM entities (`User`, `RefreshToken`, `PasswordResetToken`, `Expense`, `Budget`, `Category`, `PaymentMethod`) |
+| `app/schemas/*` | Pydantic request/response models per resource and auth domain |
+| `app/services/*` | Business logic per resource (`AuthService`, `ExpenseService`, `CategoryService`, `PaymentMethodService`, `BudgetService`, `DashboardService`) |
+| `app/repositories/*` | Database access per resource enforcing `user_id` scoping |
 | `app/utils/pagination.py` | Shared pagination helper logic |
 | `app/utils/datetime.py` | Date/time normalization helpers |
-| `app/utils/money.py` | Decimal-safe monetary helpers (parsing, formatting, rounding) |
-| `app/constants/categories.py` | Starter category seed definitions, referenced by the seed migration |
+| `app/utils/money.py` | Decimal-safe monetary helpers |
+| `app/constants/categories.py` | Starter category seed definitions |
 | `app/constants/payment_methods.py` | Starter payment method seed definitions |
 
 ## 12.3 Backend Behavioral Requirements
 
 - All I/O (database calls) is asynchronous (`asyncpg` + SQLAlchemy async session).
-- Every service method that mutates data must be wrapped in a single database transaction; partial writes must not be possible (relevant especially to Section 10.3's reassign-then-delete operation).
-- Services return domain-level results or raise domain exceptions; routers translate these into HTTP responses via the standard envelopes.
-- Pagination defaults (`page=1`, `page_size=20`, `max page_size=100`) are enforced centrally in `utils/pagination.py`, not duplicated per router.
+- Every service method that mutates data must be wrapped in a single database transaction; partial writes must not be possible.
+- Every protected service and repository method accepts an explicit `user_id: UUID` from the authenticated security context.
+- Services return domain-level results or raise domain exceptions; routers translate these into HTTP responses via standard envelopes.
+- Pagination defaults (`page=1`, `page_size=20`, `max page_size=100`) are enforced centrally in `utils/pagination.py`.
 
 ---
 
-# 13. Authentication and Authorization
+# 13. Authentication, Authorization & User Data Isolation
 
-## 13.1 V1 Boundary (Explicit)
+## 13.1 Authentication Architecture
 
-- Paradox V1 is designed and implemented for **exactly one real user**, per PRD Phase 1 scope.
-- **No authentication/authorization enforcement is implemented in V1.** There is no login flow, no session/token issuance, and no per-request identity check on any endpoint.
-- The API is not intended for public/multi-tenant exposure in this phase; access control at the network/deployment level (e.g., environment restriction, not sharing the deployed URL) is the operator's responsibility, not an application feature of V1.
+Paradox implements a production-ready **JWT + HttpOnly Rotated Refresh Token** authentication model:
 
-## 13.2 Why a `users` Table Exists Despite No Auth
+```
+User Login / OAuth ──► Validates Credentials / Google ID Token
+                     │
+                     ├─► Issues Access Token (JWT, 15 min lifetime)
+                     │     └─► Sent in JSON response body ➔ Stored in-memory in frontend AuthContext
+                     │
+                     └─► Issues Refresh Token (Opaque string, 7–30 day lifetime)
+                           ├─► SHA-256 Hash stored in `refresh_tokens` table
+                           └─► Sent via `Set-Cookie: paradox_refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth`
+```
 
-A `users` table (Section 6.2.1) is included purely as a **forward-compatible schema placeholder** so that Phase 3 ("Multi-User Product Foundation") does not require a breaking schema migration. It is seeded with exactly one row and is not referenced by any V1 endpoint's authorization logic — this satisfies the finalized rule: *"Do not add authentication/multi-user implementation to V1 merely because a `User` entity may exist for future compatibility."*
+## 13.2 Token Lifecycle, Rotation & Revocation
 
-## 13.3 Future Phase Boundary (Non-MVP, documented for continuity only)
+1. **Short-Lived Access Token**:
+   - Lifetime: 10–15 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`).
+   - Signed with `JWT_SECRET_KEY` using algorithm `HS256`.
+   - Claims: `sub` (`user_id`), `email`, `exp`, `iat`, `type: "access"`.
+   - Passed in `Authorization: Bearer <access_token>` header on every API call.
+2. **Long-Lived Refresh Token**:
+   - Lifetime: 7–30 days (configurable via `REFRESH_TOKEN_EXPIRE_DAYS`).
+   - Stored in an `HttpOnly`, `Secure`, `SameSite="Lax"` cookie scoped to `Path=/api/v1/auth`.
+   - **Database Security**: The database never stores plaintext refresh tokens; only a cryptographic hash `SHA-256(token)` is persisted in `refresh_tokens`.
+3. **Refresh Token Rotation**:
+   - Calling `/api/v1/auth/refresh` looks up the hashed token in `refresh_tokens`.
+   - The used token is revoked or replaced.
+   - A brand-new refresh token is generated, hashed, persisted, and set in the response cookie along with a fresh access token.
+   - If an expired, revoked, or tampered token is presented, the request is rejected with `401 Unauthorized`.
+4. **Server-Side Session Revocation**:
+   - `/api/v1/auth/logout`: Revokes the current session's refresh token hash and clears the cookie.
+   - `/api/v1/auth/logout-all`: Marks all active refresh tokens for `current_user.id` as revoked in the database (`is_revoked = true`), immediately terminating all active mobile/desktop sessions.
 
-Phase 3 of the PRD will require: user registration/login, session or token-based authentication (e.g., JWT), per-request identity resolution, and row-level data isolation (e.g., a `user_id` foreign key enforced on `expenses`, `budgets`). None of this is implemented, stubbed, or partially wired in V1. See Section 26.
+## 13.3 Password Security & Hashing
+
+- All passwords are encrypted with `bcrypt` (or `argon2`) utilizing automatic salt generation.
+- Plaintext passwords are never stored, logged, or included in any API response or telemetry.
+- Minimum password length is 8 characters with strength requirements enforced in Zod (frontend) and Pydantic (backend).
+
+## 13.4 Google Sign-In (OAuth 2.0 / OpenID Connect)
+
+- Frontend obtains Google ID Token via Google Identity Services (`@react-oauth/google`).
+- ID Token is transmitted to `POST /api/v1/auth/google`.
+- Backend validates the token signature directly against Google's public JSON Web Key Sets (JWKS) and verifies `aud == GOOGLE_CLIENT_ID` and `iss in ["accounts.google.com", "https://accounts.google.com"]`.
+- The user is matched by verified email:
+  - If user exists, links `google_id` if missing.
+  - If user does not exist, provisions a new account with `is_verified = true` and `password_hash = null`.
+- Issues standard application Access Token and Refresh Token cookie.
+
+## 13.5 Row-Level Multi-Tenant User Data Isolation (CRITICAL)
+
+- **Zero Trust in Client Identifiers**: The backend never accepts or trusts a `user_id` query parameter or body field sent by the frontend for access control.
+- **SecurityContext Derivation**: FastAPI dependency `get_current_user` parses and cryptographically validates the Bearer JWT, fetches the user from the database, and injects `current_user: User` into routers.
+- **Strict Query Scoping**:
+  * **Expenses**: `select(Expense).where(Expense.user_id == current_user.id, ...)`
+  * **Budgets**: `select(Budget).where(Budget.user_id == current_user.id, ...)`
+  * **Categories**: `select(Category).where(or_(Category.is_default == True, Category.user_id == current_user.id))`
+  * **Payment Methods**: `select(PaymentMethod).where(or_(PaymentMethod.is_default == True, PaymentMethod.user_id == current_user.id))`
+- **Unauthorized Mutation Protection**: Attempting to view, edit, or delete another user's expense or custom entity returns `404 Not Found` (ensuring resource existence is never leaked).
 
 ---
 
 # 14. Security Requirements
 
-Even though V1 has no authentication layer, the following baseline security requirements apply:
-
 | ID | Requirement |
 |---|---|
-| SRS-SEC-01 | No secrets (database credentials, API keys) may be committed to version control. `.env` files are gitignored; only `.env.example` (placeholder values) is committed. |
-| SRS-SEC-02 | All configuration is sourced from environment variables via `app/core/config.py`, never hardcoded. |
-| SRS-SEC-03 | All request bodies are validated server-side (Section 9.3) regardless of frontend validation state. |
-| SRS-SEC-04 | Database access is limited to the application's own service account/connection string; no direct external database exposure beyond what the deployment platform (Supabase) requires. |
-| SRS-SEC-05 | Error responses returned to clients must not leak stack traces, SQL fragments, internal file paths, or other implementation details (Section 15.4). |
-| SRS-SEC-06 | CORS must be explicitly configured to allow only the known frontend origin(s) (local dev URL, deployed Vercel URL), not a wildcard, in non-development environments. |
-| SRS-SEC-07 | Financial data is treated as private; no endpoint exposes another entity's data since V1 is single-user, but the reassignment/deletion logic (Section 10.3) must never silently discard financial history — only reassign category/payment-method association. |
-| SRS-SEC-08 | Deployment configuration (Render, Vercel, Supabase) must use platform-managed secret storage rather than plaintext configuration files. |
-| SRS-SEC-09 | Dependency versions are pinned (`requirements.txt` / `pyproject.toml`, `package.json`) to avoid unreviewed transitive upgrades. |
+| SRS-SEC-01 | No secrets (JWT secret keys, database credentials, Google OAuth secrets) may be committed to version control. |
+| SRS-SEC-02 | All configuration is sourced from environment variables via `app/core/config.py`. |
+| SRS-SEC-03 | All request bodies and query parameters are validated server-side via Pydantic schemas. |
+| SRS-SEC-04 | Rate limiting is enforced on auth endpoints (`/auth/login`, `/auth/register`, `/auth/forgot-password`) to prevent brute-force attacks. |
+| SRS-SEC-05 | Error responses must not leak stack traces, SQL fragments, internal paths, or token secrets. |
+| SRS-SEC-06 | CORS is restricted to known frontend origins (`CORS_ALLOWED_ORIGINS`). |
+| SRS-SEC-07 | Refresh tokens are stored exclusively in `HttpOnly`, `Secure`, `SameSite=Lax` cookies to prevent XSS exfiltration. |
+| SRS-SEC-08 | Cookie-based refresh and logout endpoints are protected against CSRF via SameSite attributes and custom origin validation. |
+| SRS-SEC-09 | Passwords are hashed with BCrypt/Argon2 with high work factor before database insertion. |
+| SRS-SEC-10 | Dependency versions are pinned in `requirements.txt` and `package.json`. |
 
-## 14.1 Baseline Threat-Category Protections
+## 14.1 Threat-Category Protections
 
-The following clarifies V1's baseline posture per specific threat category. None of this introduces enterprise-grade security infrastructure — it is the minimum reasonable protection for a web application handling private financial data, appropriate to the single-user MVP scope.
-
-| Threat Category | V1 Protection |
+| Threat Category | Protection Mechanism |
 |---|---|
-| **CORS** | `CORS_ALLOWED_ORIGINS` (Section 19.1) explicitly whitelists the known frontend origin(s) only — local dev URL and the deployed Vercel URL. No wildcard (`*`) origin in any non-local environment (restates SRS-SEC-06). |
-| **XSS (Cross-Site Scripting)** | The frontend renders all user-supplied text (expense descriptions, category/payment-method names) through React's default escaping — no `dangerouslySetInnerHTML` or equivalent raw-HTML injection is used anywhere in the frontend for user-supplied content. Backend responses are always `application/json`, never rendered as HTML, eliminating reflected-XSS vectors through the API. |
-| **SQL Injection** | All database access goes through SQLAlchemy 2.0's parameterized query construction (ORM queries / `select()` constructs) as required by Section 6.1 and Section 12.1 — no raw string-interpolated SQL is used anywhere in `repositories/`. |
-| **CSRF (Cross-Site Request Forgery)** | V1 has no authenticated session/cookie-based identity (Section 13.1), so classic cookie-based CSRF does not apply to its mutating endpoints. As a baseline precaution appropriate to this architecture, the API only accepts state-changing requests with `Content-Type: application/json` (not form-encoded), and CORS (above) restricts which origins' browser-based requests are permitted to reach the API at all. If Phase 3 introduces cookie/session-based authentication, CSRF tokens must be added at that time (Section 26) — this is explicitly a future-phase concern, not a V1 gap. |
-| **Secure Headers** | The backend sets baseline secure HTTP response headers (e.g., `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` or an equivalent `Content-Security-Policy frame-ancestors` directive, `Referrer-Policy: strict-origin-when-cross-origin`). HSTS (`Strict-Transport-Security`) is enabled in production, where TLS is guaranteed by the hosting platforms (Vercel/Render both terminate TLS by default). |
-| **Secret Management** | Restates and consolidates SRS-SEC-01, SRS-SEC-02, SRS-SEC-08: secrets live only in environment variables, sourced from platform-managed secret storage (Vercel/Render/Supabase project settings) in deployed environments and from a local, gitignored `.env`/`.env.local` in development; `.env.example` documents required variable names with placeholder values only (see Section 19.3 for the full file-level policy). |
-
-No enterprise-grade security architecture (WAF, rate limiting infrastructure, SOC2-oriented controls, secrets rotation automation) is required in V1, per the finalized decision to avoid unjustified complexity.
+| **CORS** | Configured via `CORS_ALLOWED_ORIGINS` with credentials support (`allow_credentials=True`) strictly for whitelisted origins. |
+| **XSS** | Frontend auto-escapes all strings; Refresh Tokens are `HttpOnly` so Javascript cannot access them; Access Tokens are stored purely in memory. |
+| **CSRF** | SameSite cookie policy (`SameSite=Lax`) + requirement of `Content-Type: application/json` on state-changing endpoints prevents cross-site submission. |
+| **SQL Injection** | Parameterized queries constructed strictly via SQLAlchemy 2.0 ORM. |
+| **Brute Force** | Rate limiting applied via `slowapi` or Redis/in-memory limiter on sensitive authentication routes. |
+| **Token Hijacking** | Access tokens are short-lived (15 mins); refresh tokens are rotated on every use and hashed in the database; single and global session revocation enabled. |
 
 ---
 
@@ -956,9 +1230,12 @@ Errors must be predictable, consistently shaped (Section 8.4), and understandabl
 | Exception | HTTP Status | `error.code` |
 |---|---|---|
 | `NotFoundError` | 404 | `NOT_FOUND` |
-| `ValidationError` (business-rule level) | 422 | `VALIDATION_ERROR` |
-| `ConflictError` (e.g., duplicate name, protected entity deletion) | 409 | `CONFLICT` |
-| `UnprocessableRequestError` (query-parameter contradictions, e.g. `date_from > date_to`) | 422 | `INVALID_REQUEST` |
+| `ValidationError` | 422 | `VALIDATION_ERROR` |
+| `ConflictError` (e.g., duplicate email, duplicate category name) | 409 | `CONFLICT` |
+| `AuthenticationError` (invalid credentials, expired/revoked token) | 401 | `UNAUTHORIZED` |
+| `AuthorizationError` (access denied to resource) | 403 | `FORBIDDEN` |
+| `RateLimitError` (too many failed requests) | 429 | `RATE_LIMITED` |
+| `UnprocessableRequestError` | 422 | `INVALID_REQUEST` |
 | Unhandled exception | 500 | `INTERNAL_ERROR` |
 
 Pydantic schema validation failures are caught by a FastAPI exception handler and mapped to the same `422` / `VALIDATION_ERROR` shape as domain-level `ValidationError`, so API consumers see one consistent validation error format regardless of whether the failure originated in schema parsing or business-rule enforcement.
@@ -1042,21 +1319,29 @@ No error response, in any environment, may include: raw exception messages from 
 
 ## 19.1 Backend Environment Variables
 
-| Category | Example Variables | Purpose |
-|---|---|---|
-| Database connection | `DATABASE_URL` | asyncpg-compatible PostgreSQL connection string |
-| Application environment | `APP_ENV` (`local`, `staging`, `production`), `DEBUG` | Behavior toggles (e.g., verbose error detail only outside production) |
-| API configuration | `API_V1_PREFIX`, `APP_NAME` | Routing/metadata configuration |
-| CORS | `CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed frontend origins |
-| Logging | `LOG_LEVEL` | Logging verbosity |
-| Timezone | `APP_TIMEZONE` | Server-side "current date"/"current month" semantics (Section 10.6), default `UTC` |
+| Category | Variable | Required | Default / Example | Purpose |
+|---|---|---|---|---|
+| Database | `DATABASE_URL` | Yes | `postgresql+asyncpg://postgres:postgres@localhost:5432/paradox` | asyncpg PostgreSQL connection string |
+| Application | `APP_ENV` | Yes | `local` (`local`, `staging`, `production`) | Environment toggle |
+| Application | `DEBUG` | No | `true` | Verbose debug flag |
+| API | `API_V1_PREFIX` | No | `/api/v1` | Routing prefix |
+| API | `APP_NAME` | No | `Paradox` | Application metadata name |
+| CORS | `CORS_ALLOWED_ORIGINS` | Yes | `http://localhost:3000` | Whitelisted frontend origins |
+| Security / JWT | `JWT_SECRET_KEY` | Yes | `<random-32-byte-hex-secret>` | Secret key for signing Access Tokens |
+| Security / JWT | `JWT_ALGORITHM` | No | `HS256` | JWT signing algorithm |
+| Security / JWT | `ACCESS_TOKEN_EXPIRE_MINUTES`| No | `15` | Lifetime of short-lived access token |
+| Security / JWT | `REFRESH_TOKEN_EXPIRE_DAYS` | No | `7` | Lifetime of rotated refresh token cookie |
+| Google OAuth | `GOOGLE_CLIENT_ID` | No | `...apps.googleusercontent.com` | Google OAuth 2.0 Web Client ID |
+| Google OAuth | `GOOGLE_CLIENT_SECRET` | No | `...` | Google OAuth Client Secret |
+| Application | `FRONTEND_URL` | No | `http://localhost:3000` | Base URL for password reset links |
+| Timezone | `APP_TIMEZONE` | No | `UTC` | Server reference timezone |
 
 ## 19.2 Frontend Environment Variables
 
-| Category | Example Variables | Purpose |
-|---|---|---|
-| Backend/API base URL | `NEXT_PUBLIC_API_BASE_URL` | Base URL the frontend API client targets |
-| Environment configuration | `NEXT_PUBLIC_APP_ENV` | Non-sensitive environment flag for client-side behavior |
+| Category | Variable | Required | Default / Example | Purpose |
+|---|---|---|---|---|
+| API base URL | `NEXT_PUBLIC_API_BASE_URL` | Yes | `http://127.0.0.1:8000/api/v1` | Target backend REST endpoint |
+| Google OAuth | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`| No | `...apps.googleusercontent.com` | Google Identity button Client ID |
 
 ## 19.3 File Distinctions
 
@@ -1065,13 +1350,6 @@ No error response, in any environment, may include: raw exception messages from 
 | `.env.example` | Documents all required variables with placeholder/dummy values | Yes |
 | `.env` (backend) | Actual local backend configuration | No (gitignored) |
 | `.env.local` (frontend) | Actual local frontend configuration (Next.js convention) | No (gitignored) |
-
-**`.env`, `.env.local`, and any other local environment file are local configuration examples/instances only — they exist purely so a developer's own machine can run the application, and must never contain committed secrets.** Concretely:
-
-- `.env` (backend) and `.env.local` (frontend) are gitignored in `backend/.gitignore` and `frontend/.gitignore` respectively (Section 23.3) and must never be committed, staged, or pushed under any circumstance.
-- `.env.example` is the **only** environment file committed to the repository, and it must contain variable **names** with placeholder/dummy values only (e.g., `DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/paradox`) — never a real credential, key, or connection string.
-- Real secrets are never placed in the repository at any layer, in any branch, or in commit history; production/staging secrets are configured directly and exclusively in the Vercel/Render/Supabase platform dashboards (Section 20, SRS-SEC-08).
-- If a secret is ever accidentally committed, it must be treated as compromised and rotated — not merely removed from a future commit — though the operational process for rotation is outside this SRS's scope.
 
 ---
 
@@ -1098,58 +1376,9 @@ FastAPI   → Docker image → Render
 PostgreSQL → Supabase
 ```
 
-- **Frontend (Vercel)**: builds and deploys directly from the `frontend/` directory using Next.js's standard build (`next build`); environment variables configured in the Vercel project settings, including `NEXT_PUBLIC_API_BASE_URL` pointing at the deployed Render backend URL.
-- **Backend (Render)**: built and deployed via `backend/Dockerfile`, producing a container that runs the FastAPI app with an ASGI server (e.g., `uvicorn`/`gunicorn+uvicorn workers`); environment variables (Section 19.1) configured in the Render service settings, including `DATABASE_URL` pointing at Supabase.
-- **Database (Supabase)**: managed PostgreSQL; Alembic migrations are run against the Supabase connection string as part of the deployment process (pre-deploy step or manual/CI-triggered migration run — the exact automation mechanism is an implementation detail left to the build pipeline, but migrations must run before the new backend version serves traffic).
-
-## 20.3 Docker Responsibilities
-
-- `frontend/Dockerfile` exists for completeness/portability but is **not** the deployment path used by Vercel (Vercel builds natively); it must still build a valid production image if used for alternative hosting.
-- `backend/Dockerfile` is the **required** deployment artifact for Render and must produce a production-ready image (installing dependencies from `requirements.txt`/`pyproject.toml`, copying the `app/` source, exposing the correct port, running the ASGI server as the entrypoint).
-- Frontend and backend Docker images are built and deployed independently; neither depends on the other's Dockerfile.
-
-## 20.4 Build/Start Expectations Summary
-
-| Component | Local | Deployed |
-|---|---|---|
-| Frontend | `next dev` | Vercel-managed build (`next build`) |
-| Backend | `uvicorn app.main:app --reload` | Docker image → Render-managed process |
-| Database | Local PostgreSQL | Supabase-managed PostgreSQL |
-| Migrations | `alembic upgrade head` (manual, local) | `alembic upgrade head` run as part of the deploy step, before new backend traffic is served |
-
-## 20.5 Production Considerations (Phase-appropriate)
-
-- The health endpoint (`/api/v1/health`, Section 7.7) is used by Render's health-check mechanism to determine service readiness.
-- CORS is restricted to the known Vercel deployment URL (and local dev URL in non-production) per Section 14 (SRS-SEC-06).
-- No auto-scaling, multi-region, or blue/green deployment strategy is required for V1 — a single Render service instance is sufficient for single-user validation, consistent with avoiding premature scaling (PRD Section 18 risk: "Premature scaling").
-
-## 20.6 CI/CD
-
-A single, simple CI/CD pipeline is sufficient for V1 — no multi-stage release trains, canary deploys, or feature-flag infrastructure are introduced, consistent with avoiding premature operational complexity.
-
-### 20.6.1 Pull-Request Checks (required to merge)
-
-On every pull request targeting the main branch, CI must run and pass:
-
-| Check | Scope |
-|---|---|
-| Frontend lint | ESLint against `frontend/` |
-| Frontend type-check | `tsc --noEmit` against `frontend/` |
-| Frontend tests | Component/unit tests (Section 17.1) against `frontend/` |
-| Frontend build | `next build` against `frontend/`, to catch build-breaking errors before merge |
-| Backend lint | A configured Python linter/formatter check (e.g., `ruff`/`flake8`) against `backend/` |
-| Backend tests | `pytest` (unit, integration, API layers — Section 17.1) against `backend/`, run against a disposable/CI-provisioned PostgreSQL instance with Alembic migrations applied |
-
-A pull request must not be merged if any of the above checks fail. Checks run independently for `frontend/` and `backend/` so a change to one does not require rebuilding/retesting the other unnecessarily.
-
-### 20.6.2 Production Deployment Flow
-
-- Merging to the main branch triggers deployment:
-  - **Frontend**: Vercel's native Git integration builds and deploys `frontend/` automatically on merge (no separate CI step needed to trigger this — Vercel handles it).
-  - **Backend**: On merge, the CI/CD pipeline (or Render's native Git integration) builds `backend/Dockerfile` and deploys the resulting image to Render.
-- Database migrations (`alembic upgrade head`) are run against the Supabase connection as a pre-deploy or deploy-time step, **before** the new backend version begins serving traffic, consistent with Section 20.2/20.4.
-- Deployment is considered successful only once the newly deployed backend responds healthy on `/api/v1/health` (Section 7.7).
-- No manual production deployment step is required beyond merging an approved, passing pull request — but rollback (redeploying the previous Render image / previous Vercel deployment) remains a manual, developer-triggered action in V1; no automated rollback is implemented.
+- **Frontend (Vercel)**: builds and deploys directly from `frontend/` using Next.js build (`next build`); environment variables configured in Vercel project settings.
+- **Backend (Render)**: built and deployed via `backend/Dockerfile`, running ASGI uvicorn workers; environment variables configured in Render service dashboard.
+- **Database (Supabase)**: managed PostgreSQL with Alembic migrations executed as a pre-deploy or deploy step.
 
 ---
 
@@ -1157,43 +1386,63 @@ A pull request must not be merged if any of the above checks fail. Checks run in
 
 | API Endpoint | Database Entities Touched | Primary UI Surface |
 |---|---|---|
-| `POST/GET/PATCH/DELETE /api/v1/expenses[/…]` | `expenses`, reads `categories`/`payment_methods` for validation | Expense List, Add Expense, Expense Detail/Edit |
-| `POST/GET/PATCH/DELETE /api/v1/categories[/…]` | `categories`, cascading update to `expenses.category_id` on protected deletion | Categories screen; category selector in Expense form |
-| `POST/GET/PATCH/DELETE /api/v1/payment-methods[/…]` | `payment_methods`, cascading update to `expenses.payment_method_id` on protected deletion | Categories/Payment Methods screen; payment method selector in Expense form |
-| `GET/PUT /api/v1/budget` | `budgets` | Budget screen; Dashboard budget card |
-| `GET /api/v1/dashboard` | Reads `expenses`, `categories`, `budgets` (aggregate/read-only) | Dashboard screen |
-| `GET /api/v1/health` | Connectivity check only, no domain tables | N/A (operational) |
+| `POST /api/v1/auth/register` | `users`, `refresh_tokens` | Register Screen (`/register`) |
+| `POST /api/v1/auth/login` | `users`, `refresh_tokens` | Login Screen (`/login`) |
+| `POST /api/v1/auth/google` | `users`, `refresh_tokens` | Google Sign-In Button on Login/Register |
+| `POST /api/v1/auth/refresh` | `refresh_tokens` | Background Axios/Fetch Interceptor |
+| `POST /api/v1/auth/logout` | `refresh_tokens` | Topbar / Navigation Drawer Logout |
+| `POST /api/v1/auth/logout-all` | `refresh_tokens` | User Profile / Security Settings |
+| `POST /api/v1/auth/forgot-password` | `users`, `password_reset_tokens` | Forgot Password Form (`/forgot-password`) |
+| `POST /api/v1/auth/reset-password` | `users`, `password_reset_tokens`, `refresh_tokens` | Reset Password Form (`/reset-password`) |
+| `POST /api/v1/auth/change-password`| `users` | User Profile / Security Settings |
+| `GET /api/v1/auth/me` | `users` | Topbar User Profile Avatar / Initial |
+| `POST/GET/PATCH/DELETE /api/v1/expenses[/…]` | `expenses` (scoped to `user_id`) | Expense List, Add Expense, Expense Detail/Edit |
+| `POST/GET/PATCH/DELETE /api/v1/categories[/…]` | `categories` (scoped to `user_id` & defaults) | Categories Screen; Category selector in Expense form |
+| `POST/GET/PATCH/DELETE /api/v1/payment-methods[/…]` | `payment_methods` (scoped to `user_id` & defaults) | Categories/Payment Methods screen; Dropdown |
+| `GET/PUT/DELETE /api/v1/budget[/all]` | `budgets` (scoped to `user_id`) | Budget Planner Screen; Dashboard budget card |
+| `GET /api/v1/dashboard` | Reads `expenses`, `categories`, `budgets` for `user_id` | Dashboard screen |
+| `GET /api/v1/health` | Connectivity check only | N/A (operational) |
 
 ---
 
 # 22. Requirement Traceability Matrix
 
-| PRD ID | PRD Requirement | SRS Requirement(s) | API Area | DB Entity | Test Coverage Area |
+| ID | Requirement | SRS Requirement(s) | API Area | DB Entity | Test Coverage Area |
 |---|---|---|---|---|---|
-| FR-01 | Create expense | SRS-FN-01 | `POST /expenses` | `expenses` | API tests, unit (validation) |
-| FR-02 | Prevent invalid expenses | SRS-FN-02, SRS-FN-03 | `POST/PATCH /expenses` | `expenses` | Unit + API tests (Section 17.2) |
-| FR-03 | View expense history | SRS-FN-04 | `GET /expenses`, `GET /expenses/{id}` | `expenses` | API tests |
-| FR-04 | Edit expense | SRS-FN-05 | `PATCH /expenses/{id}` | `expenses` | API tests |
-| FR-05 | Delete expense with confirmation | SRS-FN-06 | `DELETE /expenses/{id}` | `expenses` | API tests, E2E, frontend confirmation dialog test |
-| FR-06 | Meaningful categories; starter categories | SRS-FN-07, SRS-FN-09 | `POST/GET /categories` | `categories` | Seed migration test, API tests |
-| FR-07 | Create/rename custom categories | SRS-FN-10, SRS-FN-11 | `POST/PATCH /categories` | `categories` | API tests |
-| FR-08 | Category removal integrity | SRS-FN-12, SRS-FN-13, Section 10.3 | `DELETE /categories/{id}` | `categories`, `expenses` | Integration test (reassignment transaction) |
-| FR-09 | Payment methods | SRS-FN-14, SRS-FN-15 | `/payment-methods` | `payment_methods` | API tests |
-| FR-10 | Review by date range | SRS-FN-16 | `GET /expenses?date_from&date_to` | `expenses` | API tests |
-| FR-11 | Search history | SRS-FN-17 | `GET /expenses?search` | `expenses` | API tests |
-| FR-12 | Filter by date/category/amount/payment method | SRS-FN-18 (narrowed to date-OR-category, single dimension, for V1 — Section 3.4.1) | `GET /expenses` | `expenses` | API tests (incl. mutual-exclusion `422` case) |
-| FR-13 | Sort by date/amount/category | SRS-FN-19 | `GET /expenses?sort_by&sort_order` | `expenses` | API tests |
-| FR-14 | Accurate totals | SRS-FN-20, Section 10.1 | `GET /dashboard` | `expenses` | Unit test (Decimal fidelity) |
-| FR-15 | Category-based spending | SRS-FN-21 | `GET /dashboard` | `expenses`, `categories` | Unit + API tests |
-| FR-16 | Spending trends | SRS-FN-22 | `GET /dashboard?period` | `expenses` | Unit + API tests |
-| FR-17 | Top spending categories | SRS-FN-23 | `GET /dashboard` | `expenses`, `categories` | Unit + API tests |
-| FR-18 | One overall monthly budget | SRS-FN-24 | `GET/PUT /budget` | `budgets` | API tests |
-| FR-19 | Compare spending vs budget | SRS-FN-25 | `GET /budget`, `GET /dashboard` | `budgets`, `expenses` | Unit test (Section 10.2 thresholds) |
-| FR-20 | Budget amount/spent/remaining/status | SRS-FN-26, Section 10.2 | `GET /budget`, `GET /dashboard` | `budgets` | Unit + API tests |
-| FR-21 | Dashboard | SRS-FN-27 | `GET /dashboard` | all read entities | API + E2E |
-| FR-22 | Records persist across sessions | SRS-FN-08 | all mutating endpoints | all | Reliability/E2E test |
-| FR-23 | No fabricated financial data | SRS-FN-28, Section 7.6 empty-safe rule | `GET /dashboard`, `GET /budget` | all | API test (zero-data scenario) |
-| FR-24 | Understandable empty/validation/loading/error states | SRS-FN-29, Section 11.1, Section 15.3 | all | N/A | Frontend component tests |
+| AUTH-01 | Sign up / Register | SRS-FN-AUTH-01 | `POST /auth/register` | `users`, `refresh_tokens` | Unit, API test |
+| AUTH-02 | Login with email/pass | SRS-FN-AUTH-02 | `POST /auth/login` | `users`, `refresh_tokens` | API test, token verification |
+| AUTH-03 | Google OAuth / OIDC | SRS-FN-AUTH-03 | `POST /auth/google` | `users`, `refresh_tokens` | Mocked OIDC token verification test |
+| AUTH-04 | Refresh token rotation | SRS-FN-AUTH-04 | `POST /auth/refresh` | `refresh_tokens` | Rotation & reuse attack test |
+| AUTH-05 | Secure logout | SRS-FN-AUTH-05 | `POST /auth/logout` | `refresh_tokens` | Cookie clear & DB revocation test |
+| AUTH-06 | Logout all devices | SRS-FN-AUTH-06 | `POST /auth/logout-all` | `refresh_tokens` | Multi-session revocation test |
+| AUTH-07 | Forgot & reset password | SRS-FN-AUTH-07 | `/auth/forgot-password`, `/auth/reset-password` | `users`, `password_reset_tokens` | Password recovery lifecycle test |
+| AUTH-08 | Change password | SRS-FN-AUTH-08 | `POST /auth/change-password` | `users` | Current password check test |
+| AUTH-09 | User data isolation | SRS-FN-AUTH-09 | All `/expenses`, `/budget`, `/categories` | All entities | Multi-user tenant separation test |
+| AUTH-10 | Unauthorized access rejection | SRS-FN-AUTH-10 | All protected endpoints | All entities | 401 & cross-user 404 test |
+| FR-01 | Create expense | SRS-FN-01 | `POST /expenses` | `expenses` | API tests, user_id check |
+| FR-02 | Prevent invalid expenses | SRS-FN-02, SRS-FN-03 | `POST/PATCH /expenses` | `expenses` | Unit + API tests |
+| FR-03 | View expense history | SRS-FN-04 | `GET /expenses`, `GET /expenses/{id}` | `expenses` | User-scoped API tests |
+| FR-04 | Edit expense | SRS-FN-05 | `PATCH /expenses/{id}` | `expenses` | User ownership check |
+| FR-05 | Delete expense with confirmation | SRS-FN-06 | `DELETE /expenses/{id}` | `expenses` | User ownership check |
+| FR-06 | Starter categories | SRS-FN-07, SRS-FN-09 | `POST/GET /categories` | `categories` | Seed migration test, shared visibility |
+| FR-07 | Custom categories | SRS-FN-10, SRS-FN-11 | `POST/PATCH /categories` | `categories` | User-scoped category test |
+| FR-08 | Category deletion integrity | SRS-FN-12, SRS-FN-13 | `DELETE /categories/{id}` | `categories`, `expenses` | Cascade reassignment in-user test |
+| FR-09 | Payment methods | SRS-FN-14, SRS-FN-15 | `/payment-methods` | `payment_methods` | User-scoped payment method test |
+| FR-10 | Review by date range | SRS-FN-16 | `GET /expenses?date_from&date_to` | `expenses` | User-scoped date filter test |
+| FR-11 | Search history | SRS-FN-17 | `GET /expenses?search` | `expenses` | User-scoped text search test |
+| FR-12 | Single-dimension filter | SRS-FN-18 | `GET /expenses` | `expenses` | Filter mutual exclusion test |
+| FR-13 | Sort expenses | SRS-FN-19 | `GET /expenses?sort_by&sort_order` | `expenses` | Sorting test |
+| FR-14 | Accurate totals | SRS-FN-20 | `GET /dashboard` | `expenses` | Decimal sum fidelity test |
+| FR-15 | Category breakdown | SRS-FN-21 | `GET /dashboard` | `expenses`, `categories` | User-scoped aggregate test |
+| FR-16 | Spending trends | SRS-FN-22 | `GET /dashboard?period` | `expenses` | Trend bucket test |
+| FR-17 | Top categories | SRS-FN-23 | `GET /dashboard` | `expenses`, `categories` | Top ranking test |
+| FR-18 | Multi-granularity budget | SRS-FN-24 | `GET/PUT/DELETE /budget` | `budgets` | Multi-granularity upsert test |
+| FR-19 | Budget tracking | SRS-FN-25 | `GET /budget`, `GET /dashboard` | `budgets`, `expenses` | Status calculation test |
+| FR-20 | Budget status values | SRS-FN-26 | `GET /budget` | `budgets` | Threshold tests |
+| FR-21 | Dashboard | SRS-FN-27 | `GET /dashboard` | all read entities | Aggregation test |
+| FR-22 | Session persistence | SRS-FN-08 | all mutating endpoints | all | Refresh token lifecycle test |
+| FR-23 | No fabricated data | SRS-FN-28 | `GET /dashboard`, `GET /budget` | all | Zero-data empty test |
+| FR-24 | Meaningful UI states | SRS-FN-29 | all screens | N/A | Frontend UI test |
 
 ---
 
@@ -1206,8 +1455,9 @@ backend/
 ├── app/
 │   ├── main.py
 │   ├── api/
-│   │   ├── deps.py
-│   │   ├── router.py
+│   │   ├── deps.py                  # get_db, get_current_user SecurityContext
+│   │   ├── router.py                # Aggregates /auth, /expenses, /categories, /payment_methods, /budget, /dashboard, /health
+│   │   ├── auth.py                  # /auth/register, /login, /google, /refresh, /logout, /me, /forgot, /reset, /change
 │   │   ├── health.py
 │   │   ├── expenses.py
 │   │   ├── categories.py
@@ -1215,40 +1465,45 @@ backend/
 │   │   ├── budget.py
 │   │   └── dashboard.py
 │   ├── core/
-│   │   ├── config.py
-│   │   ├── exceptions.py
+│   │   ├── config.py                # Settings: DB, JWT, OAuth, CORS
+│   │   ├── security.py              # BCrypt, JWT encode/decode, token hashing, Google OIDC validation
+│   │   ├── exceptions.py            # Domain exceptions (incl. AuthenticationError, AuthorizationError, RateLimitError)
 │   │   ├── error_handlers.py
-│   │   ├── logging.py
-│   │   └── security.py
+│   │   └── logging.py
 │   ├── db/
 │   │   ├── session.py
 │   │   ├── base.py
 │   │   └── models/
-│   │       ├── expense.py
-│   │       ├── category.py
-│   │       ├── payment_method.py
-│   │       ├── budget.py
-│   │       └── user.py
+│   │       ├── user.py              # User entity with email, password_hash, google_id
+│   │       ├── refresh_token.py     # Hashed refresh tokens for session rotation/revocation
+│   │       ├── password_reset_token.py # Secure reset tokens
+│   │       ├── expense.py           # Expense with user_id FK
+│   │       ├── budget.py            # Budget with user_id FK & period constraints
+│   │       ├── category.py          # Category with nullable user_id FK
+│   │       └── payment_method.py    # PaymentMethod with nullable user_id FK
 │   ├── schemas/
 │   │   ├── common.py
+│   │   ├── auth.py                  # UserRegister, UserLogin, TokenResponse, GoogleLogin, PasswordReset, etc.
+│   │   ├── user.py
 │   │   ├── expense.py
 │   │   ├── category.py
 │   │   ├── payment_method.py
 │   │   ├── budget.py
-│   │   ├── dashboard.py
-│   │   └── user.py
+│   │   └── dashboard.py
 │   ├── services/
-│   │   ├── expense_service.py
-│   │   ├── category_service.py
-│   │   ├── payment_method_service.py
-│   │   ├── budget_service.py
-│   │   └── dashboard_service.py
+│   │   ├── auth_service.py          # Login, Register, Google OAuth, Refresh, Password management
+│   │   ├── expense_service.py       # Scoped to user_id
+│   │   ├── category_service.py      # Scoped to user_id & defaults
+│   │   ├── payment_method_service.py# Scoped to user_id & defaults
+│   │   ├── budget_service.py        # Scoped to user_id
+│   │   └── dashboard_service.py     # Scoped to user_id
 │   ├── repositories/
-│   │   ├── expense_repository.py
-│   │   ├── category_repository.py
+│   │   ├── auth_repository.py       # Users, refresh_tokens, reset_tokens DB operations
+│   │   ├── user_repository.py
+│   │   ├── expense_repository.py    # WHERE expense.user_id == current_user.id
+│   │   ├── category_repository.py   # WHERE category.user_id == current_user.id OR is_default
 │   │   ├── payment_method_repository.py
-│   │   ├── budget_repository.py
-│   │   └── user_repository.py
+│   │   └── budget_repository.py     # WHERE budget.user_id == current_user.id
 │   ├── utils/
 │   │   ├── pagination.py
 │   │   ├── datetime.py
@@ -1260,11 +1515,14 @@ backend/
 │   └── versions/
 ├── tests/
 │   ├── unit/
+│   │   ├── test_auth.py
+│   │   ├── test_user_isolation.py
+│   │   ├── test_money.py
+│   │   └── test_budget_granularity.py
 │   ├── integration/
 │   └── api/
 ├── Dockerfile
 ├── .gitignore
-├── .env
 ├── .env.example
 ├── alembic.ini
 ├── requirements.txt
@@ -1272,46 +1530,54 @@ backend/
 └── README.md
 ```
 
-> Note: exactly one `backend/.gitignore` exists (do not duplicate).
-
 ## 23.2 Frontend Structure (authoritative)
 
 ```text
 frontend/
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx
-│   │   ├── page.tsx
+│   │   ├── layout.tsx               # AuthProvider + QueryProvider + ThemeProvider + Shell
+│   │   ├── page.tsx                 # Root redirect to /dashboard or /login
+│   │   ├── login/
+│   │   │   └── page.tsx             # Login & Google Sign-In Screen
+│   │   ├── register/
+│   │   │   └── page.tsx             # Registration Screen
+│   │   ├── forgot-password/
+│   │   │   └── page.tsx             # Password Recovery Request Screen
+│   │   ├── reset-password/
+│   │   │   └── page.tsx             # New Password Submission Screen
 │   │   ├── dashboard/
-│   │   │   └── page.tsx
+│   │   │   └── page.tsx             # Protected Dashboard
 │   │   ├── expenses/
-│   │   │   ├── page.tsx
+│   │   │   ├── page.tsx             # Protected Expense List
 │   │   │   ├── new/
 │   │   │   │   └── page.tsx
 │   │   │   └── [id]/
 │   │   │       └── page.tsx
 │   │   ├── categories/
-│   │   │   └── page.tsx
+│   │   │   └── page.tsx             # Protected Categories
 │   │   └── budget/
-│   │       └── page.tsx
+│   │       └── page.tsx             # Protected Multi-Granularity Budget Planner
 │   ├── features/
-│   │   ├── expenses/
+│   │   ├── auth/                    # Auth Context, Forms, Hooks, Schemas, Types, GoogleSignInButton
 │   │   │   ├── components/
+│   │   │   ├── context/
 │   │   │   ├── hooks/
-│   │   │   ├── services/
 │   │   │   ├── schemas/
 │   │   │   └── types.ts
+│   │   ├── expenses/
 │   │   ├── categories/
 │   │   ├── payment-methods/
 │   │   ├── budget/
 │   │   └── dashboard/
 │   ├── components/
 │   │   ├── ui/
-│   │   ├── layout/
-│   │   └── common/
+│   │   ├── layout/                  # Shell, Topbar (with User Avatar & Logout), Navigation Drawer
+│   │   └── common/                  # ProtectedRoute, PwaRegister, ThemeProvider
 │   ├── lib/
 │   │   ├── api/
-│   │   │   ├── client.ts
+│   │   │   ├── client.ts            # Typed HTTP client with Bearer JWT injection & 401 Auto-Refresh
+│   │   │   ├── auth.ts              # Auth API calls
 │   │   │   ├── expenses.ts
 │   │   │   ├── categories.ts
 │   │   │   ├── payment-methods.ts
@@ -1322,66 +1588,36 @@ frontend/
 │   ├── types/
 │   └── styles/
 ├── public/
-├── Dockerfile
-├── .gitignore
-├── .env.local
-├── .env.example
 ├── package.json
 ├── next.config.ts
 ├── tsconfig.json
 └── README.md
 ```
 
-## 23.3 Repository-Root Structure
-
-```text
-paradox/
-├── frontend/
-├── backend/
-├── .gitignore                (root: OS/editor/general artifacts)
-└── README.md
-```
-
-Three `.gitignore` files total: root, `frontend/.gitignore` (Next.js/Node artifacts, `.env*` except `.env.example`), and `backend/.gitignore` (Python/venv/cache artifacts, `.env*` except `.env.example`) — no unnecessary duplication of rules across files.
-
 ---
 
 # 24. API Documentation Requirements
 
-- FastAPI's built-in OpenAPI schema generation must be enabled and accurate: every router must declare response models (Pydantic schemas), status codes, and parameter types so the auto-generated schema is a faithful contract.
-- Interactive documentation (Swagger UI at `/docs`, ReDoc at `/redoc`) must be reachable in local and staging environments; may be disabled or access-restricted in production per standard FastAPI configuration, at the team's discretion, since V1 has no auth layer to protect it otherwise.
-- Every endpoint in Section 7 must have a docstring/`summary`/`description` in the FastAPI route decorator matching the purpose stated in this SRS.
-- Example request/response bodies shown in this SRS (Section 7) should be reflected as OpenAPI examples where FastAPI/Pydantic supports it, to keep generated documentation and this SRS in sync.
+- FastAPI's built-in OpenAPI schema generation must document all endpoints under `/api/v1/auth`, `/api/v1/expenses`, `/api/v1/categories`, `/api/v1/payment-methods`, `/api/v1/budget`, and `/api/v1/dashboard`.
+- OpenAPI schema includes HTTP Bearer security scheme definition (`HTTPBearer`).
+- Interactive Swagger UI (`/docs`) and ReDoc (`/redoc`) are available in local and staging environments.
 
 ---
 
 # 25. Data Backup and Recovery
 
-Scope is intentionally minimal for a single-user validation phase, consistent with avoiding premature operational complexity:
-
-- **Backup**: Rely on Supabase's managed PostgreSQL backup capabilities (platform-provided automatic backups/point-in-time recovery as available on the selected Supabase plan). No custom backup tooling is built for V1.
-- **Recovery**: In the event of data loss, recovery is performed via Supabase's restore mechanism; there is no custom disaster-recovery automation in Phase 1.
-- **Migration safety**: All schema changes go through Alembic migrations, which are reversible where practical (`downgrade()` implemented for each migration) to allow rollback of a bad deployment.
-- **Data export**: Not a V1 requirement (PRD Section 13: "Advanced export/reporting" is out of scope); may be considered in a later phase.
-
-This is deliberately lightweight because Paradox V1 serves one user and has not yet been validated as worth production-grade backup infrastructure — escalate this section's scope in Phase 5 ("Production-Ready Product").
+- **Backup**: Managed PostgreSQL backups on Supabase with point-in-time recovery.
+- **Migration Safety**: All schema evolutions (including user foreign keys and refresh token tables) managed via idempotent Alembic migrations.
 
 ---
 
 # 26. Future Compatibility Requirements
 
-The following are **documented for architectural continuity only** and are **explicitly not implemented in V1**. They exist so that Phase 1 code does not require a disruptive rewrite when later phases begin, per the PRD roadmap (Section 14) and the finalized instruction not to implement future complexity prematurely.
-
-| Future Phase | Compatibility Consideration | Why it's safe to defer |
-|---|---|---|
-| Phase 2 (Refinement) | No structural changes anticipated; the layered architecture and feature-organized frontend are already positioned to absorb UX refinements without rearchitecting. | Architecture already supports iterative UI/UX change |
-| Phase 3 (Multi-User Foundation) | `users` table already exists (Section 6.2.1); UUID primary keys throughout avoid awkward key migrations; adding `user_id` foreign keys to `expenses`/`budgets`/`categories`/`payment_methods` and an auth middleware layer (`app/core/security.py` is reserved) is additive, not a rewrite. | Schema and layering were chosen specifically to avoid an obvious rewrite, without adding auth logic now |
-| Phase 2 (Refinement) — filter expansion | Combined multi-dimension filtering (date + category + payment method + amount together) and reintroducing `payment_method_id`/`amount_min`/`amount_max` as query parameters on `GET /expenses` are candidates once real usage shows single-dimension filtering (Section 3.4.1) is insufficient. | The `expense_repository` query-building logic is isolated enough to extend without changing the endpoint's contract style |
-| Phase 4 (Advanced Financial Understanding) | The `dashboard_service`/`expense_repository` separation allows new aggregate queries (recurring expenses, deeper trend analysis) to be added as new service methods without touching the API contract style established in Section 7. | Aggregation logic is isolated in the service layer |
-| Phase 5 (Production-Ready) | Logging (Section 18), health checks (Section 7.7), and environment separation (Section 19) are already in place as the minimal scaffolding a production hardening pass would extend. | Baseline operational hooks exist without full production tooling |
-| Phase 6 (Long-Term Evolution) | REST/JSON API versioned at `/api/v1` leaves room for a future `/api/v2` without disturbing V1 consumers if a breaking model change is ever needed. | Versioning strategy was chosen precisely for this purpose |
-
-No code, schema column, or endpoint beyond what is listed above may be added "just in case." Each future item requires its own PRD-level validation before becoming an SRS requirement, per PRD Principle 3 ("Validation before expansion") and Principle 6 ("Complexity must be earned").
+| Future Phase | Compatibility Consideration |
+|---|---|
+| Phase 4 (Advanced Analytics) | Multi-series trend charts, recurring expenses, and export tools built on top of user-isolated tables. |
+| Phase 5 (Production Enterprise) | MFA / TOTP two-factor authentication, email verification links via SendGrid/SES, and Redis-backed session blacklist. |
+| Phase 6 (Multi-Currency) | Per-user currency preferences stored in `users.currency_code`. |
 
 ---
 
@@ -1393,8 +1629,6 @@ See Section 1.3.
 
 ## 27.2 Starter Category Seed List
 
-Seeded via Alembic data migration; `is_default = true` for all entries below (non-deletable, renamable):
-
 1. Food & Dining
 2. Transportation
 3. Shopping
@@ -1403,27 +1637,25 @@ Seeded via Alembic data migration; `is_default = true` for all entries below (no
 6. Health
 7. Education
 8. Groceries
-9. Uncategorized *(reserved fallback for category-deletion reassignment, Section 10.3 — must remain first-class and non-deletable)*
+9. Uncategorized *(reserved fallback for category-deletion reassignment, Section 10.3)*
 
 ## 27.3 Starter Payment Method Seed List
-
-Seeded via Alembic data migration; `is_default = true` for all entries below:
 
 1. Cash
 2. Debit Card
 3. Credit Card
 4. Bank Transfer
 5. Digital Wallet
-6. Other *(reserved fallback for payment-method-deletion reassignment, Section 10.3 — must remain first-class and non-deletable)*
+6. Other *(reserved fallback for payment-method-deletion reassignment, Section 10.3)*
 
 ## 27.4 Budget Status Values
 
 | Value | Meaning |
 |---|---|
-| `under_budget` | Spending is below 90% of the configured monthly budget |
-| `near_limit` | Spending is between 90% and 100% (inclusive) of the configured monthly budget |
-| `over_budget` | Spending exceeds 100% of the configured monthly budget |
-| `null` / omitted | No budget has been configured yet |
+| `under_budget` | Spending is below 90% of the configured budget for the period |
+| `near_limit` | Spending is between 90% and 100% (inclusive) of the configured budget |
+| `over_budget` | Spending exceeds 100% of the configured budget |
+| `null` / omitted | No budget has been configured for the selected period |
 
 ## 27.5 Standard Error Codes
 
@@ -1431,33 +1663,30 @@ Seeded via Alembic data migration; `is_default = true` for all entries below:
 |---|---|---|
 | `VALIDATION_ERROR` | 422 | Schema or business-rule validation failure |
 | `INVALID_REQUEST` | 422 | Contradictory or malformed query parameters |
-| `NOT_FOUND` | 404 | Requested resource does not exist |
-| `CONFLICT` | 409 | Duplicate name, or attempted deletion of a protected (`is_default`) entity |
+| `UNAUTHORIZED` | 401 | Missing, invalid, expired, or revoked authentication token |
+| `FORBIDDEN` | 403 | Authenticated user lacks permission for requested resource |
+| `NOT_FOUND` | 404 | Requested resource does not exist (or belongs to another user) |
+| `CONFLICT` | 409 | Duplicate entity (email, category name) or deletion of protected entity |
+| `RATE_LIMITED` | 429 | Too many requests on sensitive authentication endpoints |
 | `INTERNAL_ERROR` | 500 | Unhandled server-side failure |
 
-## 27.6 Definition of Done (Phase 1)
+## 27.6 Definition of Done
 
-A feature or the overall Phase 1 release is considered done when:
+A feature or release is considered done when:
 
-- [ ] All applicable functional requirements in Section 3 are implemented and pass their traced tests (Section 22).
-- [ ] Frontend and backend validation are both implemented and consistent (Section 9).
-- [ ] API behavior matches Section 7 exactly, including status codes and error envelope shape.
-- [ ] Alembic migrations exist for every schema change, including the starter category/payment-method seed data (Section 27.2–27.3), and both `upgrade()`/`downgrade()` are implemented.
-- [ ] Unit, integration, and API tests pass, with priority coverage (Section 17.2) green.
-- [ ] Critical financial calculations (totals, budget status, category percentages) are verified against known test data.
-- [ ] Loading, empty, validation, and error states are implemented and visually verified for every primary screen (Section 11.2).
-- [ ] Frontend successfully integrates against the deployed/local backend end-to-end for the core loop (Add → Review → Understand → Adjust).
-- [ ] All required environment variables are documented in `.env.example` for both frontend and backend.
-- [ ] `backend/Dockerfile` builds successfully and runs the FastAPI app correctly in a container.
-- [ ] No secrets are present anywhere in the committed repository.
-- [ ] This SRS and its traceability matrix (Section 22) are updated if any implementation deviation was necessary, with the deviation and reason documented.
+- [ ] User registration, email/password login, Google Sign-In, and token refresh are fully functional.
+- [ ] Access Tokens expire in 15 minutes; Refresh Tokens rotate on every refresh call and store only SHA-256 hashes in DB.
+- [ ] Single session logout and "Logout from all devices" correctly revoke token hashes in database and clear cookies.
+- [ ] Strict row-level multi-tenant user data isolation is enforced across all endpoints (`expenses`, `budgets`, `categories`, `payment_methods`).
+- [ ] Attempting to access another user's resources returns `404 Not Found` without data leakage.
+- [ ] Idempotent Alembic migration upgrades schema cleanly.
+- [ ] Pytest unit tests, user isolation tests, and Postman API collection pass 100% green.
+- [ ] Next.js frontend builds cleanly with 0 TypeScript/ESLint warnings and protected routes redirect unauthenticated users to `/login`.
 
 ---
 
 ## Document Status
 
-**Version 1.1 — Final, Implementation-Ready SRS for Paradox Phase 1 (Single-User Core MVP).**
+**Version 2.0 — Final, Implementation-Ready SRS for Paradox (Authentication & Row-Level Multi-Tenant Data Isolation).**
 
-This document is the technical source of truth for **how** Paradox is built. Product scope, priorities, and rationale remain governed by `PARADOX_PRD_FINAL.md`. Any conflict between this SRS and the PRD on product scope must be resolved in favor of the PRD; any conflict on technical implementation detail must be resolved in favor of this SRS, and reconciled with the original `PARADOX_SRS_CLAUDE_PROMPT.md` decisions where applicable.
-
-Version 1.1 incorporates a targeted set of modification instructions (see Revision History above) as in-place amendments to v1.0. All previously finalized architecture, project structure, API surface, testing strategy, deployment topology, Docker decisions, and `.gitignore` structure from v1.0 remain unchanged except where this revision explicitly narrows the V1 expense-filtering contract (Section 3.4.1, Section 7.2). No future-phase feature was introduced as a V1 requirement in this revision.
+This document serves as the authoritative technical source of truth for implementing authentication, session lifecycle, and data isolation in Paradox. All architectural layers and endpoint contracts defined herein are binding.

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -14,13 +14,19 @@ import {
   Moon,
   Menu,
   X,
-  Smartphone,
   ChevronRight,
+  LogOut,
+  KeyRound,
+  ShieldAlert,
+  User as UserIcon,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useTheme } from "@/components/common/ThemeProvider";
 import { BackgroundGrid } from "@/components/common/BackgroundGrid";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { ChangePasswordModal } from "@/features/auth/components/ChangePasswordModal";
+import { useToast } from "@/components/ui/toast";
 
 interface ShellProps {
   children: React.ReactNode;
@@ -33,15 +39,38 @@ const navItems = [
   { label: "Budget", href: "/budget", icon: PiggyBank, description: "Monthly, Weekly & Daily Targets" },
 ];
 
+const authRoutes = ["/login", "/register", "/forgot-password", "/reset-password"];
+
 export const Shell: React.FC<ShellProps> = ({ children }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const { user, isAuthenticated, logout, logoutAll } = useAuth();
+  const { addToast } = useToast();
+
   const [isOpen, setIsOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 
   // Close drawer on route change
   useEffect(() => {
     setIsOpen(false);
+    setIsProfileMenuOpen(false);
   }, [pathname]);
+
+  // Click outside to close profile dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Prevent background scrolling when menu drawer is open
   useEffect(() => {
@@ -54,6 +83,30 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
       document.body.style.overflow = "";
     };
   }, [isOpen]);
+
+  const handleLogout = async () => {
+    await logout();
+    addToast("Logged out successfully.", "info");
+    router.push("/login");
+  };
+
+  const handleLogoutAll = async () => {
+    await logoutAll();
+    addToast("Logged out from all devices.", "info");
+    router.push("/login");
+  };
+
+  // On standalone auth pages, render children with background grid and no header
+  if (isAuthRoute) {
+    return (
+      <div className="relative min-h-screen bg-background flex flex-col">
+        <BackgroundGrid />
+        <main className="relative z-10 flex-1 flex flex-col min-w-0">{children}</main>
+      </div>
+    );
+  }
+
+  const userInitial = user?.display_name ? user.display_name.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || "U");
 
   return (
     <div className="relative min-h-screen bg-background flex flex-col">
@@ -124,7 +177,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           })}
         </nav>
 
-        {/* Right: Theme switcher + User Avatar */}
+        {/* Right: Theme switcher + User Profile Menu */}
         <div className="flex items-center space-x-3">
           <button
             onClick={toggleTheme}
@@ -133,9 +186,79 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center font-bold text-xs border border-border">
-            U
-          </div>
+
+          {isAuthenticated ? (
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                className="h-8 w-8 rounded-full bg-primary/20 text-primary hover:bg-primary/30 flex items-center justify-center font-bold text-xs border border-primary/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 overflow-hidden"
+              >
+                {user?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.avatar_url} alt={user.display_name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{userInitial}</span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {isProfileMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-64 p-2 rounded-2xl bg-surface border border-border shadow-2xl z-50 animate-fade-in"
+                  >
+                    <div className="px-3 py-2 border-b border-border/60 mb-1">
+                      <p className="text-xs font-semibold text-foreground truncate">{user?.display_name || "User"}</p>
+                      <p className="text-[11px] text-foreground-muted truncate">{user?.email}</p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        setIsChangePasswordOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface-hover rounded-xl transition-colors"
+                    >
+                      <KeyRound className="w-3.5 h-3.5 text-primary" />
+                      <span>Change Password</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface-hover rounded-xl transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-warning" />
+                      <span>Sign Out</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        handleLogoutAll();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-danger hover:bg-danger/10 rounded-xl transition-colors"
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      <span>Sign Out from All Devices</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white transition-colors shadow-sm"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </header>
 
@@ -238,26 +361,63 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
                 </div>
 
                 {/* User Session Info */}
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center space-x-3">
-                    <div className="h-9 w-9 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs border border-primary/30">
-                      U
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-foreground">Primary User</p>
-                      <div className="flex items-center space-x-1 text-[10px] text-emerald-400">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Online • PWA Enabled</span>
+                {isAuthenticated ? (
+                  <div className="p-3 rounded-xl bg-surface border border-border/80 space-y-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs border border-primary/30 overflow-hidden">
+                        {user?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={user.avatar_url} alt={user.display_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{userInitial}</span>
+                        )}
+                      </div>
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-semibold text-foreground truncate">{user?.display_name || "User"}</p>
+                        <p className="text-[10px] text-foreground-muted truncate">{user?.email}</p>
                       </div>
                     </div>
+
+                    <div className="pt-2 border-t border-border/60 flex items-center justify-between">
+                      <button
+                        onClick={() => {
+                          setIsOpen(false);
+                          setIsChangePasswordOpen(true);
+                        }}
+                        className="text-[11px] text-foreground-muted hover:text-foreground flex items-center gap-1"
+                      >
+                        <KeyRound className="w-3 h-3 text-primary" />
+                        <span>Password</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsOpen(false);
+                          handleLogout();
+                        }}
+                        className="text-[11px] text-danger hover:underline flex items-center gap-1"
+                      >
+                        <LogOut className="w-3 h-3" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
                   </div>
-                  <Smartphone className="h-4 w-4 text-muted-foreground" />
-                </div>
+                ) : (
+                  <Link
+                    href="/login"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold flex items-center justify-center shadow-md transition-colors"
+                  >
+                    Sign In to Paradox
+                  </Link>
+                )}
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} />
 
       {/* Main Content Area */}
       <main className="relative z-10 flex-1 flex flex-col min-w-0 pb-16 overflow-y-auto">

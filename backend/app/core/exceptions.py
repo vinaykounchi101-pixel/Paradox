@@ -32,6 +32,27 @@ class ConflictError(ParadoxException):
         super().__init__(message, code="CONFLICT")
 
 
+class AuthenticationError(ParadoxException):
+    """Raised when authentication fails (missing, invalid, or expired credentials/token)."""
+
+    def __init__(self, message: str = "Could not validate credentials"):
+        super().__init__(message, code="UNAUTHORIZED")
+
+
+class AuthorizationError(ParadoxException):
+    """Raised when an authenticated user does not have permission to access a resource."""
+
+    def __init__(self, message: str = "Access forbidden"):
+        super().__init__(message, code="FORBIDDEN")
+
+
+class RateLimitError(ParadoxException):
+    """Raised when too many requests are sent to sensitive endpoints."""
+
+    def __init__(self, message: str = "Too many requests. Please try again later."):
+        super().__init__(message, code="RATE_LIMITED")
+
+
 class UnprocessableRequestError(ParadoxException):
     """Raised when a request is malformed or contains contradictory parameters."""
 
