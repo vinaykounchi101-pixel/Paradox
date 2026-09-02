@@ -34,12 +34,19 @@ class Settings(BaseSettings):
     # Application URLs
     FRONTEND_URL: str = "http://localhost:3000"
 
-    # Email Configuration (Supports Resend API and SMTP)
-    EMAIL_PROVIDER: str = "auto"  # "auto", "resend", or "smtp"
+    # Email Configuration (Supports Brevo API, Resend API, and SMTP)
+    EMAIL_PROVIDER: str = "auto"  # "auto", "brevo", "resend", or "smtp"
+
+    # Brevo (Sendinblue) API Configuration (Recommended for Production without custom domain)
+    BREVO_API_KEY: Union[str, None] = None
+    BREVO_SENDER_EMAIL: Union[str, None] = None
+    BREVO_SENDER_NAME: str = "Paradox Expense Tracker"
+
+    # Resend API Configuration
     RESEND_API_KEY: Union[str, None] = None
     RESEND_FROM_EMAIL: str = "Paradox <onboarding@resend.dev>"
 
-    # SMTP Email Configuration (Fallback / Local Development)
+    # SMTP Email Configuration (Fallback / Local Development / Brevo SMTP Relay)
     SMTP_HOST: Union[str, None] = None
     SMTP_PORT: int = 587
     SMTP_TLS: bool = True

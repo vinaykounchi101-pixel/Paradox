@@ -16,13 +16,14 @@ This document details technical debt items, architectural tradeoffs, short-term 
 
 ---
 
-## 2. Production Email Dispatch Provider (RESOLVED via SMTP)
+## 2. Production Email Dispatch Provider (RESOLVED via Multi-Provider Engine)
 * **Status**: **RESOLVED**.
 * **Resolution**:
-  - Implemented `EmailService` ([`backend/app/services/email_service.py`](file:///e:/Projects/Paradox/backend/app/services/email_service.py)) with environment-driven SMTP support (`SMTP_HOST`, `SMTP_PORT`, `SMTP_TLS`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`).
+  - Implemented `EmailService` ([`backend/app/services/email_service.py`](file:///e:/Projects/Paradox/backend/app/services/email_service.py)) with flexible multi-provider dispatch: Brevo REST API (`BREVO_API_KEY`), Resend REST API (`RESEND_API_KEY`), and standard SMTP (`SMTP_*`).
+  - Brevo enables production transactional delivery from verified Gmail accounts without requiring custom domains.
   - Supports Gmail App Passwords with auto-sanitization of spaces, STARTTLS (port 587), and SSL (port 465).
   - Formats branded responsive HTML templates matching the Paradox dark design system, with plain-text fallback.
-  - Automatically dispatches password reset emails asynchronously without blocking the event loop.
+  - Asynchronously dispatches pre-registration verification emails and password reset emails without blocking the event loop.
 
 ---
 

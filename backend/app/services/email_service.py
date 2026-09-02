@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 class EmailService:
     """
-    Flexible Dual-Engine Email Service.
-    Supports both Resend REST API (Production / Render) and SMTP (Localhost / Gmail).
-    Environment-driven with zero manual code switching.
+    Universal Multi-Provider Email Service.
+    Supports Brevo (Sendinblue) REST API, Resend REST API, and SMTP (Gmail/Relay).
+    100% environment-driven with zero hardcoded credentials.
     """
 
     def __init__(self) -> None:
@@ -27,6 +27,11 @@ class EmailService:
         self.password = settings.SMTP_PASSWORD
         self.from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USER or "noreply@paradox.local"
         self.from_name = settings.SMTP_FROM_NAME or "Paradox Expense Tracker"
+
+    @property
+    def is_brevo_configured(self) -> bool:
+        """Returns True if BREVO_API_KEY is provided."""
+        return bool(settings.BREVO_API_KEY and settings.BREVO_API_KEY.strip())
 
     @property
     def is_resend_configured(self) -> bool:
@@ -41,22 +46,26 @@ class EmailService:
     @property
     def is_configured(self) -> bool:
         """Returns True if at least one email delivery provider is configured."""
-        return bool(self.is_resend_configured or self.is_smtp_configured)
+        return bool(self.is_brevo_configured or self.is_resend_configured or self.is_smtp_configured)
 
     @property
     def active_provider(self) -> Optional[str]:
         """
         Determines the active email provider based on EMAIL_PROVIDER and configured keys.
-        Options: 'resend', 'smtp', or None.
+        Options: 'brevo', 'resend', 'smtp', or None.
         """
         mode = (settings.EMAIL_PROVIDER or "auto").lower().strip()
-        if mode == "resend" and self.is_resend_configured:
+        if mode == "brevo" and self.is_brevo_configured:
+            return "brevo"
+        elif mode == "resend" and self.is_resend_configured:
             return "resend"
         elif mode == "smtp" and self.is_smtp_configured:
             return "smtp"
         else:
-            # Auto-detection: prioritize Resend if API key is present, otherwise SMTP
-            if self.is_resend_configured:
+            # Auto-detection priority: Brevo -> Resend -> SMTP
+            if self.is_brevo_configured:
+                return "brevo"
+            elif self.is_resend_configured:
                 return "resend"
             elif self.is_smtp_configured:
                 return "smtp"
@@ -327,10 +336,18 @@ class EmailService:
     async def _dispatch_email(
         self, to_email: str, subject: str, plain_body: str, html_body: str
     ) -> bool:
-        """Route email delivery through the active provider (Resend API or SMTP)."""
+        """Route email delivery through the active provider (Brevo API, Resend API, or SMTP)."""
         provider = self.active_provider
 
-        if provider == "resend":
+        if provider == "brevo":
+            return await asyncio.to_thread(
+                self._send_brevo_email_sync,
+                to_email=to_email,
+                subject=subject,
+                plain_body=plain_body,
+                html_body=html_body,
+            )
+        elif provider == "resend":
             return await asyncio.to_thread(
                 self._send_resend_email_sync,
                 to_email=to_email,
@@ -347,6 +364,60 @@ class EmailService:
                 html_body=html_body,
             )
         return False
+
+    def _send_brevo_email_sync(
+        self, to_email: str, subject: str, plain_body: str, html_body: str
+    ) -> bool:
+        """Synchronous Brevo / Sendinblue REST API delivery with automatic SMTP fallback."""
+        try:
+            api_key = settings.BREVO_API_KEY.strip()
+            sender_email = settings.BREVO_SENDER_EMAIL or self.from_email
+            sender_name = settings.BREVO_SENDER_NAME or self.from_name
+
+            payload = {
+                "sender": {
+                    "name": sender_name,
+                    "email": sender_email,
+                },
+                "to": [
+                    {
+                        "email": to_email,
+                    }
+                ],
+                "subject": subject,
+                "htmlContent": html_body,
+                "textContent": plain_body,
+            }
+
+            req = urllib.request.Request(
+                "https://api.brevo.com/v3/smtp/email",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "api-key": api_key,
+                    "Content-Type": "application/json",
+                    "accept": "application/json",
+                    "User-Agent": "Paradox-Backend/1.0",
+                },
+                method="POST",
+            )
+
+            with urllib.request.urlopen(req, timeout=15) as response:
+                if response.status in (200, 201, 202):
+                    logger.info("Email successfully sent to %s via Brevo API", to_email)
+                    return True
+                else:
+                    logger.warning(
+                        "Brevo API returned status code: %s for %s",
+                        response.status,
+                        to_email,
+                    )
+                    return False
+        except Exception as exc:
+            logger.error("Failed to send email to %s via Brevo API: %s", to_email, exc)
+            if self.is_smtp_configured:
+                logger.info("Attempting automatic SMTP fallback for %s...", to_email)
+                return self._send_smtp_email_sync(to_email, subject, plain_body, html_body)
+            return False
 
     def _send_resend_email_sync(
         self, to_email: str, subject: str, plain_body: str, html_body: str
@@ -388,7 +459,6 @@ class EmailService:
                     return False
         except Exception as exc:
             logger.error("Failed to send email to %s via Resend API: %s", to_email, exc)
-            # Automatic fallback to SMTP if SMTP is configured
             if self.is_smtp_configured:
                 logger.info("Attempting automatic SMTP fallback for %s...", to_email)
                 return self._send_smtp_email_sync(to_email, subject, plain_body, html_body)
