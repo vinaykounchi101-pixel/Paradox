@@ -109,23 +109,26 @@ Paradox/
 ## 6. Testing & Build Verification
 - **Backend Tests (`pytest`)**:
   - `tests/unit/test_auth.py`: Password hashing, JWT sign/decode, token rotation, registration/login flows. (PASSED)
-  - `tests/unit/test_email.py`: SMTP email service dispatching, unconfigured safety, and payload formatting. (PASSED)
+  - `tests/unit/test_email.py`: Resend REST API & SMTP email dispatching, unconfigured safety, and provider resolution. (PASSED)
+  - `tests/unit/test_pre_registration_verification.py`: Pre-registration token generation, token validation, user creation, and expiry handling. (PASSED)
   - `tests/unit/test_user_isolation.py`: Cross-tenant data isolation and dynamic date scoping. (PASSED)
   - `tests/unit/test_budget_granularity.py`: Budget schemas across all granularities. (PASSED)
   - `tests/unit/test_budget_status.py`: 90% / 100% budget threshold calculations. (PASSED)
   - `tests/unit/test_money.py`: Monetary rounding and decimal precision. (PASSED)
-  - **Result**: `15 passed in 1.78s` (100% green).
+  - **Result**: `22 passed in 1.99s` (100% green).
 - **Frontend Builds (`next build`)**:
-  - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 13 routes.
+  - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 14 routes (including `/register/complete`).
 
 ---
 
 ## 7. Next Session Handoff Notes
-- Authentication, Multi-Tenant User Isolation, and SMTP Password Recovery are completely implemented, verified, and integrated end-to-end.
-- **Gmail SMTP Integration**:
-  - `EmailService` ([`backend/app/services/email_service.py`](file:///e:/Projects/Paradox/backend/app/services/email_service.py)) supports live dispatching of password reset emails via Gmail SMTP (`smtp.gmail.com:587`).
-  - Auto-sanitizes Google App Password spacing.
-  - Forgot password endpoint and UI return `404 NOT_FOUND` with clear feedback when an unregistered email is entered.
+- **Pre-Registration Email Verification**:
+  - Unverified accounts are never created in the database until the email magic link is clicked and validated.
+  - New route: `/register/complete?token=...` allowing verified users to set their Display Name and Password.
+  - Alembic migration `e5f9a2b3c4d1_add_pending_registration_tokens` manages token hashing and expiration.
+- **Dual-Engine Email Service (Resend REST API + Gmail SMTP)**:
+  - `EmailService` ([`backend/app/services/email_service.py`](file:///e:/Projects/Paradox/backend/app/services/email_service.py)) supports both Resend API (Production / Render via `RESEND_API_KEY`) and Gmail SMTP (Localhost via `SMTP_*`).
+  - Automatic fallback to SMTP if Resend is unavailable.
 - **Google OAuth 2.0 / OpenID Connect**:
   - Dual-mode backend verification (JWKS + TokenInfo fallback) and frontend Google Identity Services integration.
 - For local testing:

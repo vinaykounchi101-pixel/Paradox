@@ -11,6 +11,7 @@ from app.core.security import (
     create_access_token,
     generate_password_reset_token,
     generate_refresh_token,
+    generate_registration_token,
     get_password_hash,
     hash_token,
     verify_google_id_token,
@@ -21,7 +22,9 @@ from app.repositories.auth_repository import AuthRepository
 from app.services.email_service import email_service
 from app.schemas.auth import (
     ChangePasswordRequest,
+    CompleteRegistrationRequest,
     GoogleLoginRequest,
+    InitiateRegistrationRequest,
     ResetPasswordRequest,
     UserLoginRequest,
     UserRegisterRequest,
@@ -35,10 +38,94 @@ class AuthService:
         self.db = db
         self.auth_repo = AuthRepository(db)
 
+    async def initiate_registration(self, email: str) -> str:
+        """
+        Initiates pre-registration verification.
+        Checks if user exists, generates secure token, and emails the verification setup link.
+        """
+        clean_email = email.lower().strip()
+        existing_user = await self.auth_repo.get_user_by_email(clean_email)
+        if existing_user:
+            raise ConflictError("An account with this email address already exists.")
+
+        raw_token, token_hash = generate_registration_token()
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        await self.auth_repo.create_pending_registration_token(
+            email=clean_email,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+
+        await email_service.send_registration_verification_email(
+            to_email=clean_email,
+            token=raw_token,
+        )
+
+        logger.info("Pre-registration verification link dispatched to: %s", clean_email)
+        return clean_email
+
+    async def validate_registration_token(self, token: str) -> str:
+        """
+        Validates the pre-registration token and returns the verified email.
+        """
+        if not token:
+            raise AuthenticationError("Missing registration verification token.")
+
+        token_hash = hash_token(token)
+        record = await self.auth_repo.get_pending_registration_token_by_hash(token_hash)
+        now = datetime.now(timezone.utc)
+
+        if not record or record.is_used or record.expires_at < now:
+            raise AuthenticationError("Invalid or expired registration verification link.")
+
+        # Ensure user wasn't registered in the interim
+        existing_user = await self.auth_repo.get_user_by_email(record.email)
+        if existing_user:
+            raise ConflictError("An account with this email address is already registered.")
+
+        return record.email
+
+    async def complete_registration(
+        self, data: CompleteRegistrationRequest, user_agent: Optional[str] = None
+    ) -> Tuple[str, str, User]:
+        """
+        Completes user registration after email has been verified via token.
+        Creates verified user in database and issues JWT session tokens.
+        """
+        email = await self.validate_registration_token(data.token)
+        token_hash = hash_token(data.token)
+
+        password_hash = get_password_hash(data.password)
+        user = await self.auth_repo.create_user(
+            email=email,
+            display_name=data.display_name.strip() if data.display_name else "User",
+            password_hash=password_hash,
+            is_verified=True,
+        )
+
+        # Mark token as used
+        await self.auth_repo.mark_pending_registration_token_used(token_hash)
+
+        # Issue Tokens
+        access_token = create_access_token(subject=str(user.id), email=user.email)
+        raw_refresh, refresh_hash = generate_refresh_token()
+        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+        await self.auth_repo.create_refresh_token(
+            user_id=user.id,
+            token_hash=refresh_hash,
+            expires_at=expires_at,
+            user_agent=user_agent,
+        )
+
+        logger.info("User registration completed for verified email: %s", user.email)
+        return access_token, raw_refresh, user
+
     async def register(
         self, data: UserRegisterRequest, user_agent: Optional[str] = None
     ) -> Tuple[str, str, User]:
-        """Register a new user, hashes password, and issues initial access + refresh tokens."""
+        """Legacy direct register fallback (marks is_verified=True)."""
         existing_user = await self.auth_repo.get_user_by_email(data.email)
         if existing_user:
             raise ConflictError("An account with this email already exists.")
@@ -48,7 +135,7 @@ class AuthService:
             email=data.email,
             display_name=data.display_name or "User",
             password_hash=password_hash,
-            is_verified=False,
+            is_verified=True,
         )
 
         # Issue Tokens

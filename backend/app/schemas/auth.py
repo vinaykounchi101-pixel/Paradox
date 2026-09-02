@@ -11,6 +11,21 @@ class UserRegisterRequest(BaseModel):
     display_name: Optional[str] = Field(default="User", max_length=100)
 
 
+class InitiateRegistrationRequest(BaseModel):
+    email: EmailStr
+
+
+class ValidateRegistrationTokenResponse(BaseModel):
+    email: EmailStr
+    valid: bool = True
+
+
+class CompleteRegistrationRequest(BaseModel):
+    token: str = Field(..., description="Verification token received via email link")
+    display_name: str = Field(..., min_length=1, max_length=100, description="User display name")
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
+
+
 class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1)

@@ -2,16 +2,37 @@ import { client, setAccessToken } from "./client";
 import {
   AuthTokens,
   ChangePasswordRequest,
+  CompleteRegistrationRequest,
   ForgotPasswordRequest,
   GoogleLoginRequest,
+  InitiateRegistrationRequest,
   LoginRequest,
   MessageResponse,
   RegisterRequest,
   ResetPasswordRequest,
   User,
+  ValidateRegistrationTokenResponse,
 } from "@/features/auth/types";
 
 export const authApi = {
+  async initiateRegistration(data: InitiateRegistrationRequest): Promise<MessageResponse> {
+    return await client.post<MessageResponse>("/auth/register/initiate", data);
+  },
+
+  async validateRegistrationToken(token: string): Promise<ValidateRegistrationTokenResponse> {
+    return await client.get<ValidateRegistrationTokenResponse>(
+      `/auth/register/validate-token?token=${encodeURIComponent(token)}`
+    );
+  },
+
+  async completeRegistration(data: CompleteRegistrationRequest): Promise<AuthTokens> {
+    const res = await client.post<AuthTokens>("/auth/register/complete", data);
+    if (res.access_token) {
+      setAccessToken(res.access_token);
+    }
+    return res;
+  },
+
   async register(data: RegisterRequest): Promise<AuthTokens> {
     const res = await client.post<AuthTokens>("/auth/register", data);
     if (res.access_token) {

@@ -5,6 +5,7 @@ import { authApi } from "@/lib/api/auth";
 import { setAccessToken } from "@/lib/api/client";
 import {
   AuthTokens,
+  CompleteRegistrationRequest,
   GoogleLoginRequest,
   LoginRequest,
   RegisterRequest,
@@ -17,6 +18,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (data: LoginRequest) => Promise<AuthTokens>;
   register: (data: RegisterRequest) => Promise<AuthTokens>;
+  completeRegistration: (data: CompleteRegistrationRequest) => Promise<AuthTokens>;
   loginWithGoogle: (data: GoogleLoginRequest) => Promise<AuthTokens>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -57,6 +59,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (data: RegisterRequest): Promise<AuthTokens> => {
     const res = await authApi.register(data);
+    setUser(res.user);
+    return res;
+  };
+
+  const completeRegistration = async (data: CompleteRegistrationRequest): Promise<AuthTokens> => {
+    const res = await authApi.completeRegistration(data);
     setUser(res.user);
     return res;
   };
@@ -106,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         register,
+        completeRegistration,
         loginWithGoogle,
         logout,
         logoutAll,

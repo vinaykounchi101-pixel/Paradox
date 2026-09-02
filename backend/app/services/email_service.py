@@ -1,6 +1,8 @@
 import asyncio
+import json
 import logging
 import smtplib
+import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -11,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Service for dispatching transactional emails via SMTP (e.g. Gmail)."""
+    """
+    Flexible Dual-Engine Email Service.
+    Supports both Resend REST API (Production / Render) and SMTP (Localhost / Gmail).
+    Environment-driven with zero manual code switching.
+    """
 
     def __init__(self) -> None:
         self.host = settings.SMTP_HOST
@@ -23,22 +29,182 @@ class EmailService:
         self.from_name = settings.SMTP_FROM_NAME or "Paradox Expense Tracker"
 
     @property
-    def is_configured(self) -> bool:
-        """Returns True if SMTP server and authentication credentials are set."""
+    def is_resend_configured(self) -> bool:
+        """Returns True if RESEND_API_KEY is provided."""
+        return bool(settings.RESEND_API_KEY and settings.RESEND_API_KEY.strip())
+
+    @property
+    def is_smtp_configured(self) -> bool:
+        """Returns True if SMTP credentials are provided."""
         return bool(self.host and self.user and self.password)
+
+    @property
+    def is_configured(self) -> bool:
+        """Returns True if at least one email delivery provider is configured."""
+        return bool(self.is_resend_configured or self.is_smtp_configured)
+
+    @property
+    def active_provider(self) -> Optional[str]:
+        """
+        Determines the active email provider based on EMAIL_PROVIDER and configured keys.
+        Options: 'resend', 'smtp', or None.
+        """
+        mode = (settings.EMAIL_PROVIDER or "auto").lower().strip()
+        if mode == "resend" and self.is_resend_configured:
+            return "resend"
+        elif mode == "smtp" and self.is_smtp_configured:
+            return "smtp"
+        else:
+            # Auto-detection: prioritize Resend if API key is present, otherwise SMTP
+            if self.is_resend_configured:
+                return "resend"
+            elif self.is_smtp_configured:
+                return "smtp"
+            return None
+
+    async def send_registration_verification_email(
+        self, to_email: str, token: str
+    ) -> bool:
+        """
+        Send a pre-registration verification email with secure setup link.
+        Runs asynchronously without blocking the event loop.
+        """
+        setup_link = f"{settings.FRONTEND_URL.rstrip('/')}/register/complete?token={token}"
+
+        if not self.is_configured:
+            logger.info(
+                "No email provider configured. Pre-registration link for %s: %s",
+                to_email,
+                setup_link,
+            )
+            return True
+
+        subject = "Complete Your Paradox Registration"
+        plain_body = (
+            f"Hello,\n\n"
+            f"Thank you for starting your registration with Paradox Expense Tracker!\n\n"
+            f"Click the link below to verify your email address and set up your password:\n{setup_link}\n\n"
+            f"This link will expire in 1 hour. If you did not request this, you can safely ignore this email.\n\n"
+            f"— The Paradox Team"
+        )
+
+        html_body = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complete Your Registration</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #09090b;
+      color: #fafafa;
+      margin: 0;
+      padding: 24px;
+    }}
+    .container {{
+      max-width: 520px;
+      margin: 0 auto;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      padding: 36px 32px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }}
+    .logo {{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      color: #6366f1;
+      text-decoration: none;
+      margin-bottom: 24px;
+    }}
+    h1 {{
+      font-size: 22px;
+      font-weight: 600;
+      color: #ffffff;
+      margin: 0 0 12px 0;
+    }}
+    p {{
+      font-size: 14px;
+      line-height: 1.6;
+      color: #a1a1aa;
+      margin: 0 0 20px 0;
+    }}
+    .btn-container {{
+      text-align: center;
+      margin: 32px 0;
+    }}
+    .btn {{
+      display: inline-block;
+      background-color: #6366f1;
+      color: #ffffff !important;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 32px;
+      border-radius: 12px;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    }}
+    .footer {{
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid #27272a;
+      font-size: 12px;
+      color: #71717a;
+      text-align: center;
+    }}
+    .link-fallback {{
+      word-break: break-all;
+      color: #818cf8;
+      font-size: 12px;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <span>✦ Paradox</span>
+    </div>
+    <h1>Verify Your Email & Set Up Account</h1>
+    <p>We received a request to create a new Paradox account with <strong>{to_email}</strong>.</p>
+    <p>Click the button below to verify your email address and choose your password:</p>
+    
+    <div class="btn-container">
+      <a href="{setup_link}" class="btn" target="_blank">Complete Registration</a>
+    </div>
+
+    <p style="font-size: 13px; color: #71717a;">This link is valid for <strong>1 hour</strong>. If you did not request this, you can safely ignore this email.</p>
+    
+    <div class="footer">
+      <p style="margin-bottom: 8px;">If the button doesn't work, copy and paste this link into your browser:</p>
+      <a href="{setup_link}" class="link-fallback">{setup_link}</a>
+    </div>
+  </div>
+</body>
+</html>"""
+
+        return await self._dispatch_email(
+            to_email=to_email,
+            subject=subject,
+            plain_body=plain_body,
+            html_body=html_body,
+        )
 
     async def send_password_reset_email(
         self, to_email: str, display_name: str, reset_token: str
     ) -> bool:
         """
         Send a password reset email with secure token link.
-        Runs asynchronously via a background thread to prevent blocking event loop.
+        Runs asynchronously without blocking the event loop.
         """
         reset_link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={reset_token}"
 
         if not self.is_configured:
             logger.info(
-                "SMTP not configured. Password reset link for %s: %s",
+                "No email provider configured. Password reset link for %s: %s",
                 to_email,
                 reset_link,
             )
@@ -151,13 +317,82 @@ class EmailService:
 </body>
 </html>"""
 
-        return await asyncio.to_thread(
-            self._send_smtp_email_sync,
+        return await self._dispatch_email(
             to_email=to_email,
             subject=subject,
             plain_body=plain_body,
             html_body=html_body,
         )
+
+    async def _dispatch_email(
+        self, to_email: str, subject: str, plain_body: str, html_body: str
+    ) -> bool:
+        """Route email delivery through the active provider (Resend API or SMTP)."""
+        provider = self.active_provider
+
+        if provider == "resend":
+            return await asyncio.to_thread(
+                self._send_resend_email_sync,
+                to_email=to_email,
+                subject=subject,
+                plain_body=plain_body,
+                html_body=html_body,
+            )
+        elif provider == "smtp":
+            return await asyncio.to_thread(
+                self._send_smtp_email_sync,
+                to_email=to_email,
+                subject=subject,
+                plain_body=plain_body,
+                html_body=html_body,
+            )
+        return False
+
+    def _send_resend_email_sync(
+        self, to_email: str, subject: str, plain_body: str, html_body: str
+    ) -> bool:
+        """Synchronous Resend REST API delivery with automatic SMTP fallback."""
+        try:
+            api_key = settings.RESEND_API_KEY.strip()
+            from_addr = settings.RESEND_FROM_EMAIL or "Paradox <onboarding@resend.dev>"
+
+            payload = {
+                "from": from_addr,
+                "to": [to_email],
+                "subject": subject,
+                "html": html_body,
+                "text": plain_body,
+            }
+
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "Paradox-Backend/1.0",
+                },
+                method="POST",
+            )
+
+            with urllib.request.urlopen(req, timeout=15) as response:
+                if response.status in (200, 201):
+                    logger.info("Email successfully sent to %s via Resend API", to_email)
+                    return True
+                else:
+                    logger.warning(
+                        "Resend API returned non-200 status code: %s for %s",
+                        response.status,
+                        to_email,
+                    )
+                    return False
+        except Exception as exc:
+            logger.error("Failed to send email to %s via Resend API: %s", to_email, exc)
+            # Automatic fallback to SMTP if SMTP is configured
+            if self.is_smtp_configured:
+                logger.info("Attempting automatic SMTP fallback for %s...", to_email)
+                return self._send_smtp_email_sync(to_email, subject, plain_body, html_body)
+            return False
 
     def _send_smtp_email_sync(
         self, to_email: str, subject: str, plain_body: str, html_body: str
@@ -192,7 +427,7 @@ class EmailService:
             server.sendmail(self.from_email, [to_email], msg.as_string())
             server.quit()
 
-            logger.info("Password reset email successfully sent to %s via SMTP", to_email)
+            logger.info("Email successfully sent to %s via SMTP", to_email)
             return True
         except Exception as exc:
             logger.error("Failed to send email to %s via SMTP: %s", to_email, exc, exc_info=True)

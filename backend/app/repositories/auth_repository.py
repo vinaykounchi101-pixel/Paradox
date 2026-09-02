@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.password_reset_token import PasswordResetToken
 from app.db.models.refresh_token import RefreshToken
+from app.db.models.pending_registration_token import PendingRegistrationToken
 from app.db.models.user import User
 
 
@@ -135,6 +136,42 @@ class AuthRepository:
         stmt = (
             update(PasswordResetToken)
             .where(PasswordResetToken.token_hash == token_hash)
+            .values(is_used=True)
+        )
+        await self.session.execute(stmt)
+        await self.session.flush()
+
+    # --- Pre-Registration Token Operations ---
+
+    async def create_pending_registration_token(
+        self,
+        email: str,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> PendingRegistrationToken:
+        token = PendingRegistrationToken(
+            email=email.lower().strip(),
+            token_hash=token_hash,
+            expires_at=expires_at,
+            is_used=False,
+        )
+        self.session.add(token)
+        await self.session.flush()
+        return token
+
+    async def get_pending_registration_token_by_hash(
+        self, token_hash: str
+    ) -> Optional[PendingRegistrationToken]:
+        stmt = select(PendingRegistrationToken).where(
+            PendingRegistrationToken.token_hash == token_hash
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def mark_pending_registration_token_used(self, token_hash: str) -> None:
+        stmt = (
+            update(PendingRegistrationToken)
+            .where(PendingRegistrationToken.token_hash == token_hash)
             .values(is_used=True)
         )
         await self.session.execute(stmt)

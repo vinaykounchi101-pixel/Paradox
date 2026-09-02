@@ -34,7 +34,12 @@ class Settings(BaseSettings):
     # Application URLs
     FRONTEND_URL: str = "http://localhost:3000"
 
-    # SMTP Email Configuration
+    # Email Configuration (Supports Resend API and SMTP)
+    EMAIL_PROVIDER: str = "auto"  # "auto", "resend", or "smtp"
+    RESEND_API_KEY: Union[str, None] = None
+    RESEND_FROM_EMAIL: str = "Paradox <onboarding@resend.dev>"
+
+    # SMTP Email Configuration (Fallback / Local Development)
     SMTP_HOST: Union[str, None] = None
     SMTP_PORT: int = 587
     SMTP_TLS: bool = True

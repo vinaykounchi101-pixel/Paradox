@@ -107,6 +107,17 @@ def generate_password_reset_token() -> Tuple[str, str]:
     return raw_token, token_hash
 
 
+def generate_registration_token() -> Tuple[str, str]:
+    """
+    Generate a secure pre-registration verification token.
+    Returns:
+        (raw_token, token_hash)
+    """
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hash_token(raw_token)
+    return raw_token, token_hash
+
+
 def verify_google_id_token(
     id_token_str: str, client_id: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:

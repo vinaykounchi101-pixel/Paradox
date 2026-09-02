@@ -24,6 +24,21 @@ export interface RegisterRequest {
   display_name?: string;
 }
 
+export interface InitiateRegistrationRequest {
+  email: string;
+}
+
+export interface ValidateRegistrationTokenResponse {
+  email: string;
+  valid: boolean;
+}
+
+export interface CompleteRegistrationRequest {
+  token: string;
+  display_name: string;
+  password: string;
+}
+
 export interface GoogleLoginRequest {
   id_token: string;
 }

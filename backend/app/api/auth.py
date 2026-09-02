@@ -9,14 +9,17 @@ from app.core.config import settings
 from app.db.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
+    CompleteRegistrationRequest,
     ForgotPasswordRequest,
     GoogleLoginRequest,
+    InitiateRegistrationRequest,
     MessageResponse,
     ResetPasswordRequest,
     TokenResponse,
     UserLoginRequest,
     UserRegisterRequest,
     UserResponse,
+    ValidateRegistrationTokenResponse,
 )
 from app.services.auth_service import AuthService
 
@@ -52,6 +55,64 @@ def clear_refresh_cookie(response: Response) -> None:
         path=REFRESH_COOKIE_PATH,
         httponly=True,
         samesite="lax",
+    )
+
+
+@router.post(
+    "/register/initiate",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Initiate pre-registration email verification",
+)
+async def initiate_registration(
+    data: InitiateRegistrationRequest,
+    db: AsyncSession = Depends(get_db),
+) -> MessageResponse:
+    service = AuthService(db)
+    email = await service.initiate_registration(data.email)
+    return MessageResponse(
+        message=f"Verification link has been sent to {email}. Please check your inbox to complete registration.",
+        success=True,
+    )
+
+
+@router.get(
+    "/register/validate-token",
+    response_model=ValidateRegistrationTokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Validate pre-registration verification token",
+)
+async def validate_registration_token(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+) -> ValidateRegistrationTokenResponse:
+    service = AuthService(db)
+    email = await service.validate_registration_token(token)
+    return ValidateRegistrationTokenResponse(email=email, valid=True)
+
+
+@router.post(
+    "/register/complete",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Complete registration after email verification",
+)
+async def complete_registration(
+    data: CompleteRegistrationRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    user_agent = request.headers.get("user-agent")
+    service = AuthService(db)
+    access_token, raw_refresh, user = await service.complete_registration(
+        data, user_agent=user_agent
+    )
+    set_refresh_cookie(response, raw_refresh)
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user),
     )
 
 

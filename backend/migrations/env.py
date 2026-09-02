@@ -27,6 +27,9 @@ from app.db.models.category import Category
 from app.db.models.payment_method import PaymentMethod
 from app.db.models.expense import Expense
 from app.db.models.budget import Budget
+from app.db.models.refresh_token import RefreshToken
+from app.db.models.password_reset_token import PasswordResetToken
+from app.db.models.pending_registration_token import PendingRegistrationToken
 
 # Set the SQLAlchemy URL from config environment settings dynamically
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
