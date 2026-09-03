@@ -168,6 +168,9 @@ Paradox/
 - Testing:
   - Backend: `.venv\Scripts\pytest tests/ -q` -> 31/31 passed.
   - Frontend: `npm.cmd run build` -> 0 errors.
+- **Documentation**:
+  - `PARADOX_PRD_FINAL.md` and `PARADOX_SRS.md` updated to v2.2 reflecting all Paradox V2 Supercharged features, schemas, and endpoints.
+  - `AI_FEATURES.md` created with complete dual-engine architecture, endpoints, and OCR flows.
 - **Universal Multi-Provider Email Service (Brevo REST API + Resend API + Gmail SMTP)**:
   - `EmailService` ([`backend/app/services/email_service.py`](file:///e:/Projects/Paradox/backend/app/services/email_service.py)) supports Brevo (ideal for Production/Render without custom domains via `BREVO_API_KEY`), Resend API (`RESEND_API_KEY`), and Gmail SMTP (`SMTP_*` for Localhost).
   - 100% environment-driven with automatic fallback.
