@@ -14,6 +14,9 @@ import {
   Clock,
   Sun,
   PlusCircle,
+  Sparkles,
+  Loader2,
+  Check,
 } from "lucide-react";
 import { useBudget, useBudgetsList, useBudgetMutation } from "../hooks/useBudget";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
@@ -23,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { BudgetPeriodType } from "@/lib/api/budget";
+import { aiApi, SuggestBudgetResponse } from "@/lib/api/ai";
 
 // Helpers for default period keys
 function getDefaultPeriodKey(type: BudgetPeriodType): string {
@@ -101,6 +105,30 @@ export default function BudgetConfigView() {
   // Local Form State
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
+
+  // AI Suggestion State
+  const [aiSuggestion, setAiSuggestion] = useState<SuggestBudgetResponse | null>(null);
+  const [loadingAiSuggest, setLoadingAiSuggest] = useState(false);
+
+  const handleFetchAiSuggest = async () => {
+    try {
+      setLoadingAiSuggest(true);
+      const res = await aiApi.suggestBudget(periodType);
+      setAiSuggestion(res.data);
+    } catch {
+      toastError("Could not fetch AI budget suggestion");
+    } finally {
+      setLoadingAiSuggest(false);
+    }
+  };
+
+  const handleApplyAiSuggest = () => {
+    if (aiSuggestion) {
+      setAmount(String(aiSuggestion.suggested_amount));
+      setError("");
+      success(`Applied AI suggested target: $${aiSuggestion.suggested_amount}`);
+    }
+  };
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState<{ type: BudgetPeriodType; key: string } | null>(null);
@@ -236,21 +264,78 @@ export default function BudgetConfigView() {
                 />
               </div>
 
-              {/* Amount Input */}
-              <Input
-                label={`Spending Limit ($) for ${formatPeriodLabel(periodType, periodKey)}`}
-                type="number"
-                step="1"
-                min="1"
-                placeholder={periodType === "day" ? "e.g. 50" : periodType === "week" ? "e.g. 350" : "e.g. 1500"}
-                value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setError("");
-                }}
-                error={error}
-                required
-              />
+              {/* Amount Input with AI Smart Suggestion */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Spending Limit ($) for {formatPeriodLabel(periodType, periodKey)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleFetchAiSuggest}
+                    disabled={loadingAiSuggest}
+                    className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer transition disabled:opacity-50"
+                  >
+                    {loadingAiSuggest ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                    )}
+                    <span>AI Smart Suggest</span>
+                  </button>
+                </div>
+
+                {aiSuggestion && (
+                  <div className="rounded-xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent p-3 space-y-2 text-xs animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-indigo-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                        Recommended Target:{" "}
+                        <strong className="text-white text-sm">
+                          ${aiSuggestion.suggested_amount}
+                        </strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleApplyAiSuggest}
+                        className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-[11px] transition cursor-pointer"
+                      >
+                        Apply Target
+                      </button>
+                    </div>
+                    <p className="text-zinc-400 leading-relaxed text-[11px]">
+                      {aiSuggestion.reasoning}
+                    </p>
+                    {aiSuggestion.category_allocations?.length > 0 && (
+                      <div className="pt-1 flex flex-wrap gap-1.5">
+                        {aiSuggestion.category_allocations.map((alloc, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-md bg-zinc-900/90 border border-zinc-800 text-[10px] text-zinc-300"
+                          >
+                            {alloc.category_name}: ${alloc.suggested_amount} ({alloc.percentage}%)
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Input
+                  label=""
+                  type="number"
+                  step="1"
+                  min="1"
+                  placeholder={periodType === "day" ? "e.g. 50" : periodType === "week" ? "e.g. 350" : "e.g. 1500"}
+                  value={amount}
+                  onChange={(e) => {
+                    setAmount(e.target.value);
+                    setError("");
+                  }}
+                  error={error}
+                  required
+                />
+              </div>
 
               {/* Slider for quick edits */}
               <div className="space-y-1 pt-1">

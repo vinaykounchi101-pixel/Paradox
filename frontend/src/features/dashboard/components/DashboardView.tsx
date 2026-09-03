@@ -12,17 +12,34 @@ import {
   TrendingDown,
   Percent,
   Tags,
+  FileText,
+  Repeat,
+  Printer,
+  Sparkles,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useCurrency } from "@/features/auth/context/CurrencyContext";
+import { expensesApi } from "@/lib/api/expenses";
 import { useDashboard } from "../hooks/useDashboard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { BarChart3D } from "./BarChart3D";
 import { TrendGraph } from "./TrendGraph";
 import { TiltCard } from "@/components/common/TiltCard";
+import { FinancialCopilotCard } from "./FinancialCopilotCard";
 
 export default function DashboardView() {
+  const { formatCurrency, currency, currencySymbol } = useCurrency();
   const [period, setPeriod] = useState<"current_month" | "last_30_days" | "current_week">("current_month");
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const { data, isLoading, isError, error } = useDashboard(period);
+  const { data: recurringData } = useQuery({
+    queryKey: ["recurring_expenses"],
+    queryFn: expensesApi.getRecurring,
+  });
+  const recurringTotal = recurringData?.data?.total_monthly_commitment || "0.00";
+  const recurringList = recurringData?.data?.recurring_expenses || [];
 
   if (isLoading) {
     return (
@@ -72,29 +89,46 @@ export default function DashboardView() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-glow">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Real-time insights on your monthly spending.
+            Real-time insights on your financial health.
           </p>
         </div>
 
-        {/* Period selection tabs */}
-        <div className="flex bg-zinc-900 border border-border p-1 rounded-lg">
-          {(["current_month", "last_30_days", "current_week"] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                period === p
-                  ? "bg-primary text-primary-foreground shadow"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {p === "current_month" && "Current Month"}
-              {p === "last_30_days" && "Last 30 Days"}
-              {p === "current_week" && "Current Week"}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Monthly Health Report Button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsReportModalOpen(true)}
+            className="cursor-pointer text-xs"
+            title="Generate monthly financial health report"
+          >
+            <FileText className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+            Health Report
+          </Button>
+
+          {/* Period selection tabs */}
+          <div className="flex bg-zinc-900 border border-border p-1 rounded-lg">
+            {(["current_month", "last_30_days", "current_week"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  period === p
+                    ? "bg-primary text-primary-foreground shadow"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p === "current_month" && "Current Month"}
+                {p === "last_30_days" && "Last 30 Days"}
+                {p === "current_week" && "Current Week"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* AI Financial Copilot Insights Card */}
+      <FinancialCopilotCard period={period} />
 
       {/* Top row cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:items-stretch">
@@ -120,7 +154,7 @@ export default function DashboardView() {
                     transition={{ duration: 0.35, ease: "easeOut" }}
                     style={{ display: "inline-block", transformStyle: "preserve-3d" }}
                   >
-                    ${total_spent}
+                    {formatCurrency(total_spent)}
                   </motion.span>
                 </AnimatePresence>
               </div>
@@ -168,8 +202,8 @@ export default function DashboardView() {
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-3xl font-extrabold tracking-tight">${spent.toFixed(2)}</span>
-                    <span className="text-sm text-muted-foreground">of ${limit.toFixed(2)} limit</span>
+                    <span className="text-3xl font-extrabold tracking-tight">{formatCurrency(spent)}</span>
+                    <span className="text-sm text-muted-foreground">of {formatCurrency(limit)} limit</span>
                   </div>
                   
                   {/* Progress bar */}
@@ -246,6 +280,48 @@ export default function DashboardView() {
         </Card>
       </div>
 
+      {/* Subscriptions & Fixed Commitments Widget */}
+      <Card variant="glass" className="p-5">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <Repeat className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Subscriptions & Fixed Bills</CardTitle>
+              <CardDescription>Committed recurring expenses automatically tracked</CardDescription>
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-muted-foreground">Monthly Fixed Burden:</span>
+            <span className="text-lg font-bold text-foreground font-mono">{formatCurrency(recurringTotal)}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+              {recurringList.length} Active
+            </span>
+          </div>
+        </div>
+
+        {recurringList.length > 0 ? (
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-3 border-t border-border/50">
+            {recurringList.map((r) => (
+              <div key={r.id} className="p-3 rounded-xl bg-zinc-900/60 border border-border flex items-center justify-between">
+                <div className="min-w-0 pr-2">
+                  <p className="text-xs font-semibold text-foreground truncate">{r.description || "Recurring Bill"}</p>
+                  <p className="text-[10px] text-muted-foreground capitalize">{r.recurring_frequency || "monthly"} • {r.category?.name || "General"}</p>
+                </div>
+                <div className="font-mono text-xs font-bold text-foreground shrink-0">
+                  {formatCurrency(r.amount)}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            No recurring subscriptions marked yet. When recording an expense, toggle "🔁 Recurring Subscription" to track your recurring burdens here.
+          </p>
+        )}
+      </Card>
+
       {/* Grid: Latest Transactions */}
       <div className="grid grid-cols-1 gap-6">
         {/* Recent expenses */}
@@ -278,7 +354,14 @@ export default function DashboardView() {
                 {recent_expenses.map((e) => (
                   <div key={e.id} className="flex justify-between items-center py-3.5 first:pt-0 last:pb-0">
                     <div className="space-y-1 pr-4 min-w-0">
-                      <p className="font-semibold text-sm truncate">{e.description || "Unspecified Expense"}</p>
+                      <p className="font-semibold text-sm truncate flex items-center gap-1.5">
+                        <span>{e.description || "Unspecified Expense"}</span>
+                        {e.is_recurring && (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            🔁 {e.recurring_frequency || "monthly"}
+                          </span>
+                        )}
+                      </p>
                       <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                         <span className="bg-zinc-800/80 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase text-zinc-300">
                           {e.category?.name || "Uncategorized"}
@@ -291,7 +374,7 @@ export default function DashboardView() {
                       </div>
                     </div>
                     <div className="font-mono text-sm font-bold text-foreground shrink-0">
-                      -${e.amount}
+                      -{formatCurrency(e.amount)}
                     </div>
                   </div>
                 ))}
@@ -300,6 +383,96 @@ export default function DashboardView() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Monthly Financial Health Report Modal */}
+      <Dialog
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        title="Monthly Financial Health Report"
+      >
+        <div className="space-y-4 print:p-0">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">Statement Period</p>
+              <p className="text-sm font-bold text-foreground capitalize">{period.replace("_", " ")}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => window.print()}
+              className="cursor-pointer text-xs"
+            >
+              <Printer className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+              Print / Save PDF
+            </Button>
+          </div>
+
+          {/* Key Metrics Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl bg-zinc-900/70 border border-border">
+              <p className="text-[11px] text-muted-foreground font-medium">Total Spend</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">{formatCurrency(total_spent)}</p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-zinc-900/70 border border-border">
+              <p className="text-[11px] text-muted-foreground font-medium">Budget Target</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">
+                {limit !== null ? formatCurrency(limit) : "None"}
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-zinc-900/70 border border-border col-span-2 sm:col-span-1">
+              <p className="text-[11px] text-muted-foreground font-medium">Monthly Commitments</p>
+              <p className="text-lg font-bold text-indigo-400 mt-0.5">{formatCurrency(recurringTotal)}</p>
+            </div>
+          </div>
+
+          {/* Category Breakdown Table in Report */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Top Spending Categories</p>
+            <div className="divide-y divide-border/60 border border-border rounded-xl overflow-hidden bg-zinc-900/40">
+              {category_breakdown.slice(0, 5).map((c) => (
+                <div key={c.category_name} className="flex justify-between items-center px-3 py-2 text-xs">
+                  <span className="font-medium text-foreground">{c.category_name}</span>
+                  <div className="flex items-center gap-2 font-mono">
+                    <span className="font-bold text-foreground">{formatCurrency(c.total)}</span>
+                    <span className="text-[10px] text-muted-foreground">({c.percentage}%)</span>
+                  </div>
+                </div>
+              ))}
+              {category_breakdown.length === 0 && (
+                <p className="p-3 text-xs text-muted-foreground text-center">No categories recorded yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Health Assessment Summary */}
+          <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/25 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
+              <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+              Financial Health Summary
+            </div>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              {isOverBudget
+                ? `You have exceeded your budgeted monthly spending target. Consider reviewing non-essential spending in your top categories.`
+                : isNearBudget
+                ? `You have utilized ${pct.toFixed(1)}% of your monthly budget. Monitor remaining discretionary purchases carefully.`
+                : `Your finances are in excellent standing with healthy savings headroom remaining.`}
+            </p>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsReportModalOpen(false)}
+              className="cursor-pointer"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

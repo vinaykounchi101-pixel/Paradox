@@ -85,6 +85,10 @@ export const authApi = {
     return await client.get<User>("/auth/me");
   },
 
+  async updateMe(data: { currency?: string; display_name?: string }): Promise<User> {
+    return await client.patch<User>("/auth/me", data);
+  },
+
   async forgotPassword(data: ForgotPasswordRequest): Promise<MessageResponse> {
     return await client.post<MessageResponse>("/auth/forgot-password", data);
   },

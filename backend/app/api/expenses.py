@@ -3,7 +3,7 @@ import math
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 
 from app.api.deps import get_current_user, get_db
 from app.db.models.user import User
@@ -63,6 +63,54 @@ async def list_expenses(
             "total_items": total_items,
             "total_pages": total_pages,
         },
+    }
+
+
+@router.get("/export")
+async def export_expenses(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> Response:
+    """Export expenses as a downloadable CSV spreadsheet."""
+    service = ExpenseService(db)
+    csv_data = await service.export_expenses_csv(current_user.id, date_from, date_to)
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=paradox_expenses_{date.today().isoformat()}.csv"},
+    )
+
+
+@router.post("/import", status_code=status.HTTP_200_OK)
+async def import_expenses(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> dict:
+    """Import expenses from a CSV file (e.g. Bank Statement) with AI auto-categorization."""
+    content_bytes = await file.read()
+    csv_content = content_bytes.decode("utf-8", errors="replace")
+    service = ExpenseService(db)
+    result = await service.import_expenses_csv(current_user.id, csv_content)
+    return {"data": result}
+
+
+@router.get("/recurring", status_code=status.HTTP_200_OK)
+async def get_recurring_expenses(
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> dict:
+    """Retrieve recurring commitments, upcoming subscriptions, and total monthly commitment."""
+    service = ExpenseService(db)
+    result = await service.get_recurring_commitments(current_user.id)
+    return {
+        "data": {
+            "total_monthly_commitment": result["total_monthly_commitment"],
+            "total_count": result["total_count"],
+            "recurring_expenses": [ExpenseRead.model_validate(e) for e in result["recurring_expenses"]],
+        }
     }
 
 

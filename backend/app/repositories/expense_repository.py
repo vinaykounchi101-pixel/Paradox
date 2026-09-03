@@ -133,3 +133,41 @@ class ExpenseRepository:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_recurring_expenses(self, user_id: uuid.UUID) -> List[Expense]:
+        stmt = (
+            select(Expense)
+            .where(
+                Expense.user_id == user_id,
+                Expense.is_recurring == True,  # noqa: E712
+            )
+            .options(
+                selectinload(Expense.category),
+                selectinload(Expense.payment_method),
+            )
+            .order_by(Expense.amount.desc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_all_expenses_for_export(
+        self,
+        user_id: uuid.UUID,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+    ) -> List[Expense]:
+        stmt = (
+            select(Expense)
+            .where(Expense.user_id == user_id)
+            .options(
+                selectinload(Expense.category),
+                selectinload(Expense.payment_method),
+            )
+        )
+        if date_from:
+            stmt = stmt.where(Expense.date >= date_from)
+        if date_to:
+            stmt = stmt.where(Expense.date <= date_to)
+        stmt = stmt.order_by(Expense.date.desc(), Expense.id.desc())
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())

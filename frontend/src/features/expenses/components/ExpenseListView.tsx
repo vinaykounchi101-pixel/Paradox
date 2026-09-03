@@ -16,7 +16,13 @@ import {
   Tags,
   DollarSign,
   Receipt,
+  Download,
+  Upload,
+  Loader2,
+  FileSpreadsheet,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCurrency } from "@/features/auth/context/CurrencyContext";
 import { useExpenses } from "../hooks/useExpenses";
 import { useExpenseMutations } from "../hooks/useExpenseMutations";
 import { useCategories } from "@/features/categories/hooks/useCategories";
@@ -27,12 +33,14 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
-import { ExpenseRead } from "@/lib/api/expenses";
+import { expensesApi, ExpenseRead } from "@/lib/api/expenses";
 
 export default function ExpenseListView() {
   const { success, error: toastError } = useToast();
   const { data: categories = [] } = useCategories();
   const { deleteExpense, isDeleting } = useExpenseMutations();
+  const queryClient = useQueryClient();
+  const { formatCurrency } = useCurrency();
 
   // Filters State
   const [search, setSearch] = useState("");
@@ -47,6 +55,48 @@ export default function ExpenseListView() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<ExpenseRead | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  // CSV Export & Import States
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+
+  const handleExportCsv = async () => {
+    try {
+      setIsExporting(true);
+      await expensesApi.exportCsv({
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+      });
+      success("Exported expenses to CSV");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to export CSV";
+      toastError(msg);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportCsv = async () => {
+    if (!importFile) return;
+    try {
+      setIsImporting(true);
+      const res = await expensesApi.importCsv(importFile);
+      success(res.message);
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to import CSV";
+      toastError(msg);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Load Expenses with parameters
   const { data, isLoading, isError, error } = useExpenses({
@@ -106,15 +156,44 @@ export default function ExpenseListView() {
             Manage and audit your transaction records.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setSelectedExpense(null);
-            setIsFormOpen(true);
-          }}
-          className="cursor-pointer"
-        >
-          <Plus className="h-4 w-4 mr-2" /> Record Expense
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportCsv}
+            disabled={isExporting}
+            className="cursor-pointer text-xs"
+            title="Export transactions as CSV spreadsheet"
+          >
+            {isExporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+            ) : (
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Export CSV
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsImportModalOpen(true)}
+            className="cursor-pointer text-xs"
+            title="Import bank statement CSV with AI auto-categorization"
+          >
+            <Upload className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+            Import Statement
+          </Button>
+
+          <Button
+            onClick={() => {
+              setSelectedExpense(null);
+              setIsFormOpen(true);
+            }}
+            className="cursor-pointer"
+          >
+            <Plus className="h-4 w-4 mr-2" /> Record Expense
+          </Button>
+        </div>
       </div>
 
       {/* Filter / Search / Sort Bar */}
@@ -243,13 +322,20 @@ export default function ExpenseListView() {
               <Card key={e.id} variant="glass" className="p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="space-y-0.5">
-                    <p className="font-semibold text-sm text-foreground">{e.description || "Unspecified Expense"}</p>
+                    <p className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+                      <span>{e.description || "Unspecified Expense"}</span>
+                      {e.is_recurring && (
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          🔁 {e.recurring_frequency || "monthly"}
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(e.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     </p>
                   </div>
                   <div className="font-mono text-sm font-bold text-foreground">
-                    -${e.amount}
+                    -{formatCurrency(e.amount)}
                   </div>
                 </div>
 
@@ -306,7 +392,14 @@ export default function ExpenseListView() {
                       {new Date(e.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     </td>
                     <td className="p-4 max-w-xs truncate font-medium">
-                      {e.description || "—"}
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">{e.description || "—"}</span>
+                        {e.is_recurring && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                            🔁 {e.recurring_frequency || "monthly"}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-zinc-800 text-zinc-300">
@@ -317,7 +410,7 @@ export default function ExpenseListView() {
                       {e.payment_method?.name || "Other"}
                     </td>
                     <td className="p-4 text-right font-mono font-bold">
-                      -${e.amount}
+                      -{formatCurrency(e.amount)}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-center space-x-3">
@@ -420,6 +513,67 @@ export default function ExpenseListView() {
               isLoading={isDeleting}
             >
               Delete
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* CSV Bank Statement Import Modal */}
+      <Dialog
+        isOpen={isImportModalOpen}
+        onClose={() => {
+          setIsImportModalOpen(false);
+          setImportFile(null);
+        }}
+        title="Import Bank Statement (CSV)"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Upload your bank statement or transaction spreadsheet (.csv). Our AI will parse the entries, categorize each purchase, and add them to your account.
+          </p>
+
+          <div
+            onClick={() => document.getElementById("csv-file-input")?.click()}
+            className="border-2 border-dashed border-border hover:border-primary/60 rounded-xl p-6 text-center cursor-pointer transition bg-zinc-900/40 hover:bg-zinc-900/70 space-y-2"
+          >
+            <input
+              id="csv-file-input"
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) setImportFile(f);
+              }}
+            />
+            <FileSpreadsheet className="h-8 w-8 mx-auto text-indigo-400" />
+            <p className="text-xs font-semibold text-foreground">
+              {importFile ? importFile.name : "Click to select CSV file or drag & drop"}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Supports standard bank exports with Date, Amount, and Narration columns.
+            </p>
+          </div>
+
+          <div className="flex space-x-3 pt-2">
+            <Button
+              variant="secondary"
+              className="flex-1 cursor-pointer"
+              onClick={() => {
+                setIsImportModalOpen(false);
+                setImportFile(null);
+              }}
+              disabled={isImporting}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 cursor-pointer"
+              onClick={handleImportCsv}
+              disabled={!importFile || isImporting}
+              isLoading={isImporting}
+            >
+              {isImporting ? "Processing with AI..." : "Start Import"}
             </Button>
           </div>
         </div>

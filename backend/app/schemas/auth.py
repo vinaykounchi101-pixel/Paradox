@@ -41,9 +41,15 @@ class UserResponse(BaseModel):
     display_name: str
     avatar_url: Optional[str] = None
     is_verified: bool
+    currency: str = "INR"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UpdateProfileRequest(BaseModel):
+    display_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    currency: Optional[str] = Field(None, min_length=3, max_length=10)
 
 
 class TokenResponse(BaseModel):

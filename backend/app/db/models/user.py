@@ -48,6 +48,11 @@ class User(Base):
         nullable=False,
         default=False,
     )
+    currency: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        default="INR",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

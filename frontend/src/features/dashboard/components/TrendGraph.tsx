@@ -1,7 +1,6 @@
-"use client";
-
 import React, { useState } from "react";
 import { motion } from "framer-motion";
+import { useCurrency } from "@/features/auth/context/CurrencyContext";
 
 interface TrendItem {
   label: string;
@@ -13,6 +12,7 @@ interface TrendGraphProps {
 }
 
 export const TrendGraph: React.FC<TrendGraphProps> = ({ data }) => {
+  const { currencySymbol, formatCurrency } = useCurrency();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Geometry
@@ -116,7 +116,7 @@ export const TrendGraph: React.FC<TrendGraphProps> = ({ data }) => {
               textAnchor="end"
               className="text-[9px] font-mono fill-muted-foreground font-semibold"
             >
-              ${line.val.toFixed(0)}
+              {currencySymbol}{line.val.toFixed(0)}
             </text>
           </g>
         ))}
@@ -201,7 +201,7 @@ export const TrendGraph: React.FC<TrendGraphProps> = ({ data }) => {
           }}
         >
           <div className="text-[10px] text-muted-foreground">{coords[hoveredIndex].label}</div>
-          <div className="font-bold text-primary mt-0.5">${coords[hoveredIndex].val.toFixed(2)}</div>
+          <div className="font-bold text-primary mt-0.5">{formatCurrency(coords[hoveredIndex].val)}</div>
         </div>
       )}
     </div>

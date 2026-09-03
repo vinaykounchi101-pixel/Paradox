@@ -151,7 +151,7 @@ export const client = {
     request<T>(path, {
       ...options,
       method: "POST",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
     }),
 
   put: <T>(path: string, body?: any, options?: RequestInit) =>

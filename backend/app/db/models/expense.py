@@ -1,8 +1,9 @@
 import uuid
 from decimal import Decimal
 from datetime import date, datetime
+from typing import Optional
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,6 +44,15 @@ class Expense(Base):
     )
     description: Mapped[str] = mapped_column(
         String(255),
+        nullable=True,
+    )
+    is_recurring: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+    recurring_frequency: Mapped[Optional[str]] = mapped_column(
+        String(20),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

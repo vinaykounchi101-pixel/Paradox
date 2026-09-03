@@ -15,6 +15,8 @@ class ExpenseBase(BaseModel):
     payment_method_id: uuid.UUID
     date: date_type
     description: Optional[str] = Field(None, max_length=255)
+    is_recurring: bool = False
+    recurring_frequency: Optional[str] = Field(None, max_length=20)
 
     @field_validator("description")
     @classmethod
@@ -34,6 +36,8 @@ class ExpenseUpdate(BaseModel):
     payment_method_id: Optional[uuid.UUID] = None
     date: Optional[date_type] = None
     description: Optional[str] = Field(None, max_length=255)
+    is_recurring: Optional[bool] = None
+    recurring_frequency: Optional[str] = Field(None, max_length=20)
 
     @field_validator("description")
     @classmethod

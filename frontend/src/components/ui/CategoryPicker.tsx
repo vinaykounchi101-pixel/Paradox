@@ -40,6 +40,7 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
   }, [showInput]);
 
   const handleCreate = async () => {
+    if (isSaving) return;
     const trimmed = newName.trim();
     if (!trimmed) {
       setInputError("Name cannot be empty.");
@@ -84,14 +85,30 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
     }
   };
 
+  // Deduplicate categories by id and lower-case name to guarantee zero visual duplicates
+  const deduplicated = React.useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    const result: CategoryRead[] = [];
+    for (const cat of categories) {
+      const lower = cat.name.toLowerCase().trim();
+      if (!seenIds.has(cat.id) && !seenNames.has(lower)) {
+        seenIds.add(cat.id);
+        seenNames.add(lower);
+        result.push(cat);
+      }
+    }
+    return result;
+  }, [categories]);
+
   // Sort: defaults first, then alphabetical
-  const sorted = [...categories].sort((a, b) => {
+  const sorted = [...deduplicated].sort((a, b) => {
     if (a.is_default && !b.is_default) return -1;
     if (!a.is_default && b.is_default) return 1;
     return a.name.localeCompare(b.name);
   });
 
-  const selectedCat = categories.find((c) => c.id === value);
+  const selectedCat = deduplicated.find((c) => c.id === value);
 
   return (
     <div className="flex flex-col space-y-2 w-full">

@@ -25,6 +25,7 @@ import { twMerge } from "tailwind-merge";
 import { useTheme } from "@/components/common/ThemeProvider";
 import { BackgroundGrid } from "@/components/common/BackgroundGrid";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useCurrency, CurrencyCode } from "@/features/auth/context/CurrencyContext";
 import { ChangePasswordModal } from "@/features/auth/components/ChangePasswordModal";
 import { useToast } from "@/components/ui/toast";
 
@@ -47,6 +48,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, isAuthenticated, logout, logoutAll } = useAuth();
   const { addToast } = useToast();
+  const { currency, setCurrency } = useCurrency();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -177,8 +179,24 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           })}
         </nav>
 
-        {/* Right: Theme switcher + User Profile Menu */}
-        <div className="flex items-center space-x-3">
+        {/* Right: Currency switcher + Theme switcher + User Profile Menu */}
+        <div className="flex items-center space-x-2.5">
+          {/* Currency Switcher Dropdown */}
+          <div className="relative">
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+              className="bg-zinc-900/80 hover:bg-zinc-800 text-foreground border border-border/80 rounded-lg px-2.5 py-1 text-xs font-bold cursor-pointer outline-none focus:ring-1 focus:ring-primary appearance-none pr-5 transition-colors"
+              title="Select display currency"
+            >
+              <option value="INR">₹ INR</option>
+              <option value="USD">$ USD</option>
+              <option value="EUR">€ EUR</option>
+              <option value="GBP">£ GBP</option>
+            </select>
+            <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">▼</span>
+          </div>
+
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"

@@ -85,3 +85,17 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Future Work**:
   - Implement caching (Redis / in-memory LRU) for repeated merchant-to-category lookups to minimize external LLM token costs and latency.
   - Add background rate-limiting and token quota tracking per user session.
+
+---
+
+## 10. Multimodal Vision OCR Payloads & Timeout Elimination
+* **Status**: **RESOLVED in Phase 5**.
+* **Architecture / Tradeoff**:
+  - High-resolution smartphone cameras take 5MB–12MB photos. Uploading raw base64 payloads to Google Gemini Vision endpoints frequently resulted in `httpx.ReadTimeout` and slow UI latency.
+  - **Resolution**:
+    - Implemented a client-side HTML5 `<canvas>` downscaler ([`ExpenseFormDialog.tsx`](file:///e:/Projects/Paradox/frontend/src/features/expenses/components/ExpenseFormDialog.tsx)) that resizes any high-resolution image down to max 1280px dimension at 85% JPEG quality in ~50ms, yielding ~120KB files.
+    - Updated backend model routing to Google's active **Gemini 3.6 Flash** Vision API with `gemini-flash-latest` fallback and robust JSON regex extraction.
+    - Installed `Pillow` on backend for auxiliary server-side image operations.
+* **Future Work**:
+  - Add offline client-side WASM OCR (e.g. Tesseract.js) for instantaneous 100% offline receipt parsing without network requests.
+

@@ -16,6 +16,7 @@ from app.schemas.auth import (
     MessageResponse,
     ResetPasswordRequest,
     TokenResponse,
+    UpdateProfileRequest,
     UserLoginRequest,
     UserRegisterRequest,
     UserResponse,
@@ -254,6 +255,27 @@ async def logout_all(
 async def get_me(
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
+    return UserResponse.model_validate(current_user)
+
+
+@router.patch(
+    "/me",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update current authenticated user profile preferences (currency, display name)",
+)
+async def update_me(
+    data: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserResponse:
+    if data.display_name is not None:
+        current_user.display_name = data.display_name.strip()
+    if data.currency is not None:
+        current_user.currency = data.currency.strip().upper()
+    db.add(current_user)
+    await db.flush()
+    await db.refresh(current_user)
     return UserResponse.model_validate(current_user)
 
 
