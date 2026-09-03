@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api/auth";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 import { useToast } from "@/components/ui/toast";
-import { Mail, ArrowRight, Loader2, AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
+import { Mail, ArrowRight, Loader2, AlertCircle, CheckCircle2, RefreshCw, ArrowLeft } from "lucide-react";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -97,6 +97,16 @@ export function RegisterForm() {
           >
             Entered wrong email? Change email
           </button>
+
+          <div className="pt-3 border-t border-border/60">
+            <Link
+              href="/login"
+              className="w-full py-2.5 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Go Back to Login</span>
+            </Link>
+          </div>
         </div>
       </div>
     );
