@@ -165,3 +165,36 @@ async def test_auth_service_refresh_token_rotation():
     service.auth_repo.revoke_refresh_token.assert_called_once_with(token_hash)
     # New token must be created
     assert service.auth_repo.create_refresh_token.called
+
+
+@pytest.mark.asyncio
+async def test_auth_service_switch_account():
+    mock_db = MagicMock()
+    service = AuthService(mock_db)
+
+    target_user_id = uuid.uuid4()
+    target_raw_token = "target_user_refresh_token"
+    token_hash = hash_token(target_raw_token)
+
+    mock_record = RefreshToken(
+        id=uuid.uuid4(),
+        user_id=target_user_id,
+        token_hash=token_hash,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        is_revoked=False,
+    )
+    service.auth_repo.get_refresh_token_by_hash = AsyncMock(return_value=mock_record)
+    service.auth_repo.revoke_refresh_token = AsyncMock()
+    mock_user = User(id=target_user_id, email="switched_target@example.com", display_name="Target User")
+    service.auth_repo.get_user_by_id = AsyncMock(return_value=mock_user)
+    service.auth_repo.create_refresh_token = AsyncMock()
+
+    new_access, new_refresh, user = await service.refresh(target_raw_token)
+
+    assert new_access is not None
+    assert new_refresh is not None
+    assert user.id == target_user_id
+    assert user.email == "switched_target@example.com"
+    service.auth_repo.revoke_refresh_token.assert_called_once_with(token_hash)
+    assert service.auth_repo.create_refresh_token.called
+

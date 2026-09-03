@@ -65,6 +65,14 @@ export const authApi = {
     return res;
   },
 
+  async switchAccount(refreshToken: string): Promise<AuthTokens> {
+    const res = await client.post<AuthTokens>("/auth/switch-account", { refresh_token: refreshToken });
+    if (res.access_token) {
+      setAccessToken(res.access_token);
+    }
+    return res;
+  },
+
   async logout(): Promise<MessageResponse> {
     try {
       return await client.post<MessageResponse>("/auth/logout");

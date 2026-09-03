@@ -164,29 +164,30 @@ Paradox/
 - **Subscription & Recurring Commitments Audit**:
   - `GET /api/v1/ai/subscription-audit` identifying periodic costs and flagging duplicate services.
   - Frontend [`SubscriptionAuditDialog.tsx`](frontend/src/features/dashboard/components/SubscriptionAuditDialog.tsx) accessible from the Subscriptions card.
-- **Budget Config Currency Engine**:
-  - Replaced hardcoded `$` in [`BudgetConfigView.tsx`](frontend/src/features/budget/components/BudgetConfigView.tsx) with dynamic `useCurrency()` formatting.
+- **Multi-Account In-App Switcher**:
+  - Backend: `POST /api/v1/auth/switch-account` with token rotation and user session validation.
+  - Frontend: Multi-account vault in [`AuthContext.tsx`](frontend/src/features/auth/context/AuthContext.tsx), topbar switcher in [`shell.tsx`](frontend/src/components/layout/shell.tsx), and [`AddAccountModal.tsx`](frontend/src/features/auth/components/AddAccountModal.tsx) with Google OAuth and email/password support.
 
 ---
 
 ## 8. Testing & Build Verification
 - **Backend Tests (`pytest`)**:
-  - `39 passed in 4.59s` (100% green).
-  - All unit tests in `tests/unit/test_ai_features_phase1.py` and `tests/unit/test_ai.py` pass cleanly.
+  - `40 passed in 3.27s` (100% green).
+  - Added unit test `test_auth_service_switch_account` in `tests/unit/test_auth.py`.
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 14 static/dynamic routes.
 
 ---
 
 ## 9. Current Session Handoff Notes
-- All Phase 1 AI Evolution features are fully operational, tested, and documented in [`docs/PARADOX_AI_FEATURES_UPDATED.md`](docs/PARADOX_AI_FEATURES_UPDATED.md).
+- All Phase 1 AI Evolution features and Multi-Account Switcher are fully operational, tested, and documented.
 - Active servers:
   - Backend: `http://127.0.0.1:8000` (FastAPI + Uvicorn)
   - Frontend: `http://localhost:3000` (Next.js 16 App Router)
 - Database:
   - Latest migration: `f6a1b2c3d4e5` (User currency + Recurring expenses).
 - Testing:
-  - Backend: `.venv\Scripts\pytest tests/ -q` -> 39/39 passed.
+  - Backend: `.venv\Scripts\pytest tests/ -q` -> 40/40 passed.
   - Frontend: `npm.cmd run build` -> 0 errors.
 - **Documentation**:
   - `docs/PARADOX_AI_FEATURES_UPDATED.md` maintained as the master roadmap for upcoming AI phases.

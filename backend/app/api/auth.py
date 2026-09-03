@@ -15,6 +15,7 @@ from app.schemas.auth import (
     InitiateRegistrationRequest,
     MessageResponse,
     ResetPasswordRequest,
+    SwitchAccountRequest,
     TokenResponse,
     UpdateProfileRequest,
     UserLoginRequest,
@@ -114,6 +115,7 @@ async def complete_registration(
         access_token=access_token,
         token_type="bearer",
         user=UserResponse.model_validate(user),
+        refresh_token=raw_refresh,
     )
 
 
@@ -137,6 +139,7 @@ async def register(
         access_token=access_token,
         token_type="bearer",
         user=UserResponse.model_validate(user),
+        refresh_token=raw_refresh,
     )
 
 
@@ -160,6 +163,7 @@ async def login(
         access_token=access_token,
         token_type="bearer",
         user=UserResponse.model_validate(user),
+        refresh_token=raw_refresh,
     )
 
 
@@ -183,6 +187,7 @@ async def google_login(
         access_token=access_token,
         token_type="bearer",
         user=UserResponse.model_validate(user),
+        refresh_token=raw_refresh,
     )
 
 
@@ -209,6 +214,31 @@ async def refresh_token(
         access_token=access_token,
         token_type="bearer",
         user=UserResponse.model_validate(user),
+        refresh_token=new_raw_refresh,
+    )
+
+
+@router.post(
+    "/switch-account",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Switch active account using a saved refresh token",
+)
+async def switch_account(
+    data: SwitchAccountRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    user_agent = request.headers.get("user-agent")
+    service = AuthService(db)
+    access_token, new_raw_refresh, user = await service.refresh(data.refresh_token, user_agent=user_agent)
+    set_refresh_cookie(response, new_raw_refresh)
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user),
+        refresh_token=new_raw_refresh,
     )
 
 

@@ -111,4 +111,18 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Future Work**:
   - Add user-configurable scoring pillar weights (customizing the default 40/35/25 split) for the Financial Health Score.
 
+---
+
+## 12. Multi-Account In-App Switching & Client Vault Architecture
+* **Status**: **RESOLVED in Phase 6**.
+* **Architecture / Tradeoff**:
+  - Previously, logging into another account in the same browser session would overwrite the single HttpOnly refresh token cookie, forcing a full logout/login cycle.
+  - **Resolution**:
+    - Created a secure client-side multi-session vault in [`AuthContext.tsx`](file:///e:/Projects/Paradox/frontend/src/features/auth/context/AuthContext.tsx) (`paradox_saved_accounts`).
+    - Added dedicated backend endpoint `POST /api/v1/auth/switch-account` with cryptographic token rotation.
+    - Integrated native dropdown profile switcher in [`shell.tsx`](file:///e:/Projects/Paradox/frontend/src/components/layout/shell.tsx) and [`AddAccountModal.tsx`](file:///e:/Projects/Paradox/frontend/src/features/auth/components/AddAccountModal.tsx) supporting both Google OAuth and email/password.
+* **Future Work**:
+  - Add biometrics (WebAuthn / Passkeys) for 1-touch switching on supported mobile and desktop browsers.
+
+
 

@@ -12,6 +12,12 @@ export interface AuthTokens {
   access_token: string;
   token_type: string;
   user: User;
+  refresh_token?: string;
+}
+
+export interface SavedAccount {
+  user: User;
+  refreshToken: string;
 }
 
 export interface LoginRequest {

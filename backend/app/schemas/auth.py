@@ -56,6 +56,11 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+    refresh_token: Optional[str] = None
+
+
+class SwitchAccountRequest(BaseModel):
+    refresh_token: str = Field(..., description="Refresh token for the target account to switch to")
 
 
 class ForgotPasswordRequest(BaseModel):

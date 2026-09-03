@@ -1,0 +1,25 @@
+Date,Category,Amount,Payment Method,Description,Is Recurring,Frequency
+2026-09-03,Bills & Utilities,999.00,UPI,Airtel Xstream Fiber 300Mbps,Yes,monthly
+2026-09-03,Transportation,2450.00,Credit Card,Barbeque Nation Dinner with Friends,No,
+2026-09-02,Transportation,48.50,Credit Card,Italian Bistro Dinner,No,
+2026-09-02,Transportation,120.00,UPI,Chai Point Morning Kadak Chai,No,
+2026-09-02,Entertainment,149.00,UPI,Spotify Premium Individual,Yes,monthly
+2026-09-02,Transportation,65.00,UPI,Swiggy Delivery & Platform Fee,No,
+2026-09-02,Transportation,480.00,UPI,Uber Premier Cab to Embassy TechVillage,No,
+2026-09-01,Transportation,18.00,Debit Card,Metro Monthly Pass Refill,No,
+2026-09-01,Transportation,120.00,UPI,Chai Point Afternoon Snacks,No,
+2026-09-01,Entertainment,649.00,Credit Card,Netflix 4K Ultra HD Plan,Yes,monthly
+2026-09-01,Groceries,1840.00,Debit Card,Nature's Basket Organic Groceries,No,
+2026-09-01,Groceries,50.00,UPI,Zepto Quick Delivery Surcharge,No,
+2026-09-01,Health,1250.00,Credit Card,Cult.fit Elite Gym Membership,Yes,monthly
+2026-08-31,Transportation,65.00,UPI,Swiggy Delivery & Platform Fee,No,
+2026-08-31,Groceries,112.40,Credit Card,Whole Foods Market,No,
+2026-08-30,Bills & Utilities,85.00,Bank Transfer,Internet & WiFi Bill,No,
+2026-08-29,Shopping,59.99,Credit Card,Wireless Earbuds,No,
+2026-08-28,Entertainment,24.00,Digital Wallet,Cinema Tickets (2x),No,
+2026-08-27,Health,35.00,Debit Card,Pharmacy & Vitamins,No,
+2026-08-26,Transportation,14.50,Debit Card,Coffee & Bakery Snacks,No,
+2026-08-24,Education,129.00,Credit Card,Advanced Cloud Certification Course,No,
+2026-08-22,Transportation,42.00,Debit Card,Gas Station Fuel,No,
+2026-08-20,Groceries,94.30,Credit Card,Supermarket Weekly Restock,No,
+2026-08-19,Entertainment,15.99,Digital Wallet,Streaming Service Subscription,No,
