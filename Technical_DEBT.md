@@ -124,5 +124,32 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Future Work**:
   - Add biometrics (WebAuthn / Passkeys) for 1-touch switching on supported mobile and desktop browsers.
 
+---
+
+## 13. Omnichannel Registration Cross-Device Polling (Short-Polling vs SSE)
+* **Status**: **RESOLVED in Phase 6**.
+* **Architecture / Tradeoff**:
+  - When a user registers on desktop and chooses to click the magic link on their mobile device, the desktop client needs real-time awareness to auto-advance to `/dashboard`.
+  - Implemented 3-second background short-polling against `GET /api/v1/auth/register/status?email=...`.
+  - **Resolution**:
+    - The polling loop is lightweight and targets an indexed query on `pending_registration_tokens.email`.
+    - Polling automatically stops immediately upon typing the 6-digit OTP code, navigating away, or after the 15-minute token TTL expires.
+* **Future Work**:
+  - If registration traffic reaches high volume, migrate cross-device state push to Server-Sent Events (SSE) or WebSockets.
+
+---
+
+## 14. Dynamic Vercel Preview Deployment CORS Configuration
+* **Status**: **RESOLVED in Phase 6**.
+* **Architecture / Tradeoff**:
+  - Vercel automatically deploys each commit and branch to a dynamic preview URL (e.g. `https://*-vinaykounchi101-pixels-projects.vercel.app`).
+  - Maintaining a static whitelist in `CORS_ALLOWED_ORIGINS` required manual environment updates on Render for every preview build, causing browser "Failed to fetch" CORS errors.
+  - **Resolution**:
+    - Added `allow_origin_regex=r"https:\/\/.*\.vercel\.app"` to FastAPI's `CORSMiddleware` in `backend/app/main.py`.
+    - Allows credentials (`allow_credentials=True`) while strictly scoping to legitimate Vercel subdomains.
+* **Future Work**:
+  - Scope regex tighter to specific project naming patterns if multi-tenant Vercel origin isolation is required.
+
+
 
 

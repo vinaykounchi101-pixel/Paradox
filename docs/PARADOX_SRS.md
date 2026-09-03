@@ -1,11 +1,11 @@
 # Paradox — Software Requirements Specification (SRS)
 
-**Document Version:** 2.2
-**Status:** Final — Paradox V2 Supercharged Platform (Multi-Currency, Recurring Subscriptions, CSV Statement Import/Export, Multimodal Vision OCR & Financial Health Reports)
+**Document Version:** 2.3
+**Status:** Final — Paradox V2 Supercharged Platform (Multi-Currency, Recurring Subscriptions, CSV Statement Import/Export, Multimodal Vision OCR, Omnichannel Dual-Mode Auth, In-App Multi-Account Switcher & Universal Email Delivery)
 **Product:** Paradox
-**Source of Truth (Product):** `PARADOX_PRD_FINAL.md` (v2.2)
-**Source of Truth (Technical Decisions):** `PARADOX_SRS_CLAUDE_PROMPT.md`, Production Auth Specification, AI Engine Spec & V2 Supercharged Financial Architecture
-**Guiding Principle:** Secure, robust, multi-tenant user data isolation with zero trust in frontend identity, maintaining simplicity, performance, and non-intrusive AI assistance.
+**Source of Truth (Product):** `PARADOX_PRD_FINAL.md` (v2.3)
+**Source of Truth (Technical Decisions):** `PARADOX_SRS_CLAUDE_PROMPT.md`, Production Auth Specification, AI Engine Spec, V2 Supercharged Financial Architecture & Omnichannel Registration Architecture
+**Guiding Principle:** Secure, robust, multi-tenant user data isolation with zero trust in frontend identity, maintaining simplicity, performance, low friction, and non-intrusive AI assistance.
 
 ---
 
@@ -15,9 +15,9 @@
 |---|---|
 | Document Type | Software Requirements Specification |
 | Product | Paradox — Personal Expense Tracker |
-| Phase Covered | Phase 1 to Phase 5 (Authentication, Isolation, Multi-Granularity Budgeting, AI Financial Intelligence & V2 Supercharged Financial Suite) |
-| Authoritative Product Spec | PARADOX_PRD_FINAL.md (v2.2) |
-| Authoritative Technical Decisions | PARADOX_SRS_CLAUDE_PROMPT.md, Auth Spec, AI Engine Spec & V2 Financial Architecture |
+| Phase Covered | Phase 1 to Phase 6 (Authentication, Isolation, Multi-Granularity Budgeting, AI Financial Intelligence, V2 Supercharged Financial Suite, Omnichannel Dual-Mode Registration & Multi-Account Switcher) |
+| Authoritative Product Spec | PARADOX_PRD_FINAL.md (v2.3) |
+| Authoritative Technical Decisions | PARADOX_SRS_CLAUDE_PROMPT.md, Auth Spec, AI Engine Spec, V2 Financial Architecture & Omnichannel Registration Architecture |
 | Intended Consumer | Development team / AI coding agent (e.g. Antigravity) |
 | Out-of-date Policy | Any change to product scope must first be reflected in the PRD, then propagated here |
 
@@ -30,6 +30,7 @@
 | 2.0 | Added production-ready Authentication Layer & Row-Level Multi-Tenant Data Isolation. Specified JWT authentication with short-lived access tokens (15 mins) and long-lived rotated refresh tokens (7–30 days) stored in HttpOnly, Secure, SameSite cookies with server-side SHA-256 token hashing; Google Sign-In via OAuth 2.0 / OpenID Connect with backend token verification and account linking; user registration, email/password login, forgot/reset password, change password, single session logout, and logout from all devices; added `refresh_tokens` and `password_reset_tokens` tables; updated `users`, `expenses`, `budgets`, `categories`, and `payment_methods` with mandatory `user_id` foreign keys and composite period constraints; established authoritative backend authorization (`get_current_user` SecurityContext) with zero trust in client-supplied user identifiers across all endpoints; added authentication rate limiting and CSRF protection. |
 | 2.1 | Added Multi-Provider AI Financial Recommendation & Natural Language Expense Parsing Engine (supporting Google Gemini, OpenAI, Anthropic Claude, and resilient offline semantic heuristics). Added API endpoints `POST /api/v1/ai/categorize` and `POST /api/v1/ai/parse-expense` with zero-trust authenticated user scoping; added frontend AI Quick-Add and real-time category suggestion chips to `ExpenseFormDialog`; documented upcoming AI capabilities roadmap (AI Financial Copilot, Predictive Budget Recommender, Receipt OCR Scanner). |
 | 2.2 | Added Paradox V2 Supercharged Financial Suite: Dynamic Multi-Currency System (`₹ INR`, `$ USD`, `€ EUR`, `£ GBP`) via user profile preferences (`PATCH /api/v1/auth/me`) and reactive `CurrencyContext`; Recurring Subscriptions tracking (`is_recurring`, `recurring_frequency`, and `GET /api/v1/expenses/recurring`); CSV Export (`GET /api/v1/expenses/export`) and Intelligent Bank Statement Import (`POST /api/v1/expenses/import`) with automated column discovery and bulk AI categorization; Multimodal Receipt & Invoice Vision OCR Scanner (`POST /api/v1/ai/scan-receipt`) with Google Gemini 3.6 Flash Vision and client-side canvas pre-scaler; Monthly Financial Health Report generation with print/PDF export; upgraded primary AI model routing from deprecated `gemini-1.5-flash` to `gemini-3.6-flash`. |
+| 2.3 | Added Omnichannel Dual-Mode Registration (6-digit numeric OTP code in email subject/body + single-use magic link with real-time background status polling via `GET /api/v1/auth/register/status` and instant 1-step verification via `POST /api/v1/auth/register/verify-otp`); In-App Multi-Account Switcher & Session Vault (`POST /api/v1/auth/switch-account` with client-side account registry and topbar profile switcher); Universal Multi-Provider Transactional Email Service (Brevo REST API, Resend, and SMTP); Dynamic Vercel Preview CORS Support (`allow_origin_regex` for `https://*.vercel.app`); and added `pending_registration_tokens` schema table with OTP hash and status tracking. |
 
 ---
 
@@ -45,7 +46,11 @@ This document is written so that a developer or an AI coding agent can implement
 
 This SRS covers **Paradox with Secure Production-Ready Authentication, Multi-Tenant User Isolation, AI Financial Intelligence & V2 Supercharged Suite**. It documents:
 
-- User Registration, Email/Password Login, and Google OAuth 2.0 / OpenID Connect Sign-In
+- User Registration with Dual-Mode Omnichannel Verification (6-digit OTP code + Magic Link with background cross-device status polling)
+- User Email/Password Login and Google OAuth 2.0 / OpenID Connect Sign-In
+- In-App Multi-Account Switcher & Session Vault (`POST /api/v1/auth/switch-account` with zero-friction account swapping)
+- Universal Multi-Provider Transactional Email Service (Brevo REST API, Resend, and SMTP)
+- Dynamic Preview Environment CORS Regex (`allow_origin_regex=r"https:\/\/.*\.vercel\.app"`)
 - JWT-based authentication: Short-lived access tokens (15 mins) and HttpOnly rotated refresh tokens (7–30 days)
 - Server-side refresh token revocation, secure single-session logout, and logout from all devices
 - Forgot password, reset password, and change password flows
@@ -185,6 +190,10 @@ Each functional requirement below implements the product capabilities. IDs are g
 | SRS-FN-AUTH-08 | The system must allow an authenticated user to change their password via `/api/v1/auth/change-password` by verifying their current password. | Auth Spec |
 | SRS-FN-AUTH-09 | The system must enforce strict row-level user data isolation on every endpoint: User A can only read, create, update, or delete User A's expenses, budgets, custom categories, and custom payment methods. | Auth Spec |
 | SRS-FN-AUTH-10 | Attempting to access, modify, or delete a resource belonging to another user must return `404 Not Found` (or `403 Forbidden`) and must never leak entity existence or content. | Auth Spec |
+| SRS-FN-AUTH-11 | The system must support pre-registration email verification via both a 6-digit numeric OTP code and a secure single-use magic link. | Auth Spec |
+| SRS-FN-AUTH-12 | The system must support real-time polling of registration status (`/api/v1/auth/register/status`) to allow desktop/laptop clients to auto-advance if the magic link is verified on a secondary mobile device. | Auth Spec |
+| SRS-FN-AUTH-13 | The system must support in-app multi-account switching (`/api/v1/auth/switch-account`), allowing users to swap active user sessions seamlessly via stored refresh tokens without logging out. | Auth Spec |
+| SRS-FN-AUTH-14 | The email delivery system must support universal REST API delivery via Brevo (`BREVO_API_KEY`), Resend (`RESEND_API_KEY`), and SMTP with zero hardcoding. | Auth Spec |
 
 ## 3.1 Expense Management
 
@@ -339,6 +348,30 @@ Per finalized product decision, **V1 supports filtering the expense list by date
   2. Frontend calls `POST /api/v1/auth/logout` or `POST /api/v1/auth/logout-all` with Bearer token.
   3. Backend marks corresponding refresh token hash(es) as revoked in the database and clears the refresh cookie.
   4. Frontend purges in-memory Access Token and redirects to `/login`.
+
+## 4.0G UC-00G: Dual-Mode Omnichannel Registration (Instant OTP & Cross-Device Polling)
+- **Actor**: Anonymous visitor
+- **Main Flow (Direct OTP on Same Screen)**:
+  1. User enters email on `/register` and clicks "Send Verification Code".
+  2. Backend generates a 6-digit OTP code and a cryptographic magic link token, saving hashes in `pending_registration_tokens`.
+  3. Email arrives with the 6-digit code in the subject line (visible on mobile lockscreen) and body.
+  4. User types the 6-digit code and desired password into the active register form and clicks "Complete Registration".
+  5. Frontend calls `POST /api/v1/auth/register/verify-otp`. Backend verifies OTP, provisions user, issues tokens, and sets the refresh cookie.
+- **Alternative Flow (Cross-Device Magic Link Approval)**:
+  1. User opens the email on their mobile phone and clicks the magic link button (`/register/complete?token=...`).
+  2. Meanwhile, the originating desktop/laptop browser polls `GET /api/v1/auth/register/status?email=...` every 3 seconds.
+  3. As soon as the mobile browser completes registration, the polling desktop client receives `is_used = true` and automatically navigates to `/dashboard` with zero friction.
+
+## 4.0H UC-00H: In-App Multi-Account Switching
+- **Actor**: Authenticated user with multiple accounts
+- **Main Flow**:
+  1. User opens the profile menu and clicks "Add another account".
+  2. User authenticates via email/password or Google in `AddAccountModal`.
+  3. The client registers the account in a local session registry (`paradox_saved_accounts`).
+  4. In the profile dropdown, user clicks any saved account to switch.
+  5. Frontend calls `POST /api/v1/auth/switch-account` with the target account's refresh token.
+  6. Backend rotates the token, validates the session, and returns new access/refresh tokens.
+  7. Client updates active session and immediately reloads dashboard data for the new account.
 
 ## 4.1 UC-01: Add Expense
 - **Actor**: Authenticated user (User A)
@@ -567,6 +600,23 @@ Same protection and ownership rules as `categories`.
 
 **Constraints**: `CHECK (amount >= 0)`, `UniqueConstraint("user_id", "period_type", "period_key", name="uq_user_budget_period")`.
 
+### 6.2.8 `pending_registration_tokens`
+
+| Column | Type | Constraints |
+|---|---|---|
+| id | UUID | PK, default `gen_random_uuid()` |
+| email | VARCHAR(255) | NOT NULL, index |
+| token_hash | VARCHAR(64) | NOT NULL, UNIQUE, index |
+| otp_code_hash | VARCHAR(64) | NULL |
+| is_verified | BOOLEAN | NOT NULL, default `false` |
+| expires_at | TIMESTAMPTZ | NOT NULL |
+| is_used | BOOLEAN | NOT NULL, default `false` |
+| created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
+
+**Indexes**: `ix_pending_reg_email_hash` (`email`, `token_hash`), `ix_pending_registration_tokens_email_otp` (`email`, `otp_code_hash`).
+
+**Rules**: Stores pre-registration verification tokens and 6-digit OTP code hashes. When a user enters the 6-digit OTP code or clicks the email magic link, `is_verified` is marked `true`. Once registration is completed (`/complete` or `/verify-otp`), `is_used` is set to `true` and the account is provisioned in `users`.
+
 ## 6.3 Entity Relationship Summary
 
 ```
@@ -578,6 +628,7 @@ users (1) ──< (many) refresh_tokens
 users (1) ──< (many) password_reset_tokens
 categories (1) ──< (many) expenses
 payment_methods (1) ──< (many) expenses
+pending_registration_tokens (ephemeral pre-registration verification tokens)
 ```
 
 ## 6.4 Referential Integrity Rule (Category/Payment Method Deletion)
@@ -624,8 +675,62 @@ This satisfies FR-08 ("Category removal must not make existing expense records u
 
 ## 7.2 Authentication Endpoints (`/api/v1/auth`)
 
+### `POST /api/v1/auth/register/initiate`
+- **Purpose**: Initiate pre-registration email verification by generating a 6-digit numeric OTP and a single-use magic link token.
+- **Request body**:
+```json
+{
+  "email": "user@example.com"
+}
+```
+- **Validation**: Valid email address format.
+- **Behavior**: Generates a 6-digit numeric OTP code (`secrets.randbelow(900000) + 100000`) and a 32-byte url-safe token. Hashes both with SHA-256 and persists in `pending_registration_tokens` with 15-minute expiration. Dispatches branded email with code in subject line and body via the active email service provider (Brevo REST API, Resend, or SMTP).
+- **Success**: `200 OK`, `{"message": "Verification link has been sent to user@example.com...", "success": true}`.
+- **Errors**: `409 Conflict` if email already registered in `users`.
+
+### `GET /api/v1/auth/register/validate-token`
+- **Purpose**: Validate a pre-registration verification token upon clicking the magic link.
+- **Query parameters**: `token: str`
+- **Behavior**: Verifies token hash exists in `pending_registration_tokens`, is not expired, and `is_used = false`. Marks `is_verified = true`.
+- **Success**: `200 OK`, `{"email": "user@example.com", "valid": true}`.
+- **Errors**: `400 Bad Request` if token is invalid or expired.
+
+### `POST /api/v1/auth/register/complete`
+- **Purpose**: Complete registration after verifying email via magic link.
+- **Request body**:
+```json
+{
+  "token": "valid_verification_token",
+  "password": "SecurePassword123!",
+  "display_name": "Alex"
+}
+```
+- **Success**: `201 Created`, creates user in `users`, marks token `is_used = true`, sets refresh cookie, and returns `TokenResponse`.
+
+### `POST /api/v1/auth/register/verify-otp`
+- **Purpose**: Complete registration instantly in 1 step using the 6-digit numeric OTP code.
+- **Request body**:
+```json
+{
+  "email": "user@example.com",
+  "otp_code": "582914",
+  "password": "SecurePassword123!",
+  "display_name": "Alex"
+}
+```
+- **Validation**: `otp_code` must be exactly 6 digits; `password` min 8 chars with complexity.
+- **Behavior**: Verifies SHA-256 hash of `otp_code` against pending registration tokens for `email`. If valid and unexpired, marks token `is_used = true`, creates user, hashes password, creates starter categories/methods if needed, and returns `TokenResponse` with `paradox_refresh_token` cookie.
+- **Success**: `201 Created`, returns `TokenResponse`.
+- **Errors**: `400 Bad Request` ("Invalid or expired verification code").
+
+### `GET /api/v1/auth/register/status`
+- **Purpose**: Check real-time registration status for polling desktop clients.
+- **Query parameters**: `email: str`
+- **Behavior**: Retrieves latest token for `email`. Returns boolean flags `is_verified`, `is_used`, and `is_expired`.
+- **Success**: `200 OK`, `{"email": "user@example.com", "is_verified": true, "is_used": false, "is_expired": false}`.
+
 ### `POST /api/v1/auth/register`
-- **Purpose**: Register a new user account.
+- **Purpose**: Direct user registration endpoint (bypassing pre-registration when verification is disabled).
 - **Request body**:
 ```json
 {
@@ -683,6 +788,18 @@ This satisfies FR-08 ("Category removal must not make existing expense records u
 - **Behavior**: Hashes cookie value (SHA-256), finds active token in `refresh_tokens` table, marks old token revoked/used, creates new token hash, sets new refresh cookie, and returns fresh access token.
 - **Success**: `200 OK`, returns `{ "access_token": "...", "token_type": "bearer", "expires_in": 900 }`.
 - **Errors**: `401 Unauthorized` if refresh token is missing, expired, or revoked.
+
+### `POST /api/v1/auth/switch-account`
+- **Purpose**: Switch active user session using a saved refresh token from the client account vault.
+- **Request body**:
+```json
+{
+  "refresh_token": "raw_saved_refresh_token_string"
+}
+```
+- **Behavior**: Verifies the presented refresh token hash against `refresh_tokens`, revokes the old token, issues a newly rotated refresh token and access token for the target user, and updates the `paradox_refresh_token` cookie.
+- **Success**: `200 OK`, returns `TokenResponse` for the target account.
+- **Errors**: `401 Unauthorized` if refresh token is expired or revoked.
 
 ### `POST /api/v1/auth/logout`
 - **Purpose**: Securely log out current device session.
@@ -1375,6 +1492,26 @@ User Login / OAuth ──► Validates Credentials / Google ID Token
   * **Payment Methods**: `select(PaymentMethod).where(or_(PaymentMethod.is_default == True, PaymentMethod.user_id == current_user.id))`
 - **Unauthorized Mutation Protection**: Attempting to view, edit, or delete another user's expense or custom entity returns `404 Not Found` (ensuring resource existence is never leaked).
 
+## 13.6 Omnichannel Dual-Mode Registration Architecture
+
+Paradox solves cross-device registration friction through a dual-mode verification pipeline:
+1. **Email Subject Notification**: The 6-digit numeric OTP code is embedded directly in the email subject line (`"582914 is your Paradox verification code"`). Mobile push notifications allow users on laptops to view the code without unlocking their phones or opening mail apps.
+2. **Instant In-Place Verification**: Desktop users type the 6-digit code directly on the register screen, avoiding redirect loops.
+3. **Cross-Device Status Polling**: If the user clicks the magic link on their phone, the desktop client's background polling (`checkRegistrationStatus` every 3 seconds) automatically detects completion and transitions the laptop session into the app.
+
+## 13.7 Multi-Account Switcher & Session Vault Architecture
+
+To allow seamless transitions between personal, freelance, and business finances without full logouts:
+- **Client Session Vault**: `AuthContext` maintains `paradox_saved_accounts` in local storage, preserving account identity and secure refresh credentials for each active persona.
+- **Atomic Token Switch**: Calling `/api/v1/auth/switch-account` rotates the refresh token on the backend and updates the browser's HttpOnly cookie, swapping active user identity in < 100ms.
+
+## 13.8 Universal Multi-Provider Transactional Email Dispatch
+
+Transactional email delivery (`app/services/email_service.py`) operates dynamically without hardcoded infrastructure:
+- **Brevo REST API**: Directly sends HTTPS requests to `https://api.brevo.com/v3/smtp/email` using `BREVO_API_KEY`. Delivers to any inbox (Gmail, Yahoo, Outlook) from verified Gmail addresses without requiring DNS/MX domain configuration.
+- **Resend REST API**: Connects via `RESEND_API_KEY` for modern cloud email delivery.
+- **SMTP Fallback**: Connects to standard SMTP relays on ports 587 (TLS) or 465 (SSL) with automatic password sanitization.
+
 ---
 
 # 14. Security Requirements
@@ -1396,7 +1533,7 @@ User Login / OAuth ──► Validates Credentials / Google ID Token
 
 | Threat Category | Protection Mechanism |
 |---|---|
-| **CORS** | Configured via `CORS_ALLOWED_ORIGINS` with credentials support (`allow_credentials=True`) strictly for whitelisted origins. |
+| **CORS** | Configured via `CORS_ALLOWED_ORIGINS` with credentials support (`allow_credentials=True`) strictly for whitelisted origins, plus `allow_origin_regex=r"https:\/\/.*\.vercel\.app"` to securely support dynamic Vercel preview branch deployments without wildcard security vulnerabilities. |
 | **XSS** | Frontend auto-escapes all strings; Refresh Tokens are `HttpOnly` so Javascript cannot access them; Access Tokens are stored purely in memory. |
 | **CSRF** | SameSite cookie policy (`SameSite=Lax`) + requirement of `Content-Type: application/json` on state-changing endpoints prevents cross-site submission. |
 | **SQL Injection** | Parameterized queries constructed strictly via SQLAlchemy 2.0 ORM. |
@@ -1519,7 +1656,20 @@ No error response, in any environment, may include: raw exception messages from 
 | Security / JWT | `REFRESH_TOKEN_EXPIRE_DAYS` | No | `7` | Lifetime of rotated refresh token cookie |
 | Google OAuth | `GOOGLE_CLIENT_ID` | No | `...apps.googleusercontent.com` | Google OAuth 2.0 Web Client ID |
 | Google OAuth | `GOOGLE_CLIENT_SECRET` | No | `...` | Google OAuth Client Secret |
-| Application | `FRONTEND_URL` | No | `http://localhost:3000` | Base URL for password reset links |
+| Application | `FRONTEND_URL` | No | `http://localhost:3000` | Base URL for verification and password reset links |
+| Email Delivery | `EMAIL_PROVIDER` | No | `auto` (`auto`, `brevo`, `resend`, `smtp`) | Active email provider selector |
+| Email Delivery | `BREVO_API_KEY` | No | `xkeysib-...` | Brevo REST API Key (recommended for production) |
+| Email Delivery | `BREVO_SENDER_EMAIL` | No | `your-verified-email@gmail.com` | Verified sender email for Brevo |
+| Email Delivery | `BREVO_SENDER_NAME` | No | `Paradox Expense Tracker` | Sender name in email headers |
+| Email Delivery | `RESEND_API_KEY` | No | `re_...` | Resend REST API Key |
+| Email Delivery | `SMTP_HOST` | No | `smtp.gmail.com` | SMTP host for local / relay dispatch |
+| Email Delivery | `SMTP_PORT` | No | `587` | SMTP port |
+| Email Delivery | `SMTP_USER` | No | `user@gmail.com` | SMTP username |
+| Email Delivery | `SMTP_PASSWORD` | No | `app-specific-password` | SMTP password |
+| AI Engine | `AI_PROVIDER` | No | `auto` (`auto`, `gemini`, `openai`, `anthropic`) | Multi-provider AI selector |
+| AI Engine | `GEMINI_API_KEY` | No | `AIzaSy...` | Google Gemini 3.6 Flash API Key |
+| AI Engine | `OPENAI_API_KEY` | No | `sk-...` | OpenAI API Key |
+| AI Engine | `ANTHROPIC_API_KEY`| No | `sk-ant-...` | Anthropic Claude API Key |
 | Timezone | `APP_TIMEZONE` | No | `UTC` | Server reference timezone |
 
 ## 19.2 Frontend Environment Variables
@@ -1572,7 +1722,13 @@ PostgreSQL → Supabase
 
 | API Endpoint | Database Entities Touched | Primary UI Surface |
 |---|---|---|
-| `POST /api/v1/auth/register` | `users`, `refresh_tokens` | Register Screen (`/register`) |
+| `POST /api/v1/auth/register/initiate` | `pending_registration_tokens` | Register Screen (`/register`) |
+| `GET /api/v1/auth/register/validate-token` | `pending_registration_tokens` | Complete Register (`/register/complete`) |
+| `POST /api/v1/auth/register/complete` | `users`, `pending_registration_tokens`, `refresh_tokens` | Complete Register (`/register/complete`) |
+| `POST /api/v1/auth/register/verify-otp` | `users`, `pending_registration_tokens`, `refresh_tokens` | Register Screen 6-Digit OTP Modal |
+| `GET /api/v1/auth/register/status` | `pending_registration_tokens` | Background status listener on Desktop |
+| `POST /api/v1/auth/switch-account` | `users`, `refresh_tokens` | Topbar Profile Account Switcher |
+| `POST /api/v1/auth/register` | `users`, `refresh_tokens` | Direct Register Fallback |
 | `POST /api/v1/auth/login` | `users`, `refresh_tokens` | Login Screen (`/login`) |
 | `POST /api/v1/auth/google` | `users`, `refresh_tokens` | Google Sign-In Button on Login/Register |
 | `POST /api/v1/auth/refresh` | `refresh_tokens` | Background Axios/Fetch Interceptor |
@@ -1605,6 +1761,10 @@ PostgreSQL → Supabase
 | AUTH-08 | Change password | SRS-FN-AUTH-08 | `POST /auth/change-password` | `users` | Current password check test |
 | AUTH-09 | User data isolation | SRS-FN-AUTH-09 | All `/expenses`, `/budget`, `/categories` | All entities | Multi-user tenant separation test |
 | AUTH-10 | Unauthorized access rejection | SRS-FN-AUTH-10 | All protected endpoints | All entities | 401 & cross-user 404 test |
+| AUTH-11 | Dual-mode OTP & Magic Link registration | SRS-FN-AUTH-11 | `/register/initiate`, `/register/verify-otp` | `pending_registration_tokens`, `users` | OTP verification test |
+| AUTH-12 | Cross-device registration status sync | SRS-FN-AUTH-12 | `GET /register/status` | `pending_registration_tokens` | Polling status test |
+| AUTH-13 | In-App Multi-Account Switcher | SRS-FN-AUTH-13 | `POST /auth/switch-account` | `users`, `refresh_tokens` | Token swap & session rotation test |
+| AUTH-14 | Multi-Provider Email Delivery | SRS-FN-AUTH-14 | Internal service dispatch | N/A | Brevo & SMTP dispatch test |
 | FR-01 | Create expense | SRS-FN-01 | `POST /expenses` | `expenses` | API tests, user_id check |
 | FR-02 | Prevent invalid expenses | SRS-FN-02, SRS-FN-03 | `POST/PATCH /expenses` | `expenses` | Unit + API tests |
 | FR-03 | View expense history | SRS-FN-04 | `GET /expenses`, `GET /expenses/{id}` | `expenses` | User-scoped API tests |
@@ -1661,6 +1821,7 @@ backend/
 │   │   ├── base.py
 │   │   └── models/
 │   │       ├── user.py              # User entity with email, password_hash, google_id
+│   │       ├── pending_registration_token.py # OTP & magic link verification tokens
 │   │       ├── refresh_token.py     # Hashed refresh tokens for session rotation/revocation
 │   │       ├── password_reset_token.py # Secure reset tokens
 │   │       ├── expense.py           # Expense with user_id FK
@@ -1677,7 +1838,8 @@ backend/
 │   │   ├── budget.py
 │   │   └── dashboard.py
 │   ├── services/
-│   │   ├── auth_service.py          # Login, Register, Google OAuth, Refresh, Password management
+│   │   ├── auth_service.py          # Login, Register, OTP verification, Google OAuth, Refresh, Multi-Account switch
+│   │   ├── email_service.py         # Multi-provider email dispatch (Brevo REST API, Resend, SMTP)
 │   │   ├── expense_service.py       # Scoped to user_id
 │   │   ├── category_service.py      # Scoped to user_id & defaults
 │   │   ├── payment_method_service.py# Scoped to user_id & defaults

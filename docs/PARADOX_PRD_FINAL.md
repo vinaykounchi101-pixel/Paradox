@@ -1,7 +1,7 @@
 # Paradox — Product Requirements Document (PRD)
 
-**Document Version:** 2.2  
-**Status:** Paradox V2 Supercharged Platform (Multi-Currency, Recurring Subscriptions, CSV Statement Import/Export, Multimodal Vision OCR, Financial Copilot & Monthly Health Reports)  
+**Document Version:** 2.3  
+**Status:** Paradox V2 Supercharged Platform (Multi-Currency, Recurring Subscriptions, CSV Statement Import/Export, Multimodal Vision OCR, Omnichannel Dual-Mode Authentication, In-App Multi-Account Switcher & Universal Email Delivery)  
 **Product:** Paradox  
 **Document Purpose:** Define what Paradox solves, why it exists, what users can do, what success looks like, and how the product evolves through clearly defined phases.
 
@@ -113,10 +113,14 @@ Paradox solves the problem through a secure financial tracking loop:
 ## 9. Core Product Experience
 
 ### 9.0 User Authentication & Account Security
-- **Sign Up / Register**: Create an account with email, password, and display name.
+- **Sign Up / Register**: Pre-registration email verification to prevent fraudulent or typo accounts. Supports **Dual-Mode Omnichannel Verification**:
+  - **Instant 6-Digit OTP**: Displayed prominently in the email subject line and body for fast completion directly on the originating desktop screen without opening separate browser tabs.
+  - **1-Click Magic Link**: Mobile users can click the verification link in their email; open desktop tabs automatically detect confirmation via real-time background status polling and navigate into the app without device-switching friction.
 - **Login**: Fast, secure login with email/password or one-click **Sign in with Google** (OAuth 2.0 / OpenID Connect).
-- **Session Management**: Automatic background token refresh, secure single-session logout, and "Logout from all devices" to terminate active sessions.
+- **In-App Multi-Account Switcher & Session Vault**: Users can register or log into multiple accounts (e.g. personal, freelance, business) and seamlessly switch active workspaces from the profile dropdown in 1 click without losing sessions or re-entering credentials.
+- **Session Management**: Automatic background token refresh (short-lived JWT access tokens + rotated HttpOnly refresh cookies), secure single-session logout, and "Logout from all devices" to terminate active sessions.
 - **Password Recovery**: Self-service forgot and reset password flows.
+- **Universal Email Delivery**: Multi-provider email engine delivering transactional verification codes via Brevo REST API, Resend, or SMTP to Gmail without requiring custom domain DNS setups.
 - **Data Isolation**: All dashboard metrics, expenses, categories, payment methods, and budgets are strictly isolated per user account.
 
 ### 9.1 Add an Expense
@@ -145,8 +149,11 @@ Paradox solves the problem through a secure financial tracking loop:
 
 ### Authentication & Account Security
 - **As a new user**, I want to register with my email and password or Google account so that I can create a private financial space.
+- **As a user registering on my laptop**, I want to enter the 6-digit verification code from my email notification so that I can complete registration immediately on my laptop without device-switching.
+- **As a user who taps a magic verification link on my phone**, I want my open laptop screen to automatically detect my verification in real time and take me straight to the dashboard without starting over.
 - **As a returning user**, I want to log in quickly and stay logged in securely across page reloads without entering my password every 15 minutes.
 - **As a user**, I want to log in with one click using Google Sign-In so that I don't have to manage another password.
+- **As a user with multiple accounts (e.g. personal and business)**, I want to switch between my accounts from the profile dropdown without logging out and re-entering credentials.
 - **As a user who forgot my password**, I want to request a password reset link so that I can regain access to my account.
 - **As a security-conscious user**, I want to log out from all devices at once if I suspect an unauthorized session.
 - **As a user**, I want to be certain that no other user can see, modify, or delete my expenses or financial records.
@@ -166,7 +173,7 @@ Paradox solves the problem through a secure financial tracking loop:
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-AUTH-01 | The product must allow new users to register with email, password, and optional display name. | P0 |
+| FR-AUTH-01 | The product must allow new users to initiate registration with email verification before account creation. | P0 |
 | FR-AUTH-02 | The product must allow users to log in securely with email and password. | P0 |
 | FR-AUTH-03 | The product must support Google Sign-In via OAuth 2.0 / OpenID Connect. | P0 |
 | FR-AUTH-04 | The product must maintain authenticated sessions securely with automatic token refresh. | P0 |
@@ -174,6 +181,10 @@ Paradox solves the problem through a secure financial tracking loop:
 | FR-AUTH-06 | The product must support password recovery (forgot password and reset password). | P0 |
 | FR-AUTH-07 | The product must allow authenticated users to change their password. | P0 |
 | FR-AUTH-08 | Every user's data (expenses, budgets, custom categories, payment methods) must be strictly isolated. | P0 |
+| FR-AUTH-09 | The product must support dual-mode omnichannel registration with a 6-digit OTP code and a single-use magic link. | P0 |
+| FR-AUTH-10 | The product must automatically synchronize registration completion across devices in real time via background status polling. | P0 |
+| FR-AUTH-11 | The product must support in-app multi-account switching with a client-side session vault and cryptographic token exchange. | P0 |
+| FR-AUTH-12 | The product must support resilient transactional email delivery via Brevo REST API with delivery to Gmail without requiring custom DNS domains. | P0 |
 | FR-01 | The user must be able to create an expense. | P0 |
 | FR-02 | The product must prevent clearly invalid expense records from being saved. | P0 |
 | FR-03 | The user must be able to view recorded expenses in an understandable history. | P0 |
@@ -231,10 +242,13 @@ Paradox solves the problem through a secure financial tracking loop:
 ## 13. Scope by Product Area
 
 ### In Scope
-- User Registration, Email/Password Login, and Google OAuth 2.0 Sign-In
+- User Registration with Dual-Mode Omnichannel Verification (6-digit OTP code + Magic Link cross-device sync)
+- User Login (Email/Password) and Google OAuth 2.0 Sign-In
+- In-App Multi-Account Switcher & Session Vault (fast account swapping without full logout)
 - Session Management (Auto-Refresh, Secure Logout, Logout from all devices)
 - Self-service Password Recovery (Forgot/Reset Password) and Password Change
 - Strict Row-Level Multi-Tenant Data Isolation
+- Universal Transactional Email Dispatch (Brevo REST API, Resend, SMTP)
 - Dynamic Multi-Currency System (`₹ INR`, `$ USD`, `€ EUR`, `£ GBP`) with user profile persistence
 - Expense CRUD (Create, Read, Update, Delete) with Recurring Subscriptions support
 - CSV Statement Import with AI categorizer and CSV Export
@@ -441,7 +455,10 @@ The primary user journey for an authenticated Paradox user:
 
 Paradox is functionally complete when:
 
-- [x] A user can register, log in with password, or sign in via Google.
+- [x] A user can register via 6-digit numeric OTP code sent to their email or via 1-click magic link.
+- [x] A desktop browser polling a pending registration automatically detects completion when verified on a secondary mobile device.
+- [x] A user can switch between multiple saved accounts from the profile menu without a full logout cycle.
+- [x] A user can log in with password or sign in via Google.
 - [x] Sessions refresh automatically in the background without interrupting the user.
 - [x] Logging out or logging out from all devices invalidates active sessions.
 - [x] A user can record, edit, and delete expenses in under 30 seconds (under 5 seconds via AI Quick Add or Scan).
@@ -498,6 +515,6 @@ Paradox is functionally complete when:
 
 ## Document Status
 
-**Version 2.1 — Final Product Requirements Document (PRD) for Paradox.**
+**Version 2.3 — Final Product Requirements Document (PRD) for Paradox.**
 
 This document is the product-level source of truth for Paradox. Technical design and architecture decisions are documented in [`PARADOX_SRS.md`](file:///e:/Projects/Paradox/docs/PARADOX_SRS.md) and trace directly back to the requirements and goals defined here.
