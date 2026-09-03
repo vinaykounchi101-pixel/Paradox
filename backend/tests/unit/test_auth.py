@@ -198,3 +198,63 @@ async def test_auth_service_switch_account():
     service.auth_repo.revoke_refresh_token.assert_called_once_with(token_hash)
     assert service.auth_repo.create_refresh_token.called
 
+
+@pytest.mark.asyncio
+async def test_auth_service_verify_otp_and_register():
+    mock_db = MagicMock()
+    service = AuthService(mock_db)
+
+    email = "otp_user@example.com"
+    otp = "123456"
+    otp_hash = hash_token(otp)
+
+    mock_record = MagicMock()
+    mock_record.email = email
+    mock_record.token_hash = "token_hash_123"
+    mock_record.otp_code_hash = otp_hash
+    mock_record.expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    mock_record.is_used = False
+
+    service.auth_repo.get_user_by_email = AsyncMock(return_value=None)
+    service.auth_repo.get_pending_registration_by_email_and_otp = AsyncMock(return_value=mock_record)
+    service.auth_repo.create_user = AsyncMock(return_value=User(id=uuid.uuid4(), email=email, display_name="OTP User"))
+    service.auth_repo.mark_pending_registration_token_used = AsyncMock()
+    service.auth_repo.create_refresh_token = AsyncMock()
+
+    from app.schemas.auth import VerifyOtpRegisterRequest
+    req = VerifyOtpRegisterRequest(
+        email=email,
+        otp=otp,
+        password="SecurePassword123",
+        display_name="OTP User",
+    )
+
+    access_token, raw_refresh, user = await service.verify_otp_and_register(req)
+
+    assert access_token is not None
+    assert raw_refresh is not None
+    assert user.email == email
+    service.auth_repo.mark_pending_registration_token_used.assert_called_once_with("token_hash_123")
+    assert service.auth_repo.create_refresh_token.called
+
+
+@pytest.mark.asyncio
+async def test_auth_service_check_registration_status():
+    mock_db = MagicMock()
+    service = AuthService(mock_db)
+
+    email = "check_status@example.com"
+    mock_record = MagicMock()
+    mock_record.email = email
+    mock_record.is_used = False
+    mock_record.is_verified = True
+    mock_record.expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+
+    service.auth_repo.get_user_by_email = AsyncMock(return_value=None)
+    service.auth_repo.get_latest_pending_registration_by_email = AsyncMock(return_value=mock_record)
+
+    res = await service.check_registration_status(email)
+    assert res["status"] == "verified"
+    assert res["email"] == email
+
+

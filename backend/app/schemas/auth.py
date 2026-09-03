@@ -80,3 +80,17 @@ class ChangePasswordRequest(BaseModel):
 class MessageResponse(BaseModel):
     message: str
     success: bool = True
+
+
+class VerifyOtpRegisterRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
+    display_name: Optional[str] = Field("User", min_length=1, max_length=100)
+
+
+class RegistrationStatusResponse(BaseModel):
+    email: str
+    status: str  # "pending", "verified", "completed", "expired"
+    message: str
+

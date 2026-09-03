@@ -72,30 +72,49 @@ class EmailService:
             return None
 
     async def send_registration_verification_email(
-        self, to_email: str, token: str
+        self, to_email: str, token: str, otp_code: Optional[str] = None
     ) -> bool:
         """
-        Send a pre-registration verification email with secure setup link.
+        Send a dual-mode pre-registration verification email containing both:
+        1. A 6-digit OTP code (for instant verification on any device)
+        2. A secure 1-click magic link setup URL.
         Runs asynchronously without blocking the event loop.
         """
         setup_link = f"{settings.FRONTEND_URL.rstrip('/')}/register/complete?token={token}"
 
         if not self.is_configured:
             logger.info(
-                "No email provider configured. Pre-registration link for %s: %s",
+                "No email provider configured. Pre-registration link for %s: %s | OTP: %s",
                 to_email,
                 setup_link,
+                otp_code or "N/A",
             )
             return True
 
-        subject = "Complete Your Paradox Registration"
+        subject = f"{otp_code} is your Paradox verification code" if otp_code else "Complete Your Paradox Registration"
+        
+        otp_text_block = f"\nYour 6-digit verification code: {otp_code}\n(Enter this code on your screen to complete registration)\n\n— OR —\n" if otp_code else ""
         plain_body = (
             f"Hello,\n\n"
-            f"Thank you for starting your registration with Paradox Expense Tracker!\n\n"
-            f"Click the link below to verify your email address and set up your password:\n{setup_link}\n\n"
-            f"This link will expire in 1 hour. If you did not request this, you can safely ignore this email.\n\n"
+            f"Thank you for starting your registration with Paradox Expense Tracker!\n"
+            f"{otp_text_block}"
+            f"Click the link below to verify your email address directly:\n{setup_link}\n\n"
+            f"This code and link expire in 1 hour. If you did not request this, you can safely ignore this email.\n\n"
             f"— The Paradox Team"
         )
+
+        otp_html_block = f"""
+    <div style="text-align: center; margin: 28px 0;">
+      <div style="display: inline-block; background: #27272a; border: 1px solid #3f3f46; border-radius: 12px; padding: 14px 28px; letter-spacing: 8px; font-size: 32px; font-weight: 700; color: #6366f1; font-family: monospace;">
+        {otp_code}
+      </div>
+      <p style="font-size: 12px; color: #a1a1aa; margin-top: 8px; margin-bottom: 0;">Enter this 6-digit code on your screen to continue</p>
+    </div>
+
+    <div style="margin: 24px 0; text-align: center; border-top: 1px solid #27272a; position: relative;">
+      <span style="position: relative; top: -10px; background: #18181b; padding: 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #71717a;">OR VERIFY DIRECTLY</span>
+    </div>
+""" if otp_code else ""
 
         html_body = f"""<!DOCTYPE html>
 <html lang="en">
@@ -144,7 +163,7 @@ class EmailService:
     }}
     .btn-container {{
       text-align: center;
-      margin: 32px 0;
+      margin: 24px 0;
     }}
     .btn {{
       display: inline-block;
@@ -177,15 +196,16 @@ class EmailService:
     <div class="logo">
       <span>✦ Paradox</span>
     </div>
-    <h1>Verify Your Email & Set Up Account</h1>
+    <h1>Verify Your Email</h1>
     <p>We received a request to create a new Paradox account with <strong>{to_email}</strong>.</p>
-    <p>Click the button below to verify your email address and choose your password:</p>
     
+    {otp_html_block}
+
     <div class="btn-container">
-      <a href="{setup_link}" class="btn" target="_blank">Complete Registration</a>
+      <a href="{setup_link}" class="btn" target="_blank">Tap to Verify on this Device</a>
     </div>
 
-    <p style="font-size: 13px; color: #71717a;">This link is valid for <strong>1 hour</strong>. If you did not request this, you can safely ignore this email.</p>
+    <p style="font-size: 13px; color: #71717a; text-align: center;">This code and link are valid for <strong>1 hour</strong>.</p>
     
     <div class="footer">
       <p style="margin-bottom: 8px;">If the button doesn't work, copy and paste this link into your browser:</p>

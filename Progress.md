@@ -168,26 +168,32 @@ Paradox/
   - Backend: `POST /api/v1/auth/switch-account` with token rotation and user session validation.
   - Frontend: Multi-account vault in [`AuthContext.tsx`](frontend/src/features/auth/context/AuthContext.tsx), topbar switcher in [`shell.tsx`](frontend/src/components/layout/shell.tsx), and [`AddAccountModal.tsx`](frontend/src/features/auth/components/AddAccountModal.tsx) with Google OAuth and email/password support.
 
+- **Dual-Mode Omnichannel Registration (6-Digit OTP + Cross-Device Auto-Sync)**:
+  - Database: Alembic migration `a1b2c3d4e5f6` adding `otp_code_hash` and `is_verified` columns with composite index.
+  - Backend: Endpoints `POST /api/v1/auth/register/verify-otp` (instant 1-step account creation via code) and `GET /api/v1/auth/register/status` (live background polling for mobile approval).
+  - Brevo Email: Formats email with prominent 6-digit OTP code badge in subject line and body + 1-click magic link button.
+  - Frontend: [`RegisterForm.tsx`](frontend/src/features/auth/components/RegisterForm.tsx) featuring a 6-digit code input, password setup, real-time background listener (`checkRegistrationStatus`), and navigation safeguards.
+
 ---
 
 ## 8. Testing & Build Verification
 - **Backend Tests (`pytest`)**:
-  - `40 passed in 3.27s` (100% green).
-  - Added unit test `test_auth_service_switch_account` in `tests/unit/test_auth.py`.
+  - `42 passed in 3.31s` (100% green).
+  - Added unit tests `test_auth_service_verify_otp_and_register` and `test_auth_service_check_registration_status`.
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 14 static/dynamic routes.
 
 ---
 
 ## 9. Current Session Handoff Notes
-- All Phase 1 AI Evolution features and Multi-Account Switcher are fully operational, tested, and documented.
+- All features, including Omnichannel Dual-Mode Registration and Multi-Account Switcher, are fully operational, tested, and documented.
 - Active servers:
   - Backend: `http://127.0.0.1:8000` (FastAPI + Uvicorn)
   - Frontend: `http://localhost:3000` (Next.js 16 App Router)
 - Database:
-  - Latest migration: `f6a1b2c3d4e5` (User currency + Recurring expenses).
+  - Latest migration: `a1b2c3d4e5f6` (OTP & is_verified on pending_registration_tokens).
 - Testing:
-  - Backend: `.venv\Scripts\pytest tests/ -q` -> 40/40 passed.
+  - Backend: `.venv\Scripts\pytest tests/ -q` -> 42/42 passed.
   - Frontend: `npm.cmd run build` -> 0 errors.
 - **Documentation**:
   - `docs/PARADOX_AI_FEATURES_UPDATED.md` maintained as the master roadmap for upcoming AI phases.

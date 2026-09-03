@@ -16,6 +16,8 @@ class PendingRegistrationToken(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), nullable=False, index=True)
     token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    otp_code_hash = Column(String(64), nullable=True)
+    is_verified = Column(Boolean, default=False, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     is_used = Column(Boolean, default=False, nullable=False)
     created_at = Column(
@@ -26,4 +28,5 @@ class PendingRegistrationToken(Base):
 
     __table_args__ = (
         Index("ix_pending_reg_email_hash", "email", "token_hash"),
+        Index("ix_pending_registration_tokens_email_otp", "email", "otp_code_hash"),
     )

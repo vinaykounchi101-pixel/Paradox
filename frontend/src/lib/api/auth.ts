@@ -9,14 +9,30 @@ import {
   LoginRequest,
   MessageResponse,
   RegisterRequest,
+  RegistrationStatusResponse,
   ResetPasswordRequest,
   User,
   ValidateRegistrationTokenResponse,
+  VerifyOtpRegisterRequest,
 } from "@/features/auth/types";
 
 export const authApi = {
   async initiateRegistration(data: InitiateRegistrationRequest): Promise<MessageResponse> {
     return await client.post<MessageResponse>("/auth/register/initiate", data);
+  },
+
+  async verifyOtpAndRegister(data: VerifyOtpRegisterRequest): Promise<AuthTokens> {
+    const res = await client.post<AuthTokens>("/auth/register/verify-otp", data);
+    if (res.access_token) {
+      setAccessToken(res.access_token);
+    }
+    return res;
+  },
+
+  async checkRegistrationStatus(email: string): Promise<RegistrationStatusResponse> {
+    return await client.get<RegistrationStatusResponse>(
+      `/auth/register/status?email=${encodeURIComponent(email)}`
+    );
   },
 
   async validateRegistrationToken(token: string): Promise<ValidateRegistrationTokenResponse> {

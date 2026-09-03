@@ -148,12 +148,15 @@ class AuthRepository:
         email: str,
         token_hash: str,
         expires_at: datetime,
+        otp_code_hash: Optional[str] = None,
     ) -> PendingRegistrationToken:
         token = PendingRegistrationToken(
             email=email.lower().strip(),
             token_hash=token_hash,
+            otp_code_hash=otp_code_hash,
             expires_at=expires_at,
             is_used=False,
+            is_verified=False,
         )
         self.session.add(token)
         await self.session.flush()
@@ -168,11 +171,49 @@ class AuthRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_pending_registration_by_email_and_otp(
+        self, email: str, otp_hash: str
+    ) -> Optional[PendingRegistrationToken]:
+        stmt = (
+            select(PendingRegistrationToken)
+            .where(
+                PendingRegistrationToken.email == email.lower().strip(),
+                PendingRegistrationToken.otp_code_hash == otp_hash,
+                PendingRegistrationToken.is_used == False,
+            )
+            .order_by(PendingRegistrationToken.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def get_latest_pending_registration_by_email(
+        self, email: str
+    ) -> Optional[PendingRegistrationToken]:
+        stmt = (
+            select(PendingRegistrationToken)
+            .where(
+                PendingRegistrationToken.email == email.lower().strip(),
+                PendingRegistrationToken.is_used == False,
+            )
+            .order_by(PendingRegistrationToken.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def mark_pending_registration_verified(self, token_hash: str) -> None:
+        stmt = (
+            update(PendingRegistrationToken)
+            .where(PendingRegistrationToken.token_hash == token_hash)
+            .values(is_verified=True)
+        )
+        await self.session.execute(stmt)
+        await self.session.flush()
+
     async def mark_pending_registration_token_used(self, token_hash: str) -> None:
         stmt = (
             update(PendingRegistrationToken)
             .where(PendingRegistrationToken.token_hash == token_hash)
-            .values(is_used=True)
+            .values(is_used=True, is_verified=True)
         )
         await self.session.execute(stmt)
         await self.session.flush()

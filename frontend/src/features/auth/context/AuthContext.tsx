@@ -11,6 +11,7 @@ import {
   RegisterRequest,
   SavedAccount,
   User,
+  VerifyOtpRegisterRequest,
 } from "@/features/auth/types";
 
 const SAVED_ACCOUNTS_STORAGE_KEY = "paradox_saved_accounts";
@@ -61,6 +62,7 @@ interface AuthContextType {
   login: (data: LoginRequest) => Promise<AuthTokens>;
   register: (data: RegisterRequest) => Promise<AuthTokens>;
   completeRegistration: (data: CompleteRegistrationRequest) => Promise<AuthTokens>;
+  verifyOtpAndRegister: (data: VerifyOtpRegisterRequest) => Promise<AuthTokens>;
   loginWithGoogle: (data: GoogleLoginRequest) => Promise<AuthTokens>;
   switchAccount: (userId: string) => Promise<void>;
   removeSavedAccount: (userId: string) => void;
@@ -196,6 +198,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res;
   };
 
+  const verifyOtpAndRegister = async (data: VerifyOtpRegisterRequest): Promise<AuthTokens> => {
+    const res = await authApi.verifyOtpAndRegister(data);
+    setUser(res.user);
+    setActiveUserId(res.user.id);
+    if (res.refresh_token) {
+      saveOrUpdateAccount(res.user, res.refresh_token);
+    }
+    return res;
+  };
+
   const loginWithGoogle = async (data: GoogleLoginRequest): Promise<AuthTokens> => {
     const res = await authApi.loginWithGoogle(data);
     setUser(res.user);
@@ -305,6 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         completeRegistration,
+        verifyOtpAndRegister,
         loginWithGoogle,
         switchAccount,
         removeSavedAccount,

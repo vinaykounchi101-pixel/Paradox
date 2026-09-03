@@ -68,3 +68,17 @@ export interface MessageResponse {
   message: string;
   success?: boolean;
 }
+
+export interface VerifyOtpRegisterRequest {
+  email: string;
+  otp: string;
+  password: string;
+  display_name?: string;
+}
+
+export interface RegistrationStatusResponse {
+  email: string;
+  status: "pending" | "verified" | "completed" | "expired" | "none";
+  message: string;
+}
+

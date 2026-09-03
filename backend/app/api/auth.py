@@ -14,6 +14,7 @@ from app.schemas.auth import (
     GoogleLoginRequest,
     InitiateRegistrationRequest,
     MessageResponse,
+    RegistrationStatusResponse,
     ResetPasswordRequest,
     SwitchAccountRequest,
     TokenResponse,
@@ -22,6 +23,7 @@ from app.schemas.auth import (
     UserRegisterRequest,
     UserResponse,
     ValidateRegistrationTokenResponse,
+    VerifyOtpRegisterRequest,
 )
 from app.services.auth_service import AuthService
 
@@ -117,6 +119,47 @@ async def complete_registration(
         user=UserResponse.model_validate(user),
         refresh_token=raw_refresh,
     )
+
+
+@router.post(
+    "/register/verify-otp",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Complete registration instantly using 6-digit OTP code",
+)
+async def verify_otp_and_register(
+    data: VerifyOtpRegisterRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    user_agent = request.headers.get("user-agent")
+    service = AuthService(db)
+    access_token, raw_refresh, user = await service.verify_otp_and_register(
+        data, user_agent=user_agent
+    )
+    set_refresh_cookie(response, raw_refresh)
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user),
+        refresh_token=raw_refresh,
+    )
+
+
+@router.get(
+    "/register/status",
+    response_model=RegistrationStatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Check real-time registration verification status for polling laptop/desktop clients",
+)
+async def check_registration_status(
+    email: str,
+    db: AsyncSession = Depends(get_db),
+) -> RegistrationStatusResponse:
+    service = AuthService(db)
+    result = await service.check_registration_status(email)
+    return RegistrationStatusResponse(**result)
 
 
 @router.post(

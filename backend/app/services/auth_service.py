@@ -1,4 +1,5 @@
 import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
@@ -28,6 +29,7 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     UserLoginRequest,
     UserRegisterRequest,
+    VerifyOtpRegisterRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,8 @@ class AuthService:
     async def initiate_registration(self, email: str) -> str:
         """
         Initiates pre-registration verification.
-        Checks if user exists, generates secure token, and emails the verification setup link.
+        Checks if user exists, generates secure token and 6-digit OTP,
+        and emails the unified verification setup.
         """
         clean_email = email.lower().strip()
         existing_user = await self.auth_repo.get_user_by_email(clean_email)
@@ -49,25 +52,30 @@ class AuthService:
             raise ConflictError("An account with this email address already exists.")
 
         raw_token, token_hash = generate_registration_token()
+        raw_otp = f"{secrets.randbelow(900000) + 100000}"
+        otp_hash = hash_token(raw_otp)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
         await self.auth_repo.create_pending_registration_token(
             email=clean_email,
             token_hash=token_hash,
+            otp_code_hash=otp_hash,
             expires_at=expires_at,
         )
 
         await email_service.send_registration_verification_email(
             to_email=clean_email,
             token=raw_token,
+            otp_code=raw_otp,
         )
 
-        logger.info("Pre-registration verification link dispatched to: %s", clean_email)
+        logger.info("Pre-registration verification link & OTP dispatched to: %s", clean_email)
         return clean_email
 
     async def validate_registration_token(self, token: str) -> str:
         """
         Validates the pre-registration token and returns the verified email.
+        Marks record as verified so laptop screen can auto-detect approval.
         """
         if not token:
             raise AuthenticationError("Missing registration verification token.")
@@ -84,7 +92,80 @@ class AuthService:
         if existing_user:
             raise ConflictError("An account with this email address is already registered.")
 
+        # Mark as verified so polling laptop detects mobile link approval
+        await self.auth_repo.mark_pending_registration_verified(token_hash)
+
         return record.email
+
+    async def verify_otp_and_register(
+        self, data: VerifyOtpRegisterRequest, user_agent: Optional[str] = None
+    ) -> Tuple[str, str, User]:
+        """
+        Verifies 6-digit registration OTP code and completes account creation in one step.
+        """
+        clean_email = data.email.lower().strip()
+        existing_user = await self.auth_repo.get_user_by_email(clean_email)
+        if existing_user:
+            raise ConflictError("An account with this email address is already registered.")
+
+        otp_hash = hash_token(data.otp.strip())
+        record = await self.auth_repo.get_pending_registration_by_email_and_otp(clean_email, otp_hash)
+        now = datetime.now(timezone.utc)
+
+        if not record or record.is_used or record.expires_at < now:
+            raise AuthenticationError("Invalid or expired 6-digit verification code.")
+
+        password_hash = get_password_hash(data.password)
+        user = await self.auth_repo.create_user(
+            email=clean_email,
+            display_name=data.display_name.strip() if data.display_name else "User",
+            password_hash=password_hash,
+            is_verified=True,
+        )
+
+        # Mark token as used
+        await self.auth_repo.mark_pending_registration_token_used(record.token_hash)
+
+        # Issue Tokens
+        access_token = create_access_token(subject=str(user.id), email=user.email)
+        raw_refresh, refresh_hash = generate_refresh_token()
+        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+        await self.auth_repo.create_refresh_token(
+            user_id=user.id,
+            token_hash=refresh_hash,
+            expires_at=expires_at,
+            user_agent=user_agent,
+        )
+
+        logger.info("User registration completed via 6-digit OTP for email: %s", user.email)
+        return access_token, raw_refresh, user
+
+    async def check_registration_status(self, email: str) -> dict:
+        """
+        Checks real-time registration status for polling clients (e.g. laptop waiting for mobile link approval).
+        """
+        clean_email = email.lower().strip()
+        existing_user = await self.auth_repo.get_user_by_email(clean_email)
+        if existing_user:
+            return {"email": clean_email, "status": "completed", "message": "Account registration completed."}
+
+        record = await self.auth_repo.get_latest_pending_registration_by_email(clean_email)
+        now = datetime.now(timezone.utc)
+
+        if not record:
+            return {"email": clean_email, "status": "none", "message": "No registration in progress."}
+
+        if record.expires_at < now:
+            return {"email": clean_email, "status": "expired", "message": "Verification code and link have expired."}
+
+        if record.is_used:
+            return {"email": clean_email, "status": "completed", "message": "Registration already completed."}
+
+        if record.is_verified:
+            return {"email": clean_email, "status": "verified", "message": "Email verified via mobile link!"}
+
+        return {"email": clean_email, "status": "pending", "message": "Waiting for verification."}
 
     async def complete_registration(
         self, data: CompleteRegistrationRequest, user_agent: Optional[str] = None
