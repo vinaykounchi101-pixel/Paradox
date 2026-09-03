@@ -10,11 +10,19 @@ import httpx
 from app.core.config import settings
 from app.schemas.ai import (
     AIInsightsResponse,
+    AuditSubscriptionItem,
     CategorizeResponse,
     CategoryAllocation,
+    FinancialHealthScoreResponse,
+    HealthScorePillar,
+    LeakAnalysisResponse,
     ParsedReceiptItem,
     ParseExpenseResponse,
     ParseReceiptResponse,
+    SafeToSpendResponse,
+    SimulatePurchaseResponse,
+    SpendingLeakItem,
+    SubscriptionAuditResponse,
     SuggestBudgetResponse,
 )
 
@@ -1216,6 +1224,454 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
             provider_used="heuristic-image",
         )
 
+    # =========================================================================
+    # PHASE 1: CORE FINANCIAL INTELLIGENCE METHODS
+    # =========================================================================
+
+    async def simulate_purchase(
+        self,
+        amount: Decimal,
+        category_name: Optional[str],
+        description: Optional[str],
+        total_spent: Decimal,
+        budget_limit: Optional[Decimal],
+        days_elapsed: int,
+        total_days: int,
+        category_spent: Decimal = Decimal("0.00"),
+        category_budget: Optional[Decimal] = None,
+    ) -> SimulatePurchaseResponse:
+        """
+        Evaluate a purchase decision deterministically against budget limits,
+        daily burn velocity, safe-to-spend allowance, and remaining month pacing.
+        """
+        days_remaining = max(total_days - days_elapsed, 1)
+
+        # Baseline budget calculations
+        if budget_limit and budget_limit > 0:
+            current_rem = budget_limit - total_spent
+            projected_rem = current_rem - amount
+            safe_daily_before = max(current_rem / Decimal(days_remaining), Decimal("0.00")).quantize(Decimal("0.01"))
+            safe_daily_after = max(projected_rem / Decimal(days_remaining), Decimal("0.00")).quantize(Decimal("0.01"))
+
+            # Determine verdict
+            if projected_rem < Decimal("0.00"):
+                verdict = "over_budget"
+                deficit = abs(projected_rem)
+                headline = f"Over-Budget Alert (Deficit: {deficit:.2f})"
+                advice = (
+                    f"Spending {amount:.2f} on {description or 'this item'} will breach your period budget by "
+                    f"{deficit:.2f}. Consider postponing this purchase or offsetting with other categories."
+                )
+                can_proceed = False
+                savings_impact = f"Destroys month-end surplus and puts balance in a {deficit:.2f} deficit."
+            elif amount > (current_rem * Decimal("0.40")) or safe_daily_after < (safe_daily_before * Decimal("0.60")):
+                verdict = "caution"
+                percent_burn = (amount / current_rem * Decimal("100")).quantize(Decimal("0.1"))
+                headline = f"Proceed with Caution (Consumes {percent_burn}% of remaining buffer)"
+                advice = (
+                    f"This purchase will reduce your daily safe allowance from {safe_daily_before:.2f}/day to "
+                    f"{safe_daily_after:.2f}/day for the remaining {days_remaining} days. Feasible if you tighten other expenses."
+                )
+                can_proceed = True
+                savings_impact = f"Reduces projected period surplus by {amount:.2f}."
+            else:
+                verdict = "safe"
+                headline = "Affordable Purchase (Safe to Proceed)"
+                advice = (
+                    f"Your finances accommodate {amount:.2f} smoothly. You will still have {projected_rem:.2f} "
+                    f"budget buffer ({safe_daily_after:.2f}/day for {days_remaining} days)."
+                )
+                can_proceed = True
+                savings_impact = f"Healthy trajectory retained with {projected_rem:.2f} projected buffer."
+
+            cat_impact = None
+            if category_name:
+                new_cat_spent = category_spent + amount
+                if category_budget and category_budget > 0:
+                    cat_pct = (new_cat_spent / category_budget * Decimal("100")).quantize(Decimal("0.1"))
+                    cat_impact = f"{category_name} spending will reach {new_cat_spent:.2f} ({cat_pct}% of category budget)."
+                else:
+                    cat_impact = f"{category_name} total this month will rise to {new_cat_spent:.2f}."
+
+            return SimulatePurchaseResponse(
+                verdict=verdict,
+                headline=headline,
+                advice=advice,
+                current_remaining_budget=current_rem.quantize(Decimal("0.01")),
+                projected_remaining_budget=projected_rem.quantize(Decimal("0.01")),
+                safe_to_spend_daily_before=safe_daily_before,
+                safe_to_spend_daily_after=safe_daily_after,
+                category_impact=cat_impact,
+                savings_impact=savings_impact,
+                can_proceed=can_proceed,
+            )
+        else:
+            # Unbudgeted user fallback
+            current_burn = (total_spent / Decimal(max(days_elapsed, 1))).quantize(Decimal("0.01"))
+            if amount > (current_burn * Decimal("5")):
+                verdict = "caution"
+                headline = "Substantial Outlay (No Budget Set)"
+                advice = (
+                    f"Spending {amount:.2f} is more than 5x your average daily spend ({current_burn:.2f}/day). "
+                    f"Setting a monthly budget will unlock precise safe-to-spend limits."
+                )
+                can_proceed = True
+            else:
+                verdict = "safe"
+                headline = "Manageable Expense"
+                advice = f"Spending {amount:.2f} fits within normal single-day variations. Consider setting a monthly budget."
+                can_proceed = True
+
+            return SimulatePurchaseResponse(
+                verdict=verdict,
+                headline=headline,
+                advice=advice,
+                current_remaining_budget=Decimal("0.00"),
+                projected_remaining_budget=Decimal("0.00"),
+                safe_to_spend_daily_before=Decimal("0.00"),
+                safe_to_spend_daily_after=Decimal("0.00"),
+                category_impact=f"Adds {amount:.2f} to {category_name or 'Uncategorized'}.",
+                savings_impact="No target budget defined to measure savings variance.",
+                can_proceed=can_proceed,
+            )
+
+    async def calculate_safe_to_spend(
+        self,
+        total_spent: Decimal,
+        budget_limit: Optional[Decimal],
+        days_elapsed: int,
+        total_days: int,
+    ) -> SafeToSpendResponse:
+        """
+        Calculate deterministic daily spending allowance, velocity comparison,
+        and projected date of budget exhaustion.
+        """
+        days_remaining = max(total_days - days_elapsed, 0)
+        current_burn = (total_spent / Decimal(max(days_elapsed, 1))).quantize(Decimal("0.01"))
+
+        if not budget_limit or budget_limit <= 0:
+            return SafeToSpendResponse(
+                safe_daily_allowance=Decimal("0.00"),
+                current_daily_burn_rate=current_burn,
+                remaining_budget=Decimal("0.00"),
+                days_remaining=days_remaining,
+                depletion_date=None,
+                status="optimal",
+                burn_status_message="Configure a budget target to activate the daily safe-to-spend speedometer.",
+            )
+
+        remaining = (budget_limit - total_spent).quantize(Decimal("0.01"))
+        effective_days = max(days_remaining, 1)
+        safe_daily = max(remaining / Decimal(effective_days), Decimal("0.00")).quantize(Decimal("0.01"))
+
+        # Compute depletion date
+        if remaining <= 0:
+            depletion_date = date.today().isoformat()
+            status = "danger"
+            burn_msg = f"Budget fully depleted! You are exceeding your target by {abs(remaining):.2f}."
+        elif current_burn > 0:
+            days_until_empty = int(remaining / current_burn)
+            depletion_dt = date.today() + timedelta(days=days_until_empty)
+            depletion_date = depletion_dt.isoformat()
+
+            if current_burn > (safe_daily * Decimal("1.25")):
+                status = "danger"
+                burn_msg = (
+                    f"Warning: Current spend ({current_burn:.2f}/day) is 25%+ above safe allowance ({safe_daily:.2f}/day). "
+                    f"Budget projected to run out around {depletion_date}."
+                )
+            elif current_burn > safe_daily:
+                status = "warning"
+                burn_msg = (
+                    f"Pacing Warning: Spending {current_burn:.2f}/day slightly outpaces safe target ({safe_daily:.2f}/day). "
+                    f"Estimated depletion on {depletion_date}."
+                )
+            else:
+                status = "optimal"
+                burn_msg = (
+                    f"Optimal Pacing: Daily burn ({current_burn:.2f}/day) is comfortably below safe allowance ({safe_daily:.2f}/day). "
+                    f"On track to maintain surplus."
+                )
+        else:
+            depletion_date = None
+            status = "optimal"
+            burn_msg = f"Safe allowance is {safe_daily:.2f}/day for the remaining {days_remaining} days."
+
+        return SafeToSpendResponse(
+            safe_daily_allowance=safe_daily,
+            current_daily_burn_rate=current_burn,
+            remaining_budget=remaining,
+            days_remaining=days_remaining,
+            depletion_date=depletion_date,
+            status=status,
+            burn_status_message=burn_msg,
+        )
+
+    async def calculate_health_score(
+        self,
+        total_spent: Decimal,
+        budget_limit: Optional[Decimal],
+        days_elapsed: int,
+        total_days: int,
+        category_breakdown: List[Dict[str, Any]],
+    ) -> FinancialHealthScoreResponse:
+        """
+        Compute deterministic 0-100 Financial Health Score across 3 core pillars:
+        - Budget Adherence (40 points)
+        - Savings Velocity (35 points)
+        - Category Discipline (25 points)
+        """
+        # Pillar 1: Budget Adherence (40 pts)
+        if budget_limit and budget_limit > 0:
+            expected_fraction = Decimal(days_elapsed) / Decimal(total_days)
+            actual_fraction = total_spent / budget_limit
+            if actual_fraction <= expected_fraction:
+                score_adherence = 40
+                adherence_fb = "Perfect pacing. Cumulative spending is strictly on or below target."
+            elif actual_fraction <= Decimal("1.0"):
+                over_fraction = actual_fraction - expected_fraction
+                penalty = int(over_fraction * 40 * Decimal("1.8"))
+                score_adherence = max(12, 40 - penalty)
+                adherence_fb = "Pacing is slightly faster than calendar timeline, but still within overall budget."
+            else:
+                over_budget = actual_fraction - Decimal("1.0")
+                score_adherence = max(0, int(15 - over_budget * 25))
+                adherence_fb = "Current expenditure has crossed the total period budget."
+        else:
+            score_adherence = 26
+            adherence_fb = "Default score assigned. Set a monthly budget to maximize points."
+
+        # Pillar 2: Savings Velocity (35 pts)
+        if budget_limit and budget_limit > 0:
+            daily_burn = total_spent / Decimal(max(days_elapsed, 1))
+            projected_total = daily_burn * Decimal(total_days)
+            if projected_total < budget_limit:
+                savings_margin = (budget_limit - projected_total) / budget_limit
+                score_savings = min(35, 20 + int(savings_margin * 30))
+                savings_fb = f"Projected surplus of {(budget_limit - projected_total):.2f} at period close."
+            else:
+                deficit_margin = (projected_total - budget_limit) / budget_limit
+                score_savings = max(5, int(18 - deficit_margin * 20))
+                savings_fb = "Run rate indicates potential budget overrun by end of period."
+        else:
+            score_savings = 22
+            savings_fb = "Establish target savings to measure velocity accurately."
+
+        # Pillar 3: Category Discipline (25 pts)
+        if not category_breakdown:
+            score_discipline = 20
+            discipline_fb = "Healthy baseline. Log regular expenses to track category concentration."
+        else:
+            max_pct = max((c.get("percentage", 0.0) for c in category_breakdown), default=0.0)
+            if max_pct > 65.0:
+                score_discipline = 10
+                discipline_fb = f"Over-concentration alert: One category takes {max_pct:.0f}% of total budget."
+            elif max_pct > 45.0:
+                score_discipline = 18
+                discipline_fb = f"Primary category accounts for {max_pct:.0f}% of your spending."
+            else:
+                score_discipline = 25
+                discipline_fb = "Excellent spending diversification across categories."
+
+        total_score = max(0, min(100, score_adherence + score_savings + score_discipline))
+
+        if total_score >= 80:
+            status = "excellent"
+            headline = "Outstanding Financial Health"
+            recs = [
+                "Maintain current daily burn rate to lock in maximum monthly savings.",
+                "Consider transferring projected surplus into liquid investments or emergency fund.",
+            ]
+        elif total_score >= 60:
+            status = "good"
+            headline = "Good Financial Control"
+            recs = [
+                "Monitor top-spending categories to prevent end-of-month budget strain.",
+                "Aim to trim discretionary purchases by 5-10% to push into the Excellent tier.",
+            ]
+        else:
+            status = "needs_attention"
+            headline = "Budget Strain Detected"
+            recs = [
+                "Pause non-essential and entertainment spending for the next 7 days.",
+                "Review upcoming recurring bills to avoid unexpected overdraft or deficits.",
+            ]
+
+        pillars = [
+            HealthScorePillar(name="Budget Adherence", score=score_adherence, max_score=40, feedback=adherence_fb),
+            HealthScorePillar(name="Savings Velocity", score=score_savings, max_score=35, feedback=savings_fb),
+            HealthScorePillar(name="Category Discipline", score=score_discipline, max_score=25, feedback=discipline_fb),
+        ]
+
+        return FinancialHealthScoreResponse(
+            score=total_score,
+            status=status,
+            headline=headline,
+            pillars=pillars,
+            recommendations=recs,
+        )
+
+    async def analyze_spending_leaks(
+        self,
+        past_expenses: List[Any],
+        threshold: Decimal = Decimal("150.00"),
+    ) -> LeakAnalysisResponse:
+        """
+        Identify micro-spending drains (transactions <= threshold, default ₹150/$2)
+        occurring frequently that create substantial annualized leakage.
+        """
+        # Filter micro-transactions
+        micro_txs = [
+            e for e in past_expenses
+            if hasattr(e, "amount") and Decimal(str(e.amount)) <= threshold and Decimal(str(e.amount)) > 0
+        ]
+
+        if not micro_txs:
+            return LeakAnalysisResponse(
+                total_monthly_leak=Decimal("0.00"),
+                total_annual_leak=Decimal("0.00"),
+                leaks=[],
+                summary="No significant micro-spending leaks detected under your threshold.",
+            )
+
+        # Group by normalized merchant/description or category
+        grouped: Dict[str, List[Decimal]] = {}
+        cat_map: Dict[str, str] = {}
+
+        for e in micro_txs:
+            desc = (e.description or "").strip()
+            # Clean description
+            cleaned = re.sub(r"[^\w\s]", "", desc).strip().title()
+            if not cleaned or len(cleaned) < 2:
+                cleaned = e.category.name if hasattr(e, "category") and e.category else "Miscellaneous"
+
+            grouped.setdefault(cleaned, []).append(Decimal(str(e.amount)))
+            if hasattr(e, "category") and e.category:
+                cat_map[cleaned] = e.category.name
+
+        # Calculate time span in months (minimum 1)
+        dates = [e.date for e in past_expenses if hasattr(e, "date") and e.date]
+        if dates:
+            span_days = max((max(dates) - min(dates)).days, 30)
+            months_span = Decimal(str(span_days)) / Decimal("30")
+        else:
+            months_span = Decimal("1.0")
+
+        leaks: List[SpendingLeakItem] = []
+        total_monthly = Decimal("0.00")
+
+        for key, amounts in grouped.items():
+            count = len(amounts)
+            if count >= 2:  # Occurs at least twice
+                avg_amt = (sum(amounts) / Decimal(count)).quantize(Decimal("0.01"))
+                freq_mo = max(1, int(Decimal(count) / months_span))
+                monthly_cost = (avg_amt * Decimal(freq_mo)).quantize(Decimal("0.01"))
+                annual_cost = (monthly_cost * Decimal("12")).quantize(Decimal("0.01"))
+                total_monthly += monthly_cost
+
+                # Actionable savings tip
+                tip = (
+                    f"Consolidating or capping '{key}' by 30% could save ~{(annual_cost * Decimal('0.30')):.2f} every year."
+                )
+
+                leaks.append(
+                    SpendingLeakItem(
+                        merchant_or_pattern=key,
+                        frequency_per_month=freq_mo,
+                        avg_amount=avg_amt,
+                        monthly_drain=monthly_cost,
+                        annualized_drain=annual_cost,
+                        category_name=cat_map.get(key, "General"),
+                        savings_tip=tip,
+                    )
+                )
+
+        leaks.sort(key=lambda x: x.annualized_drain, reverse=True)
+        total_annual = (total_monthly * Decimal("12")).quantize(Decimal("0.01"))
+
+        summary = (
+            f"Detected {len(leaks)} recurring micro-spending patterns draining {total_monthly:.2f}/month "
+            f"({total_annual:.2f}/year). Modest behavioral adjustments here deliver high savings leverage."
+            if leaks else "Micro-spending is well-controlled with minimal repetitive leakage."
+        )
+
+        return LeakAnalysisResponse(
+            total_monthly_leak=total_monthly.quantize(Decimal("0.01")),
+            total_annual_leak=total_annual,
+            leaks=leaks,
+            summary=summary,
+        )
+
+    async def audit_subscriptions(
+        self,
+        past_expenses: List[Any],
+        recurring_expenses: List[Any],
+    ) -> SubscriptionAuditResponse:
+        """
+        Audit recurring commitments, detect overlapping subscriptions in the same category,
+        compute annual drain, and flag bundle/annual discount opportunities.
+        """
+        audited_items: List[AuditSubscriptionItem] = []
+        total_monthly = Decimal("0.00")
+        category_counts: Dict[str, List[str]] = {}
+
+        # 1. Process explicit recurring expenses
+        for rec in recurring_expenses:
+            amt = Decimal(str(rec.amount))
+            freq = rec.recurring_frequency or "monthly"
+            cat_name = rec.category.name if hasattr(rec, "category") and rec.category else "Subscriptions"
+            merchant = rec.description or "Subscription"
+
+            if freq == "weekly":
+                mo_cost = amt * Decimal("4.33")
+            elif freq == "yearly":
+                mo_cost = amt / Decimal("12")
+            else:
+                mo_cost = amt
+
+            ann_cost = mo_cost * Decimal("12")
+            total_monthly += mo_cost
+            category_counts.setdefault(cat_name.lower(), []).append(merchant)
+
+            audited_items.append(
+                AuditSubscriptionItem(
+                    merchant=merchant,
+                    category_name=cat_name,
+                    estimated_amount=amt.quantize(Decimal("0.01")),
+                    frequency=freq,
+                    annual_cost=ann_cost.quantize(Decimal("0.01")),
+                    flag=None,
+                    optimization_tip=f"Consider an annual plan for {merchant} to save up to 15-20% on recurring fees.",
+                )
+            )
+
+        # 2. Flag duplicate/overlapping categories
+        warnings: List[str] = []
+        pot_savings = Decimal("0.00")
+
+        for cat, merchants in category_counts.items():
+            if len(merchants) >= 2:
+                names = ", ".join(merchants)
+                warnings.append(f"Multiple overlapping subscriptions in '{cat.title()}': {names}.")
+                pot_savings += Decimal("300.00")  # Modest estimate
+
+        insights = [
+            f"Active subscriptions generate a fixed commitment of {total_monthly:.2f} per month ({total_monthly * 12:.2f}/year).",
+            "Auditing subscriptions every quarter prevents zombie renewals for services you no longer utilize.",
+        ]
+        if warnings:
+            insights.append("Consolidating redundant entertainment or streaming platforms can immediately free up cash flow.")
+
+        return SubscriptionAuditResponse(
+            total_monthly_commitment=total_monthly.quantize(Decimal("0.01")),
+            total_annual_commitment=(total_monthly * Decimal("12")).quantize(Decimal("0.01")),
+            active_subscriptions=audited_items,
+            duplicate_warnings=warnings,
+            potential_annual_savings=pot_savings.quantize(Decimal("0.01")),
+            insights=insights,
+        )
+
 
 ai_service = AIService()
+
 

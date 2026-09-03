@@ -28,11 +28,25 @@ import { BarChart3D } from "./BarChart3D";
 import { TrendGraph } from "./TrendGraph";
 import { TiltCard } from "@/components/common/TiltCard";
 import { FinancialCopilotCard } from "./FinancialCopilotCard";
+import { PurchaseSimulatorDialog } from "./PurchaseSimulatorDialog";
+import { SafeToSpendCard } from "./SafeToSpendCard";
+import { LeakHunterDialog } from "./LeakHunterDialog";
+import { SubscriptionAuditDialog } from "./SubscriptionAuditDialog";
+import { ExpenseFormDialog } from "@/features/expenses/components/ExpenseFormDialog";
+import { Search } from "lucide-react";
 
 export default function DashboardView() {
   const { formatCurrency, currency, currencySymbol } = useCurrency();
   const [period, setPeriod] = useState<"current_month" | "last_30_days" | "current_week">("current_month");
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [isLeakHunterOpen, setIsLeakHunterOpen] = useState(false);
+  const [isSubAuditOpen, setIsSubAuditOpen] = useState(false);
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+
+  const handleSimulatorAddExpense = () => {
+    setIsExpenseDialogOpen(true);
+  };
   const { data, isLoading, isError, error } = useDashboard(period);
   const { data: recurringData } = useQuery({
     queryKey: ["recurring_expenses"],
@@ -94,6 +108,30 @@ export default function DashboardView() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Can I Afford This? Simulator Button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsSimulatorOpen(true)}
+            className="cursor-pointer text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30"
+            title="Simulate a planned purchase before spending"
+          >
+            <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-400" />
+            Can I Afford This?
+          </Button>
+
+          {/* Leak Hunter Button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsLeakHunterOpen(true)}
+            className="cursor-pointer text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30"
+            title="Detect micro-spending drains and leaks"
+          >
+            <Search className="h-3.5 w-3.5 mr-1.5 text-rose-400" />
+            Leak Hunter
+          </Button>
+
           {/* Monthly Health Report Button */}
           <Button
             variant="secondary"
@@ -233,13 +271,13 @@ export default function DashboardView() {
                       }
                     >
                       {isOverBudget
-                        ? `Budget Exceeded by $${(spent - limit).toFixed(2)}`
+                        ? `Budget Exceeded by ${formatCurrency(spent - limit)}`
                         : isNearBudget
                         ? `Approaching Limit (${pct.toFixed(0)}% spent)`
                         : `On Track (${pct.toFixed(0)}% spent)`}
                     </span>
                     <span className="text-muted-foreground">
-                      ${(limit - spent > 0 ? limit - spent : 0).toFixed(2)} left
+                      {formatCurrency(limit - spent > 0 ? limit - spent : 0)} left
                     </span>
                   </div>
                 </div>
@@ -248,6 +286,9 @@ export default function DashboardView() {
           </Card>
         </TiltCard>
       </div>
+
+      {/* Safe-to-Spend Speedometer Widget */}
+      <SafeToSpendCard onOpenSimulator={() => setIsSimulatorOpen(true)} />
 
       {/* Grid: Analytics Section (Trend Curve & Donut Chart) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -292,12 +333,21 @@ export default function DashboardView() {
               <CardDescription>Committed recurring expenses automatically tracked</CardDescription>
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-2.5">
             <span className="text-xs text-muted-foreground">Monthly Fixed Burden:</span>
             <span className="text-lg font-bold text-foreground font-mono">{formatCurrency(recurringTotal)}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
               {recurringList.length} Active
             </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsSubAuditOpen(true)}
+              className="text-xs h-7 gap-1 text-purple-300 border-purple-500/30 hover:bg-purple-500/10 ml-1 cursor-pointer"
+              title="Audit subscriptions and recurring commitments"
+            >
+              <Sparkles className="w-3 h-3 text-purple-400" /> Audit
+            </Button>
           </div>
         </div>
 
@@ -473,6 +523,31 @@ export default function DashboardView() {
           </div>
         </div>
       </Dialog>
+
+      {/* Can I Afford This? Simulator Dialog */}
+      <PurchaseSimulatorDialog
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        onAddAsExpense={handleSimulatorAddExpense}
+      />
+
+      {/* Micro-Spending Leak Hunter Dialog */}
+      <LeakHunterDialog
+        isOpen={isLeakHunterOpen}
+        onClose={() => setIsLeakHunterOpen(false)}
+      />
+
+      {/* Subscription & Recurring Commitments Audit Dialog */}
+      <SubscriptionAuditDialog
+        isOpen={isSubAuditOpen}
+        onClose={() => setIsSubAuditOpen(false)}
+      />
+
+      {/* Expense Form Dialog */}
+      <ExpenseFormDialog
+        isOpen={isExpenseDialogOpen}
+        onClose={() => setIsExpenseDialogOpen(false)}
+      />
     </div>
   );
 }

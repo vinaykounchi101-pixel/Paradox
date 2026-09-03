@@ -149,34 +149,50 @@ Paradox/
 
 ---
 
-## 7. Testing & Build Verification
+## 7. Phase 6: AI Evolution — Core Financial Intelligence
+- **"Can I Afford This?" Purchase Decision Simulator**:
+  - `POST /api/v1/ai/simulate-purchase` evaluating requested purchases against remaining budget buffers, daily safe allowances, and burn velocity.
+  - Frontend [`PurchaseSimulatorDialog.tsx`](frontend/src/features/dashboard/components/PurchaseSimulatorDialog.tsx) with before/after buffer impact and 1-click "Add as Expense".
+- **Safe-to-Spend Speedometer & Daily Allowance Gauge**:
+  - `GET /api/v1/ai/safe-to-spend` calculating daily spending targets, pacing velocity, and budget depletion dates.
+  - Frontend [`SafeToSpendCard.tsx`](frontend/src/features/dashboard/components/SafeToSpendCard.tsx) on Dashboard with dynamic status glows and pacing feedback.
+- **Financial Health Score (0–100 Deterministic Index)**:
+  - `GET /api/v1/ai/health-score` computing composite scores across Budget Adherence (40 pts), Savings Velocity (35 pts), and Category Discipline (25 pts).
+- **Micro-Spending "Leak Hunter"**:
+  - `GET /api/v1/ai/leak-analysis` detecting repetitive sub-threshold transactions and projecting annual drain.
+  - Frontend [`LeakHunterDialog.tsx`](frontend/src/features/dashboard/components/LeakHunterDialog.tsx) with customizable thresholds (`≤ ₹100`, `≤ ₹150`, `≤ ₹250`, `≤ ₹500`).
+- **Subscription & Recurring Commitments Audit**:
+  - `GET /api/v1/ai/subscription-audit` identifying periodic costs and flagging duplicate services.
+  - Frontend [`SubscriptionAuditDialog.tsx`](frontend/src/features/dashboard/components/SubscriptionAuditDialog.tsx) accessible from the Subscriptions card.
+- **Budget Config Currency Engine**:
+  - Replaced hardcoded `$` in [`BudgetConfigView.tsx`](frontend/src/features/budget/components/BudgetConfigView.tsx) with dynamic `useCurrency()` formatting.
+
+---
+
+## 8. Testing & Build Verification
 - **Backend Tests (`pytest`)**:
-  - `31 passed in 3.74s` (100% green).
-  - All AI unit tests in `tests/unit/test_ai.py` pass with isolated heuristic and mock modes.
+  - `39 passed in 4.59s` (100% green).
+  - All unit tests in `tests/unit/test_ai_features_phase1.py` and `tests/unit/test_ai.py` pass cleanly.
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 14 static/dynamic routes.
 
 ---
 
-## 8. Current Session Handoff Notes
-- All 5 Paradox V2 supercharged features are fully operational, tested, and documented in [`AI_FEATURES.md`](AI_FEATURES.md).
+## 9. Current Session Handoff Notes
+- All Phase 1 AI Evolution features are fully operational, tested, and documented in [`docs/PARADOX_AI_FEATURES_UPDATED.md`](docs/PARADOX_AI_FEATURES_UPDATED.md).
 - Active servers:
   - Backend: `http://127.0.0.1:8000` (FastAPI + Uvicorn)
   - Frontend: `http://localhost:3000` (Next.js 16 App Router)
 - Database:
   - Latest migration: `f6a1b2c3d4e5` (User currency + Recurring expenses).
 - Testing:
-  - Backend: `.venv\Scripts\pytest tests/ -q` -> 31/31 passed.
+  - Backend: `.venv\Scripts\pytest tests/ -q` -> 39/39 passed.
   - Frontend: `npm.cmd run build` -> 0 errors.
 - **Documentation**:
-  - `PARADOX_PRD_FINAL.md` and `PARADOX_SRS.md` updated to v2.2 reflecting all Paradox V2 Supercharged features, schemas, and endpoints.
-  - `AI_FEATURES.md` created with complete dual-engine architecture, endpoints, and OCR flows.
-- **Universal Multi-Provider Email Service (Brevo REST API + Resend API + Gmail SMTP)**:
-  - `EmailService` ([`backend/app/services/email_service.py`](file:///e:/Projects/Paradox/backend/app/services/email_service.py)) supports Brevo (ideal for Production/Render without custom domains via `BREVO_API_KEY`), Resend API (`RESEND_API_KEY`), and Gmail SMTP (`SMTP_*` for Localhost).
-  - 100% environment-driven with automatic fallback.
-- **Google OAuth 2.0 / OpenID Connect**:
-  - Dual-mode backend verification (JWKS + TokenInfo fallback) and frontend Google Identity Services integration.
+  - `docs/PARADOX_AI_FEATURES_UPDATED.md` maintained as the master roadmap for upcoming AI phases.
+  - `docs/AI_FEATURES.md` maintained as the active dual-engine reference.
 - For local testing:
   - PostgreSQL: `E:\PSQL\bin\postgres.exe -D "E:\PSQL\data"`
   - Backend: `.venv\Scripts\uvicorn app.main:app --port 8000`
   - Frontend: `npm.cmd run dev`
+

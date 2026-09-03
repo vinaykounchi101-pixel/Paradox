@@ -27,6 +27,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { BudgetPeriodType } from "@/lib/api/budget";
 import { aiApi, SuggestBudgetResponse } from "@/lib/api/ai";
+import { useCurrency } from "@/features/auth/context/CurrencyContext";
 
 // Helpers for default period keys
 function getDefaultPeriodKey(type: BudgetPeriodType): string {
@@ -77,6 +78,7 @@ function formatPeriodLabel(type: BudgetPeriodType, key?: string): string {
 
 export default function BudgetConfigView() {
   const { success, error: toastError } = useToast();
+  const { formatCurrency, currencySymbol } = useCurrency();
 
   // Active Granularity: "month" | "week" | "day"
   const [periodType, setPeriodType] = useState<BudgetPeriodType>("month");
@@ -268,7 +270,7 @@ export default function BudgetConfigView() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Spending Limit ($) for {formatPeriodLabel(periodType, periodKey)}
+                    Spending Limit ({currencySymbol}) for {formatPeriodLabel(periodType, periodKey)}
                   </span>
                   <button
                     type="button"
@@ -292,7 +294,7 @@ export default function BudgetConfigView() {
                         <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                         Recommended Target:{" "}
                         <strong className="text-white text-sm">
-                          ${aiSuggestion.suggested_amount}
+                          {formatCurrency(aiSuggestion.suggested_amount)}
                         </strong>
                       </span>
                       <button
@@ -313,7 +315,7 @@ export default function BudgetConfigView() {
                             key={idx}
                             className="px-2 py-0.5 rounded-md bg-zinc-900/90 border border-zinc-800 text-[10px] text-zinc-300"
                           >
-                            {alloc.category_name}: ${alloc.suggested_amount} ({alloc.percentage}%)
+                            {alloc.category_name}: {formatCurrency(alloc.suggested_amount)} ({alloc.percentage}%)
                           </span>
                         ))}
                       </div>
@@ -341,7 +343,7 @@ export default function BudgetConfigView() {
               <div className="space-y-1 pt-1">
                 <div className="flex justify-between text-[10px] font-semibold uppercase text-muted-foreground">
                   <span>Quick Adjust</span>
-                  <span className="text-foreground">${amount || 0}</span>
+                  <span className="text-foreground">{formatCurrency(amount || 0)}</span>
                 </div>
                 <input
                   type="range"

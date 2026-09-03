@@ -99,3 +99,16 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Future Work**:
   - Add offline client-side WASM OCR (e.g. Tesseract.js) for instantaneous 100% offline receipt parsing without network requests.
 
+---
+
+## 11. Deterministic Math & AI Commentary Separation (Phase 6 AI Evolution)
+* **Status**: **RESOLVED in Phase 6**.
+* **Architecture / Tradeoff**:
+  - LLMs frequently hallucinate arithmetic calculations or return inconsistent numerical valuations when computing financial metrics.
+  - **Resolution**:
+    - Strictly compute all financial health indicators (`SafeToSpendResponse`, `FinancialHealthScoreResponse`, `SimulatePurchaseResponse`, `LeakAnalysisResponse`, `SubscriptionAuditResponse`) deterministically in backend Python service logic.
+    - AI models (Gemini 3.6 Flash / Heuristics) provide qualitative commentary, category context, and behavioural recommendations based strictly on verified numbers.
+* **Future Work**:
+  - Add user-configurable scoring pillar weights (customizing the default 40/35/25 split) for the Financial Health Score.
+
+

@@ -76,6 +76,86 @@ export interface ParseReceiptResponse {
   provider_used: string;
 }
 
+export interface SimulatePurchaseRequest {
+  amount: number;
+  category_name?: string;
+  description?: string;
+}
+
+export interface SimulatePurchaseResponse {
+  verdict: "safe" | "caution" | "over_budget";
+  headline: string;
+  advice: string;
+  current_remaining_budget: number | string;
+  projected_remaining_budget: number | string;
+  safe_to_spend_daily_before: number | string;
+  safe_to_spend_daily_after: number | string;
+  category_impact?: string | null;
+  savings_impact: string;
+  can_proceed: boolean;
+}
+
+export interface SafeToSpendResponse {
+  safe_daily_allowance: number | string;
+  current_daily_burn_rate: number | string;
+  remaining_budget: number | string;
+  days_remaining: number;
+  depletion_date?: string | null;
+  status: "optimal" | "warning" | "danger";
+  burn_status_message: string;
+}
+
+export interface HealthScorePillar {
+  name: string;
+  score: number;
+  max_score: number;
+  feedback: string;
+}
+
+export interface FinancialHealthScoreResponse {
+  score: number;
+  status: "excellent" | "good" | "needs_attention";
+  headline: string;
+  pillars: HealthScorePillar[];
+  recommendations: string[];
+}
+
+export interface SpendingLeakItem {
+  merchant_or_pattern: string;
+  frequency_per_month: number;
+  avg_amount: number | string;
+  monthly_drain: number | string;
+  annualized_drain: number | string;
+  category_name: string;
+  savings_tip: string;
+}
+
+export interface LeakAnalysisResponse {
+  total_monthly_leak: number | string;
+  total_annual_leak: number | string;
+  leaks: SpendingLeakItem[];
+  summary: string;
+}
+
+export interface AuditSubscriptionItem {
+  merchant: string;
+  category_name: string;
+  estimated_amount: number | string;
+  frequency: string;
+  annual_cost: number | string;
+  flag?: string | null;
+  optimization_tip?: string | null;
+}
+
+export interface SubscriptionAuditResponse {
+  total_monthly_commitment: number | string;
+  total_annual_commitment: number | string;
+  active_subscriptions: AuditSubscriptionItem[];
+  duplicate_warnings: string[];
+  potential_annual_savings: number | string;
+  insights: string[];
+}
+
 export const aiApi = {
   categorize: (data: CategorizeRequest) =>
     client.post<DataResponse<CategorizeResponse>>("/ai/categorize", data),
@@ -97,5 +177,21 @@ export const aiApi = {
     formData.append("file", file);
     return client.post<DataResponse<ParseExpenseResponse>>("/ai/scan-receipt", formData);
   },
+
+  simulatePurchase: (data: SimulatePurchaseRequest) =>
+    client.post<DataResponse<SimulatePurchaseResponse>>("/ai/simulate-purchase", data),
+
+  getSafeToSpend: () =>
+    client.get<DataResponse<SafeToSpendResponse>>("/ai/safe-to-spend"),
+
+  getHealthScore: () =>
+    client.get<DataResponse<FinancialHealthScoreResponse>>("/ai/health-score"),
+
+  getLeakAnalysis: (threshold: number = 150) =>
+    client.get<DataResponse<LeakAnalysisResponse>>(`/ai/leak-analysis?threshold=${threshold}`),
+
+  getSubscriptionAudit: () =>
+    client.get<DataResponse<SubscriptionAuditResponse>>("/ai/subscription-audit"),
 };
+
 

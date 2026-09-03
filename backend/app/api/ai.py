@@ -13,10 +13,16 @@ from app.schemas.ai import (
     AIInsightsResponse,
     CategorizeRequest,
     CategorizeResponse,
+    FinancialHealthScoreResponse,
+    LeakAnalysisResponse,
     ParseExpenseRequest,
     ParseExpenseResponse,
     ParseReceiptRequest,
     ParseReceiptResponse,
+    SafeToSpendResponse,
+    SimulatePurchaseRequest,
+    SimulatePurchaseResponse,
+    SubscriptionAuditResponse,
     SuggestBudgetResponse,
 )
 from app.schemas.common import DataEnvelope
@@ -197,4 +203,148 @@ async def scan_receipt(
         payment_methods=payment_methods,
     )
     return {"data": result}
+
+
+@router.post("/simulate-purchase", response_model=DataEnvelope[SimulatePurchaseResponse], status_code=status.HTTP_200_OK)
+async def simulate_purchase(
+    payload: SimulatePurchaseRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Simulate a purchase decision ('Can I Afford This?') against active monthly budgets,
+    category allocations, and daily safe-to-spend burn velocity.
+    """
+    dashboard_service = DashboardService(db)
+    dash_data = await dashboard_service.get_dashboard_data(user_id=current_user.id, period="current_month")
+
+    today = get_current_date()
+    days_elapsed = today.day
+    total_days = calendar.monthrange(today.year, today.month)[1]
+
+    budget_limit = Decimal(dash_data.budget.amount) if dash_data.budget.amount else None
+    total_spent = Decimal(str(dash_data.total_spent))
+
+    # Find category spent if category is supplied
+    category_spent = Decimal("0.00")
+    if payload.category_name:
+        for c in dash_data.category_breakdown:
+            if c.category_name.lower() == payload.category_name.lower():
+                category_spent = Decimal(str(c.total))
+                break
+
+    result = await ai_service.simulate_purchase(
+        amount=payload.amount,
+        category_name=payload.category_name,
+        description=payload.description,
+        total_spent=total_spent,
+        budget_limit=budget_limit,
+        days_elapsed=days_elapsed,
+        total_days=total_days,
+        category_spent=category_spent,
+    )
+    return {"data": result}
+
+
+@router.get("/safe-to-spend", response_model=DataEnvelope[SafeToSpendResponse], status_code=status.HTTP_200_OK)
+async def get_safe_to_spend(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Calculate deterministic daily safe spending allowance and budget depletion date.
+    """
+    dashboard_service = DashboardService(db)
+    dash_data = await dashboard_service.get_dashboard_data(user_id=current_user.id, period="current_month")
+
+    today = get_current_date()
+    days_elapsed = today.day
+    total_days = calendar.monthrange(today.year, today.month)[1]
+
+    budget_limit = Decimal(dash_data.budget.amount) if dash_data.budget.amount else None
+    total_spent = Decimal(str(dash_data.total_spent))
+
+    result = await ai_service.calculate_safe_to_spend(
+        total_spent=total_spent,
+        budget_limit=budget_limit,
+        days_elapsed=days_elapsed,
+        total_days=total_days,
+    )
+    return {"data": result}
+
+
+@router.get("/health-score", response_model=DataEnvelope[FinancialHealthScoreResponse], status_code=status.HTTP_200_OK)
+async def get_financial_health_score(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Get deterministic 0-100 Financial Health Score across Budget Adherence,
+    Savings Velocity, and Category Discipline.
+    """
+    dashboard_service = DashboardService(db)
+    dash_data = await dashboard_service.get_dashboard_data(user_id=current_user.id, period="current_month")
+
+    today = get_current_date()
+    days_elapsed = today.day
+    total_days = calendar.monthrange(today.year, today.month)[1]
+
+    budget_limit = Decimal(dash_data.budget.amount) if dash_data.budget.amount else None
+    total_spent = Decimal(str(dash_data.total_spent))
+    cat_breakdown = [
+        {"category_name": c.category_name, "total": str(c.total), "percentage": c.percentage}
+        for c in dash_data.category_breakdown
+    ]
+
+    result = await ai_service.calculate_health_score(
+        total_spent=total_spent,
+        budget_limit=budget_limit,
+        days_elapsed=days_elapsed,
+        total_days=total_days,
+        category_breakdown=cat_breakdown,
+    )
+    return {"data": result}
+
+
+@router.get("/leak-analysis", response_model=DataEnvelope[LeakAnalysisResponse], status_code=status.HTTP_200_OK)
+async def get_leak_analysis(
+    threshold: Decimal = Query(Decimal("150.00"), description="Maximum amount for micro-spending classification"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Analyze past 90 days for recurring micro-spending leaks and compute annualized impact.
+    """
+    today = get_current_date()
+    date_from = today - timedelta(days=90)
+    expense_repo = ExpenseRepository(db)
+    past_expenses = await expense_repo.get_expenses_for_period(current_user.id, date_from, today)
+
+    result = await ai_service.analyze_spending_leaks(
+        past_expenses=past_expenses,
+        threshold=threshold,
+    )
+    return {"data": result}
+
+
+@router.get("/subscription-audit", response_model=DataEnvelope[SubscriptionAuditResponse], status_code=status.HTTP_200_OK)
+async def get_subscription_audit(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Audit active recurring subscriptions and flag duplicate overlapping services.
+    """
+    today = get_current_date()
+    date_from = today - timedelta(days=90)
+    expense_repo = ExpenseRepository(db)
+    past_expenses = await expense_repo.get_expenses_for_period(current_user.id, date_from, today)
+    recurring_expenses = await expense_repo.get_recurring_expenses(current_user.id)
+
+    result = await ai_service.audit_subscriptions(
+        past_expenses=past_expenses,
+        recurring_expenses=recurring_expenses,
+    )
+    return {"data": result}
+
 
