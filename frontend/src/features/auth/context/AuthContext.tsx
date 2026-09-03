@@ -162,6 +162,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!target) {
       throw new Error("Target account not found in saved accounts list.");
     }
+    if (!target.refreshToken) {
+      throw new Error(
+        `Session credentials missing for ${target.user.email}. Please click "Add" to reconnect this account.`
+      );
+    }
     setIsLoading(true);
     try {
       const res = await authApi.switchAccount(target.refreshToken);
@@ -173,8 +178,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         window.location.href = "/dashboard";
       }
-    } catch (err) {
-      removeSavedAccount(userId);
+    } catch (err: any) {
+      // Only remove if explicitly unauthorized / token revoked
+      if (err?.status === 401 || err?.status === 403) {
+        removeSavedAccount(userId);
+      }
       throw err;
     } finally {
       setIsLoading(false);

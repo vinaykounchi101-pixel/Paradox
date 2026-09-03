@@ -22,6 +22,7 @@ import {
   Check,
   UserPlus,
   Users,
+  Loader2,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -269,14 +270,17 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
                             type="button"
                             disabled={isSwitching}
                             onClick={async () => {
-                              if (!isCurrent) {
-                                setIsSwitching(true);
-                                try {
-                                  await switchAccount(acc.user.id);
-                                } catch (err: any) {
-                                  addToast(err?.message || "Failed to switch account", "error");
-                                  setIsSwitching(false);
-                                }
+                              if (isCurrent) {
+                                addToast(`You are already using ${acc.user.email}`, "info");
+                                setIsProfileMenuOpen(false);
+                                return;
+                              }
+                              setIsSwitching(true);
+                              try {
+                                await switchAccount(acc.user.id);
+                              } catch (err: any) {
+                                addToast(err?.message || "Failed to switch account", "error");
+                                setIsSwitching(false);
                               }
                             }}
                             className={cn(
@@ -299,6 +303,8 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
                             </div>
                             {isCurrent ? (
                               <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                            ) : isSwitching ? (
+                              <Loader2 className="w-3 h-3 text-primary animate-spin shrink-0" />
                             ) : (
                               <span className="text-[10px] text-muted-foreground hover:text-primary shrink-0">
                                 Switch
