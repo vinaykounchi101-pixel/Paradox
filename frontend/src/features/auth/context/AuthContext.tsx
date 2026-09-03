@@ -14,6 +14,7 @@ import {
 } from "@/features/auth/types";
 
 const SAVED_ACCOUNTS_STORAGE_KEY = "paradox_saved_accounts";
+const ACTIVE_USER_STORAGE_KEY = "paradox_active_user_id";
 
 function loadSavedAccounts(): SavedAccount[] {
   if (typeof window === "undefined") return [];
@@ -29,6 +30,26 @@ function persistSavedAccounts(accounts: SavedAccount[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(SAVED_ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+  } catch {}
+}
+
+function getActiveUserId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(ACTIVE_USER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setActiveUserId(userId: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (userId) {
+      localStorage.setItem(ACTIVE_USER_STORAGE_KEY, userId);
+    } else {
+      localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
+    }
   } catch {}
 }
 
@@ -86,31 +107,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const initAuth = useCallback(async () => {
     try {
-      // Attempt silent session restoration using HttpOnly cookie
+      const activeId = getActiveUserId();
+      const saved = loadSavedAccounts();
+      const activeAccount = saved.find((a) => a.user.id === activeId);
+
+      // If we have an explicitly selected active account with a refresh token, restore it
+      if (activeAccount && activeAccount.refreshToken) {
+        try {
+          const res = await authApi.switchAccount(activeAccount.refreshToken);
+          if (res?.user) {
+            setUser(res.user);
+            setActiveUserId(res.user.id);
+            if (res.refresh_token) {
+              saveOrUpdateAccount(res.user, res.refresh_token);
+            }
+            return;
+          }
+        } catch {
+          // Token expired or invalid
+          removeSavedAccount(activeAccount.user.id);
+        }
+      }
+
+      // Default fallback: silent session restoration using HttpOnly cookie
       const data = await authApi.refresh();
       if (data?.user) {
         setUser(data.user);
+        setActiveUserId(data.user.id);
         if (data.refresh_token) {
           saveOrUpdateAccount(data.user, data.refresh_token);
         }
       }
     } catch {
-      // If cookie refresh failed, check if we have saved accounts in localStorage
+      // If cookie refresh failed, check if any saved account has a valid token
       const saved = loadSavedAccounts();
       if (saved.length > 0 && saved[0].refreshToken) {
         try {
           const res = await authApi.switchAccount(saved[0].refreshToken);
           if (res?.user) {
             setUser(res.user);
+            setActiveUserId(res.user.id);
             saveOrUpdateAccount(res.user, res.refresh_token || saved[0].refreshToken);
             return;
           }
         } catch {
-          // Token expired or invalid
           removeSavedAccount(saved[0].user.id);
         }
       }
       setUser(null);
+      setActiveUserId(null);
       setAccessToken(null);
     } finally {
       setIsLoading(false);
@@ -124,6 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (data: LoginRequest): Promise<AuthTokens> => {
     const res = await authApi.login(data);
     setUser(res.user);
+    setActiveUserId(res.user.id);
     if (res.refresh_token) {
       saveOrUpdateAccount(res.user, res.refresh_token);
     }
@@ -133,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (data: RegisterRequest): Promise<AuthTokens> => {
     const res = await authApi.register(data);
     setUser(res.user);
+    setActiveUserId(res.user.id);
     if (res.refresh_token) {
       saveOrUpdateAccount(res.user, res.refresh_token);
     }
@@ -142,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const completeRegistration = async (data: CompleteRegistrationRequest): Promise<AuthTokens> => {
     const res = await authApi.completeRegistration(data);
     setUser(res.user);
+    setActiveUserId(res.user.id);
     if (res.refresh_token) {
       saveOrUpdateAccount(res.user, res.refresh_token);
     }
@@ -151,6 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async (data: GoogleLoginRequest): Promise<AuthTokens> => {
     const res = await authApi.loginWithGoogle(data);
     setUser(res.user);
+    setActiveUserId(res.user.id);
     if (res.refresh_token) {
       saveOrUpdateAccount(res.user, res.refresh_token);
     }
@@ -158,7 +207,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchAccount = async (userId: string): Promise<void> => {
-    const target = savedAccounts.find((a) => a.user.id === userId);
+    const saved = loadSavedAccounts();
+    const target = saved.find((a) => a.user.id === userId);
     if (!target) {
       throw new Error("Target account not found in saved accounts list.");
     }
@@ -171,12 +221,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await authApi.switchAccount(target.refreshToken);
       setUser(res.user);
+      setActiveUserId(res.user.id);
       if (res.refresh_token) {
         saveOrUpdateAccount(res.user, res.refresh_token);
       }
-      // Redirect or reload to flush all cached data cleanly
+      // Force page reload to flush all React Query cache and state unconditionally
       if (typeof window !== "undefined") {
-        window.location.href = "/dashboard";
+        window.location.reload();
       }
     } catch (err: any) {
       // Only remove if explicitly unauthorized / token revoked
@@ -199,9 +250,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentUserId) {
         removeSavedAccount(currentUserId);
       }
-      const remaining = savedAccounts.filter((a) => a.user.id !== currentUserId);
+      const remaining = loadSavedAccounts().filter((a) => a.user.id !== currentUserId);
       if (remaining.length > 0) {
-        // Automatically switch to the next saved account if one exists
+        setActiveUserId(remaining[0].user.id);
         try {
           await switchAccount(remaining[0].user.id);
           return;
@@ -209,6 +260,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // If fallback switch fails, proceed to clear
         }
       }
+      setActiveUserId(null);
       setUser(null);
       setAccessToken(null);
       if (typeof window !== "undefined") {
@@ -223,6 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore network errors during logout
     } finally {
+      setActiveUserId(null);
       setSavedAccounts([]);
       persistSavedAccounts([]);
       setUser(null);
