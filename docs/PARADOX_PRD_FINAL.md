@@ -1,7 +1,7 @@
 # Paradox — Product Requirements Document (PRD)
 
-**Document Version:** 2.1  
-**Status:** Multi-User Production Platform with Multi-Provider AI Intelligence & Smart Automation  
+**Document Version:** 2.2  
+**Status:** Paradox V2 Supercharged Platform (Multi-Currency, Recurring Subscriptions, CSV Statement Import/Export, Multimodal Vision OCR, Financial Copilot & Monthly Health Reports)  
 **Product:** Paradox  
 **Document Purpose:** Define what Paradox solves, why it exists, what users can do, what success looks like, and how the product evolves through clearly defined phases.
 
@@ -198,6 +198,16 @@ Paradox solves the problem through a secure financial tracking loop:
 | FR-22 | Financial records must remain available when the user returns to the product. | P0 |
 | FR-23 | Normal product use must reflect the user's real records rather than fabricated financial data. | P0 |
 | FR-24 | Empty, validation, loading, and failure states should be understandable to a non-technical user. | P0 |
+| FR-AI-01 | The product must provide real-time category recommendations as users enter notes or descriptions. | P1 |
+| FR-AI-02 | The product must support natural language expense parsing ("AI Quick Add") from freeform sentences. | P1 |
+| FR-AI-03 | The product must allow scanning receipt and invoice images via Multimodal Vision OCR to auto-fill records. | P1 |
+| FR-AI-04 | The product must provide an AI Financial Copilot card evaluating burn velocity, period projection, and savings tips. | P1 |
+| FR-CURR-01 | The user must be able to switch and persist their active currency preference (INR ₹, USD $, EUR €, GBP £). | P0 |
+| FR-RECUR-01 | The user must be able to flag expenses as recurring subscriptions (monthly, weekly, yearly). | P1 |
+| FR-RECUR-02 | The dashboard must calculate and display active subscriptions and monthly recurring financial commitments. | P1 |
+| FR-CSV-01 | The user must be able to export their transactions into a standard CSV spreadsheet. | P1 |
+| FR-CSV-02 | The user must be able to import bank statements via CSV with AI auto-categorization of transactions. | P1 |
+| FR-REP-01 | The product must generate a printable / PDF-exportable Monthly Financial Health Report. | P1 |
 
 ---
 
@@ -210,7 +220,7 @@ Paradox solves the problem through a secure financial tracking loop:
 
 ### Simplicity & Usability
 - Main screens (Login, Register, Dashboard, Expenses, Categories, Budget) must be intuitive without external documentation.
-- Recording an expense must take under 30 seconds.
+- Recording an expense must take under 30 seconds (under 5 seconds via AI Quick Add or Receipt Scanner).
 
 ### Accuracy & Reliability
 - Financial calculations use fixed-precision decimal arithmetic.
@@ -225,7 +235,13 @@ Paradox solves the problem through a secure financial tracking loop:
 - Session Management (Auto-Refresh, Secure Logout, Logout from all devices)
 - Self-service Password Recovery (Forgot/Reset Password) and Password Change
 - Strict Row-Level Multi-Tenant Data Isolation
-- Expense CRUD (Create, Read, Update, Delete)
+- Dynamic Multi-Currency System (`₹ INR`, `$ USD`, `€ EUR`, `£ GBP`) with user profile persistence
+- Expense CRUD (Create, Read, Update, Delete) with Recurring Subscriptions support
+- CSV Statement Import with AI categorizer and CSV Export
+- Multimodal Receipt & Invoice Vision OCR Scanner with client-side image optimization
+- AI Quick Add Natural Language Parser & Real-Time Category Inference
+- AI Financial Copilot (burn velocity, period projection, saving insights)
+- Monthly Financial Health Report (Print / PDF)
 - Starter and Custom Categories
 - Starter and Custom Payment Methods
 - Multi-Granularity Budget Planner (Monthly, Weekly, Daily)
@@ -237,9 +253,7 @@ Paradox solves the problem through a secure financial tracking loop:
 ### Out of Scope
 - Role-Based Access Control (RBAC) / Admin systems (all users have equal ownership of only their data)
 - Multi-user shared/joint accounts
-- Bank account direct synchronization / auto-scraping
 - Investment, loan, and tax management
-- AI financial advice or complex forecasting
 - SMS notifications
 
 ---
@@ -343,7 +357,7 @@ Deliver a production-ready, multi-user application with secure authentication, s
 
 ---
 
-## Phase 4 — AI Financial Intelligence & Smart Automation (Active)
+## Phase 4 — AI Financial Intelligence & Smart Automation (Completed & Live)
 
 ### Objective
 
@@ -354,51 +368,57 @@ Accelerate the expense logging loop and empower users with proactive, intelligen
 1. **Multi-Provider AI Service Layer**:
    - Zero hardcoding, 100% environment-driven provider auto-detection (`AI_PROVIDER=auto|gemini|openai|anthropic`).
    - Dynamic credentials support (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `AI_MODEL`).
-   - Automatic offline fallback to built-in semantic keyword heuristic engine, guaranteeing zero downtime and offline resilience without external dependencies.
+   - Upgraded to **Google Gemini 3.6 Flash** Vision & text models with automatic offline fallback to built-in semantic keyword heuristic engine, guaranteeing zero downtime and offline resilience without external dependencies.
 2. **Intelligent Financial Categorization Recommendations**:
    - Analyzes expense note/merchant descriptions (e.g., *"Starbucks iced latte"*, *"HP Petrol pump"*, *"Swiggy dinner"*) and scores the best-matching user category with confidence ratings and reasoning.
    - Frontend integrates debounced real-time suggestions below description input with 1-click apply action.
 3. **Natural Language Expense Parser ("AI Quick Add")**:
-   - Users can type or speak freeform sentences (e.g. *"Paid 450 for Zomato pizza via UPI yesterday"* or *"Metro card recharge 100 cash"*).
-   - AI extracts structured values: `amount`, `category`, `payment_method`, `date`, and `description`, instantly pre-filling the expense modal in under 3 seconds.
-
-### Upcoming AI Features Roadmap
-
-1. **AI Financial Copilot & Smart Insights Widget**:
+   - Users can type or speak freeform sentences (e.g. *"Paid 1000 for a new gaming mouse via upi 2 days ago"* or *"Starbucks coffee 250 cash"*).
+   - Resolves relative date references (`N days ago`, `yesterday`, `N weeks ago`, `N months ago`).
+   - AI extracts structured values: `amount`, `category`, `payment_method`, `date`, and `description`, pre-filling the expense modal in ~1 second.
+4. **AI Financial Copilot & Smart Insights Card**:
    - Proactive dashboard card delivering actionable spending analysis:
-     - *Overspending Anomalies*: Alerts when category spending exceeds historical weekly averages by >30%.
-     - *Budget Breach Forecasting*: Real-time burn-rate projection calculating date of potential budget exhaustion.
+     - *Health Status*: Evaluates spending velocity against budget limits (`Healthy`, `Warning`, `Critical`).
+     - *Daily Burn Velocity*: Calculates real-time daily burn rate (`₹XXX / day`).
+     - *Projected Period Total*: Real-time burn-rate projection calculating date of potential budget exhaustion.
      - *Smart Saving Tips*: Personalized micro-recommendations based on discretionary spending patterns.
-2. **Predictive Budget Recommender**:
-   - Automated recommendation of optimal Monthly, Weekly, and Daily budget limits derived from historical 30–60 day spending data with a customizable safety buffer.
-3. **Smart Receipt & Invoice Scanner (OCR + Multimodal LLM)**:
-   - Upload receipts, bills, and payment slips (JPEG/PNG/PDF).
-   - AI scans document text, merchant identity, line-item totals, tax, and date, auto-populating expense records with image attachment reference.
-4. **Conversational Spending Assistant**:
-   - Natural language query interface allowing users to ask conversational questions about their finances (e.g. *"How much have I spent on coffee this month compared to last month?"*).
+5. **Multimodal Receipt & Invoice Vision OCR Scanner**:
+   - Camera/photo upload for receipts and bills.
+   - Client-side HTML5 canvas downscaler compresses 5MB-10MB camera photos in ~50ms to ~120KB, eliminating upload timeouts.
+   - Gemini 3.6 Flash Vision parses merchant, total amount, transaction date, category, and payment method, auto-filling all fields in seconds.
 
 ---
 
-## Phase 5 — Production-Ready Enterprise Hardening
+## Phase 5 — Paradox V2 Supercharged Financial Suite (Completed & Live)
 
 ### Objective
 
-Enterprise-grade resilience, multi-factor authentication (MFA), and transactional email delivery.
+Deliver advanced financial power tools: multi-currency, recurring subscriptions, bank statement CSV processing, and exportable financial health reports.
 
-### Product focus
+### Implemented Capabilities
 
-- Multi-factor authentication (TOTP / SMS)
-- Real transactional email dispatch via Brevo/Resend/SMTP for password resets and verification
-- Redis-backed distributed session cache
-- Advanced audit logging
+1. **Dynamic Multi-Currency System (`₹ INR`, `$ USD`, `€ EUR`, `£ GBP`)**:
+   - Persistent user preference stored in `users.currency` table and updated via `PATCH /api/v1/auth/me`.
+   - Global reactive `CurrencyContext` with Topbar switcher.
+   - Re-formats all monetary values across Dashboard, Expense lists, charts, and Copilot.
+2. **Intelligent Bank Statement CSV Import & Export**:
+   - Flexible CSV statement parser discovering Date, Debit Amount, and Narration columns.
+   - AI auto-categorizer classifies imported transactions in bulk without manual tagging.
+   - One-click full CSV transaction export.
+3. **Recurring Expenses & Fixed Bills Tracker**:
+   - Tags expenses as recurring with frequency options (`monthly`, `weekly`, `yearly`).
+   - Dashboard widget displaying active subscription count and normalized monthly commitments.
+4. **Monthly Financial Health Report**:
+   - Clean printable report modal summarizing period totals, category allocations, budget adherence %, and recurring commitments with 1-click "Print / Save PDF" support.
 
 ---
 
 ## Phase 6 — Long-Term Product Evolution
 
-- Multi-currency support and localized conversion
-- Optional third-party financial service and banking integrations
-- Export reports (CSV / PDF / Excel)
+- Automated bank sync (account aggregator APIs)
+- Advanced predictive forecasting & year-over-year analytics
+- Multi-factor authentication (TOTP / Authenticator App)
+- Mobile native apps (React Native / Flutter)
 
 ---
 
@@ -407,12 +427,13 @@ Enterprise-grade resilience, multi-factor authentication (MFA), and transactiona
 The primary user journey for an authenticated Paradox user:
 
 1. **Access**: User visits Paradox, registers or signs in (Email/Password or Google).
-2. **Onboard**: The user's private dashboard loads with default starter categories and empty state guidance.
-3. **Record**: User quickly logs an expense (Amount, Category, Payment Method, Date, Note) in under 30 seconds.
-4. **Organize**: User creates custom categories or payment methods as needed.
+2. **Onboard**: The user's private dashboard loads with default starter categories, currency preference, and empty state guidance.
+3. **Record**: User logs an expense manually, via Natural Language AI Quick Add, or by scanning a receipt photo.
+4. **Organize**: User creates custom categories, payment methods, or tags recurring subscriptions.
 5. **Plan**: User configures Monthly, Weekly, or Daily budgets.
-6. **Understand**: User views real-time totals, category breakdowns, and budget meters.
-7. **Secure**: User can manage sessions, change passwords, or log out from all devices.
+6. **Understand**: User views real-time totals, category breakdowns, budget meters, and AI Copilot burn velocity.
+7. **Audit & Export**: User exports CSV statements, imports bank records, or generates a Monthly Financial Health Report.
+8. **Secure**: User can manage sessions, change passwords, or log out from all devices.
 
 ---
 
@@ -423,7 +444,7 @@ Paradox is functionally complete when:
 - [x] A user can register, log in with password, or sign in via Google.
 - [x] Sessions refresh automatically in the background without interrupting the user.
 - [x] Logging out or logging out from all devices invalidates active sessions.
-- [x] A user can record, edit, and delete expenses in under 30 seconds.
+- [x] A user can record, edit, and delete expenses in under 30 seconds (under 5 seconds via AI Quick Add or Scan).
 - [x] Expenses can be reviewed across date ranges, searched by keyword, filtered by category, and sorted.
 - [x] Users can define and track Monthly, Weekly, and Daily budgets.
 - [x] All data is strictly isolated: User A cannot see or mutate User B's data.
@@ -431,6 +452,11 @@ Paradox is functionally complete when:
 - [x] Responsive layout works seamlessly across mobile, tablet, and desktop.
 - [x] Intelligent financial categorization recommendations suggest relevant categories based on notes/descriptions.
 - [x] Natural language expense parser ("AI Quick Add") extracts structured fields from freeform sentences in under 3 seconds.
+- [x] Multimodal Vision OCR receipt scanner reads bill photos and auto-fills the expense form in ~1-2 seconds.
+- [x] Multi-currency selector allows switching between INR ₹, USD $, EUR €, and GBP £ with persistent formatting.
+- [x] Recurring subscriptions can be tracked with monthly financial commitment calculations.
+- [x] Transactions can be exported to CSV, and bank statement CSVs can be imported with AI categorization.
+- [x] Monthly Financial Health Reports can be viewed and printed or saved to PDF.
 - [x] Multi-provider AI engine dynamically detects Gemini, OpenAI, Claude, or falls back to offline semantic heuristics.
 
 ---
@@ -440,7 +466,7 @@ Paradox is functionally complete when:
 ## 17.1 Primary Success Indicators
 
 - User onboarding and login completion rate > 95%.
-- Average time to log an expense reduced from under 30 seconds to **under 5 seconds** via AI Quick Add.
+- Average time to log an expense reduced from under 30 seconds to **under 5 seconds** via AI Quick Add or Vision OCR Scan.
 - 0 incidents of cross-tenant data leakage.
 - Active weekly habit retention.
 
@@ -464,9 +490,9 @@ Paradox is functionally complete when:
 | **Phase 1** | Validate core expense loop | Single-user MVP | **Completed** |
 | **Phase 2** | Multi-granularity budgeting & PWA | Refined Budget Planner & Mobile UX | **Completed** |
 | **Phase 3** | Multi-user foundation & Auth | JWT + Google OAuth + Strict Data Isolation | **Completed** |
-| **Phase 4** | AI Financial Intelligence & Smart Automation | Multi-Provider AI (Gemini/OpenAI/Claude), Smart Categorization, AI Quick Add, Financial Copilot | **Active / Implemented** |
-| **Phase 5** | Production hardening | MFA, Transactional Email (Brevo/Resend/SMTP), distributed caching | **Active** |
-| **Phase 6** | Broader financial expansion | Multi-currency, banking integrations, advanced exports | Future |
+| **Phase 4** | AI Financial Intelligence & Smart Automation | Multi-Provider AI (Gemini 3.6 Flash / OpenAI / Claude), AI Quick Add, Smart Categorization, Copilot | **Completed & Live** |
+| **Phase 5** | Paradox V2 Supercharged Financial Suite | Multi-Currency (`₹`, `$`, `€`, `£`), Recurring Subscriptions, CSV Statement Import/Export, Receipt Vision OCR, Health Reports | **Completed & Live** |
+| **Phase 6** | Broader Financial Expansion | Open banking aggregators, predictive forecasting, native mobile | Future |
 
 ---
 

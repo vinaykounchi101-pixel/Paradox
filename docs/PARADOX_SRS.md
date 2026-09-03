@@ -1,10 +1,10 @@
 # Paradox — Software Requirements Specification (SRS)
 
-**Document Version:** 2.1
-**Status:** Final — Ready for Implementation (Authentication, Multi-Tenant Data Isolation & AI Financial Intelligence)
+**Document Version:** 2.2
+**Status:** Final — Paradox V2 Supercharged Platform (Multi-Currency, Recurring Subscriptions, CSV Statement Import/Export, Multimodal Vision OCR & Financial Health Reports)
 **Product:** Paradox
-**Source of Truth (Product):** `PARADOX_PRD_FINAL.md` (v2.1)
-**Source of Truth (Technical Decisions):** `PARADOX_SRS_CLAUDE_PROMPT.md`, Production Auth Specification & AI Engine Spec
+**Source of Truth (Product):** `PARADOX_PRD_FINAL.md` (v2.2)
+**Source of Truth (Technical Decisions):** `PARADOX_SRS_CLAUDE_PROMPT.md`, Production Auth Specification, AI Engine Spec & V2 Supercharged Financial Architecture
 **Guiding Principle:** Secure, robust, multi-tenant user data isolation with zero trust in frontend identity, maintaining simplicity, performance, and non-intrusive AI assistance.
 
 ---
@@ -15,9 +15,9 @@
 |---|---|
 | Document Type | Software Requirements Specification |
 | Product | Paradox — Personal Expense Tracker |
-| Phase Covered | Phase 1 to Phase 4 (Authentication, Isolation, Multi-Granularity Budgeting & AI Financial Intelligence) |
-| Authoritative Product Spec | PARADOX_PRD_FINAL.md (v2.1) |
-| Authoritative Technical Decisions | PARADOX_SRS_CLAUDE_PROMPT.md, Auth Spec & AI Engine Spec |
+| Phase Covered | Phase 1 to Phase 5 (Authentication, Isolation, Multi-Granularity Budgeting, AI Financial Intelligence & V2 Supercharged Financial Suite) |
+| Authoritative Product Spec | PARADOX_PRD_FINAL.md (v2.2) |
+| Authoritative Technical Decisions | PARADOX_SRS_CLAUDE_PROMPT.md, Auth Spec, AI Engine Spec & V2 Financial Architecture |
 | Intended Consumer | Development team / AI coding agent (e.g. Antigravity) |
 | Out-of-date Policy | Any change to product scope must first be reflected in the PRD, then propagated here |
 
@@ -29,6 +29,7 @@
 | 1.1 | Narrowed V1 expense filtering to a single dimension (date OR category, not combined — Section 3.4.1); added explicit default-vs-custom create/edit/delete rule tables for categories (3.2.1) and payment methods (3.3.1); added frontend server-state management approach (11.8, TanStack Query); added CI/CD pipeline (20.6); expanded baseline security threat-category coverage (14.1: XSS, SQL injection, CSRF, secure headers, CORS, secret management); added database connection pooling, concurrency-control scoping, and idempotent-seeding clarifications (6.5); reinforced the three-layer validation principle (9.1); added Design System cross-reference (11.1) without duplicating visual rules; strengthened environment-file/secret-handling language (19.3); confirmed Zod as an explicit frontend dependency for schema validation (2.2, 9.2). |
 | 2.0 | Added production-ready Authentication Layer & Row-Level Multi-Tenant Data Isolation. Specified JWT authentication with short-lived access tokens (15 mins) and long-lived rotated refresh tokens (7–30 days) stored in HttpOnly, Secure, SameSite cookies with server-side SHA-256 token hashing; Google Sign-In via OAuth 2.0 / OpenID Connect with backend token verification and account linking; user registration, email/password login, forgot/reset password, change password, single session logout, and logout from all devices; added `refresh_tokens` and `password_reset_tokens` tables; updated `users`, `expenses`, `budgets`, `categories`, and `payment_methods` with mandatory `user_id` foreign keys and composite period constraints; established authoritative backend authorization (`get_current_user` SecurityContext) with zero trust in client-supplied user identifiers across all endpoints; added authentication rate limiting and CSRF protection. |
 | 2.1 | Added Multi-Provider AI Financial Recommendation & Natural Language Expense Parsing Engine (supporting Google Gemini, OpenAI, Anthropic Claude, and resilient offline semantic heuristics). Added API endpoints `POST /api/v1/ai/categorize` and `POST /api/v1/ai/parse-expense` with zero-trust authenticated user scoping; added frontend AI Quick-Add and real-time category suggestion chips to `ExpenseFormDialog`; documented upcoming AI capabilities roadmap (AI Financial Copilot, Predictive Budget Recommender, Receipt OCR Scanner). |
+| 2.2 | Added Paradox V2 Supercharged Financial Suite: Dynamic Multi-Currency System (`₹ INR`, `$ USD`, `€ EUR`, `£ GBP`) via user profile preferences (`PATCH /api/v1/auth/me`) and reactive `CurrencyContext`; Recurring Subscriptions tracking (`is_recurring`, `recurring_frequency`, and `GET /api/v1/expenses/recurring`); CSV Export (`GET /api/v1/expenses/export`) and Intelligent Bank Statement Import (`POST /api/v1/expenses/import`) with automated column discovery and bulk AI categorization; Multimodal Receipt & Invoice Vision OCR Scanner (`POST /api/v1/ai/scan-receipt`) with Google Gemini 3.6 Flash Vision and client-side canvas pre-scaler; Monthly Financial Health Report generation with print/PDF export; upgraded primary AI model routing from deprecated `gemini-1.5-flash` to `gemini-3.6-flash`. |
 
 ---
 
@@ -42,17 +43,22 @@ This document is written so that a developer or an AI coding agent can implement
 
 ## 1.2 Scope
 
-This SRS covers **Paradox with Secure Production-Ready Authentication, Multi-Tenant User Isolation & AI Financial Intelligence**. It documents:
+This SRS covers **Paradox with Secure Production-Ready Authentication, Multi-Tenant User Isolation, AI Financial Intelligence & V2 Supercharged Suite**. It documents:
 
 - User Registration, Email/Password Login, and Google OAuth 2.0 / OpenID Connect Sign-In
 - JWT-based authentication: Short-lived access tokens (15 mins) and HttpOnly rotated refresh tokens (7–30 days)
 - Server-side refresh token revocation, secure single-session logout, and logout from all devices
 - Forgot password, reset password, and change password flows
 - Strict row-level multi-tenant user data isolation across all resources
-- Multi-Provider AI Engine supporting Google Gemini, OpenAI, Anthropic Claude, and offline keyword heuristics
+- Dynamic Multi-Currency System (`₹ INR`, `$ USD`, `€ EUR`, `£ GBP`) with user profile preference persistence
+- Recurring Subscriptions and Fixed Bills tracking (`is_recurring`, `recurring_frequency`, commitment aggregation)
+- Full CSV transaction export and intelligent bank statement CSV import with bulk AI categorization
+- Multimodal Receipt & Invoice Vision OCR Scanner with client-side canvas downscaler
+- Multi-Provider AI Engine supporting Google Gemini 3.6 Flash, OpenAI, Anthropic Claude, and offline keyword heuristics
 - Intelligent Financial Categorization Recommendations (`POST /api/v1/ai/categorize`)
 - Natural Language Expense Parsing ("AI Quick Add") (`POST /api/v1/ai/parse-expense`)
-- Planned AI features roadmap (Financial Copilot insights, Predictive Budget Planner, Receipt OCR scanner)
+- AI Financial Copilot insights (`GET /api/v1/ai/insights`) and Dynamic Budget Advisor (`GET /api/v1/ai/suggest-budget`)
+- Monthly Financial Health Report generation with printable / PDF export
 - Expense creation, viewing, editing, deletion scoped strictly to the authenticated user
 - Starter and custom categories with user-scoping for custom entries
 - Payment methods with user-scoping for custom entries
@@ -64,7 +70,7 @@ This SRS covers **Paradox with Secure Production-Ready Authentication, Multi-Ten
 - Responsive web frontend with route protection and automatic token refresh
 - Local development and deployment topology
 
-This SRS does **not** cover RBAC/admin roles (each user has equal ownership over only their own data), notifications/reminders, bank integrations, or multi-currency.
+This SRS does **not** cover RBAC/admin roles (each user has equal ownership over only their own data), notifications/reminders, or direct banking aggregator APIs.
 
 ## 1.3 Definitions, Acronyms, and Abbreviations
 
@@ -471,6 +477,7 @@ PostgreSQL
 | google_id | VARCHAR(255) | NULL, UNIQUE, index |
 | display_name | VARCHAR(100) | NOT NULL, default `'User'` |
 | avatar_url | VARCHAR(512) | NULL |
+| currency | VARCHAR(10) | NOT NULL, default `'INR'` |
 | is_verified | BOOLEAN | NOT NULL, default `true` |
 | created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 | updated_at | TIMESTAMPTZ | NOT NULL, default `now()` |
@@ -538,10 +545,12 @@ Same protection and ownership rules as `categories`.
 | payment_method_id | UUID | NOT NULL, FK → `payment_methods.id` (`ON DELETE RESTRICT`) |
 | date | DATE | NOT NULL, application-level `CHECK`: not later than current date |
 | description | VARCHAR(255) | NULL |
+| is_recurring | BOOLEAN | NOT NULL, default `false` |
+| recurring_frequency | VARCHAR(20) | NULL |
 | created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 | updated_at | TIMESTAMPTZ | NOT NULL, default `now()` |
 
-**Indexes**: `idx_expenses_user_id`, `idx_expenses_date`, `idx_expenses_category_id`, `idx_expenses_payment_method_id`, composite `idx_expenses_user_date` (`user_id`, `date`), composite `idx_expenses_user_category` (`user_id`, `category_id`).
+**Indexes**: `idx_expenses_user_id`, `idx_expenses_date`, `idx_expenses_category_id`, `idx_expenses_payment_method_id`, `idx_expenses_is_recurring`, composite `idx_expenses_user_date` (`user_id`, `date`), composite `idx_expenses_user_category` (`user_id`, `category_id`).
 
 ### 6.2.7 `budgets`
 
@@ -694,6 +703,20 @@ This satisfies FR-08 ("Category removal must not make existing expense records u
 - **Success**: `200 OK`, returns `UserRead`.
 - **Errors**: `401 Unauthorized`.
 
+### `PATCH /api/v1/auth/me`
+- **Purpose**: Update profile preferences for the currently authenticated user (e.g. `currency`, `display_name`).
+- **Headers**: `Authorization: Bearer <token>`.
+- **Request body**:
+```json
+{
+  "display_name": "Alex",
+  "currency": "INR"
+}
+```
+- **Validation**: `currency` must be one of `INR`, `USD`, `EUR`, `GBP`; `display_name` optional (1–100 chars).
+- **Success**: `200 OK`, returns updated `UserRead`.
+- **Errors**: `401 Unauthorized`, `422 Unprocessable Entity`.
+
 ### `POST /api/v1/auth/forgot-password`
 - **Purpose**: Request a password reset token.
 - **Request body**: `{ "email": "user@example.com" }`
@@ -743,10 +766,12 @@ All expense endpoints require `Authorization: Bearer <token>` and operate strict
   "category_id": "uuid",
   "payment_method_id": "uuid",
   "date": "2026-08-20",
-  "description": "Lunch"
+  "description": "Lunch",
+  "is_recurring": false,
+  "recurring_frequency": null
 }
 ```
-- **Validation**: `amount > 0`; `date <= today`; `category_id` and `payment_method_id` must reference valid categories/methods (system default or user-owned); `description` optional (≤ 255 chars).
+- **Validation**: `amount > 0`; `date <= today`; `category_id` and `payment_method_id` must reference valid categories/methods (system default or user-owned); `description` optional (≤ 255 chars); `is_recurring` boolean; `recurring_frequency` optional string (`monthly`, `weekly`, `yearly`).
 - **Success**: `201 Created`, returns `ExpenseRead` (with `user_id = current_user.id`).
 - **Errors**: `401 Unauthorized`; `422 Validation Error`; `404` if referenced category/method not found.
 
@@ -754,6 +779,47 @@ All expense endpoints require `Authorization: Bearer <token>` and operate strict
 - **Purpose**: List authenticated user's expenses with search, filter, sort, pagination.
 - **Query parameters**: `search`, `category_id`, `date_from`, `date_to`, `sort_by` (`date` | `amount` | `category`), `sort_order` (`asc` | `desc`), `page`, `page_size`.
 - **Success**: `200 OK`, returns paginated envelope scoped strictly to `current_user.id`.
+
+### `GET /api/v1/expenses/recurring`
+- **Purpose**: Retrieve active recurring subscription expenses and aggregate total monthly commitment for the authenticated user.
+- **Success**: `200 OK`.
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "description": "Netflix Subscription",
+        "amount": "649.00",
+        "recurring_frequency": "monthly",
+        "category_name": "Entertainment"
+      }
+    ],
+    "total_monthly_commitment": "649.00"
+  }
+}
+```
+
+### `GET /api/v1/expenses/export`
+- **Purpose**: Stream full filtered expense history as a standard CSV file.
+- **Query parameters**: `start_date`, `end_date`, `category_id`.
+- **Response**: `200 OK`, `Content-Type: text/csv; charset=utf-8`, attachment filename `expenses_export_YYYY-MM-DD.csv`. Columns: `ID,Date,Amount,Description,Category,Payment Method,Is Recurring,Recurring Frequency,Created At`.
+
+### `POST /api/v1/expenses/import`
+- **Purpose**: Import bank statement CSV with intelligent column mapping and bulk AI auto-categorization.
+- **Content-Type**: `multipart/form-data`
+- **Form payload**: `file: UploadFile` (CSV file up to 10MB).
+- **Behavior**: Auto-discovers Date, Amount (withdrawal/debit), and Narration headers. Applies AI/heuristic categorization to each row and bulk-inserts to the authenticated user's account in a single transaction.
+- **Success**: `200 OK`.
+```json
+{
+  "data": {
+    "imported_count": 42,
+    "failed_count": 0,
+    "message": "Successfully imported 42 expenses from statement"
+  }
+}
+```
 
 ### `GET /api/v1/expenses/{expense_id}`
 - **Purpose**: Retrieve a single expense by ID.
@@ -848,7 +914,122 @@ Follows the identical pattern as Categories:
 
 ---
 
-## 7.8 System
+## 7.8 AI Subsystem Endpoints (`/api/v1/ai`)
+
+All AI endpoints require `Authorization: Bearer <token>` and operate with zero-trust authenticated user scoping.
+
+### `POST /api/v1/ai/categorize`
+- **Purpose**: Real-time context-aware category suggestion from a note or merchant description.
+- **Request body**:
+```json
+{
+  "description": "Starbucks iced caramel macchiato",
+  "available_categories": ["Food & Dining", "Transportation", "Shopping"]
+}
+```
+- **Success**: `200 OK`.
+```json
+{
+  "data": {
+    "category_name": "Food & Dining",
+    "confidence": 0.95,
+    "reasoning": "Starbucks represents food and beverage dining",
+    "provider_used": "gemini"
+  }
+}
+```
+
+### `POST /api/v1/ai/parse-expense`
+- **Purpose**: Parse freeform natural language sentences ("AI Quick Add") into structured expense fields.
+- **Request body**:
+```json
+{
+  "text": "Paid 1000 for a new gaming mouse via upi 2 days ago"
+}
+```
+- **Success**: `200 OK`.
+```json
+{
+  "data": {
+    "amount": "1000.00",
+    "category_name": "Shopping",
+    "payment_method_name": "UPI",
+    "date": "2026-09-01",
+    "description": "A new gaming mouse",
+    "confidence": 0.94,
+    "reasoning": "Purchased hardware accessory via UPI two days ago",
+    "provider_used": "gemini"
+  }
+}
+```
+
+### `POST /api/v1/ai/scan-receipt`
+- **Purpose**: Multimodal Vision OCR extraction from uploaded receipt and invoice images.
+- **Content-Type**: `multipart/form-data`
+- **Form payload**: `file: UploadFile` (Image binary, auto-downscaled client-side via canvas to ≤1280px).
+- **Backend Model**: Google **Gemini 3.6 Flash** Vision API (`gemini-flash-latest` fallback).
+- **Success**: `200 OK`.
+```json
+{
+  "data": {
+    "amount": "1250.50",
+    "category_name": "Food & Dining",
+    "payment_method_name": "UPI",
+    "date": "2026-09-03",
+    "description": "Dominos Pizza",
+    "confidence": 0.96,
+    "reasoning": "Scanned with Gemini Vision OCR (gemini-3.6-flash)",
+    "provider_used": "gemini-vision"
+  }
+}
+```
+
+### `GET /api/v1/ai/insights`
+- **Purpose**: Financial Copilot analytics evaluating spend velocity, budget exhaustion, and tailored savings suggestions.
+- **Query parameters**: `period` (`current_month`, `last_30_days`, `current_week`).
+- **Success**: `200 OK`.
+```json
+{
+  "data": {
+    "status": "healthy",
+    "period": "current_month",
+    "daily_burn_velocity": "450.00",
+    "projected_total": "13500.00",
+    "observations": ["Discretionary spending is well within budget limits"],
+    "alerts": [],
+    "savings_tips": ["Setting aside 15% of your entertainment budget can save 2,000 this month"],
+    "generated_at": "2026-09-03T14:30:00Z"
+  }
+}
+```
+
+### `GET /api/v1/ai/suggest-budget`
+- **Purpose**: Dynamic AI Budget Advisor calculating recommended limits based on user historical burn rates.
+- **Query parameters**: `period_type` (`month`, `week`, `day`).
+- **Success**: `200 OK`.
+```json
+{
+  "data": {
+    "recommended_amount": "25000.00",
+    "period_type": "month",
+    "reasoning": "Based on average monthly expenditure of 22,000 plus a 12% safety buffer",
+    "category_breakdown": {
+      "Food & Dining": "8000.00",
+      "Groceries": "6000.00",
+      "Bills & Utilities": "4000.00"
+    }
+  }
+}
+```
+
+### `POST /api/v1/ai/parse-receipt`
+- **Purpose**: Text-based multi-line receipt or bank transaction SMS alert parser.
+- **Request body**: `{ "text": "HDFC Bank: Rs 500 debited from a/c ... on 02-Sep-26 to SWIGGY" }`
+- **Success**: `200 OK`, returns structured merchant, amount, date, and line items.
+
+---
+
+## 7.9 System
 
 ### `GET /api/v1/health`
 - **Purpose**: Liveness/readiness check (public endpoint, no auth required).
