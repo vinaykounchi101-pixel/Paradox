@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import auth, budget, categories, dashboard, expenses, health, payment_methods
+from app.api import ai, auth, budget, categories, dashboard, expenses, health, payment_methods
 
 api_router = APIRouter()
 
@@ -12,3 +12,4 @@ api_router.include_router(categories.router, prefix="/categories", tags=["catego
 api_router.include_router(payment_methods.router, prefix="/payment-methods", tags=["payment-methods"])
 api_router.include_router(budget.router, prefix="/budget", tags=["budget"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(ai.router)

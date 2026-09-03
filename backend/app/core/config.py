@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: Union[str, None] = None
     SMTP_FROM_NAME: str = "Paradox Expense Tracker"
 
+    # AI Configuration (Supports Google Gemini, OpenAI, and Anthropic Claude)
+    AI_PROVIDER: str = "auto"  # "auto", "gemini", "openai", or "anthropic"
+    GEMINI_API_KEY: Union[str, None] = None
+    OPENAI_API_KEY: Union[str, None] = None
+    ANTHROPIC_API_KEY: Union[str, None] = None
+    AI_MODEL: Union[str, None] = None  # Optional custom model override
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_url(cls, v: str) -> str:

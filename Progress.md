@@ -83,7 +83,21 @@ Paradox/
 
 ---
 
-## 4. Multi-Granularity Budget System
+## 4. Phase 4: Multi-Provider AI Financial Intelligence & Smart Automation
+- **Multi-Provider AI Service Layer**:
+  - `AIService` ([`backend/app/services/ai_service.py`](file:///e:/Projects/Paradox/backend/app/services/ai_service.py)) dynamically auto-detects and connects to **Google Gemini** (`GEMINI_API_KEY`), **OpenAI** (`OPENAI_API_KEY`), or **Anthropic Claude** (`ANTHROPIC_API_KEY`) using asynchronous `httpx` REST APIs.
+  - Zero hardcoding, 100% environment-variable driven (`AI_PROVIDER=auto|gemini|openai|anthropic`).
+  - Resilient offline fallback: If external AI services fail or keys are unconfigured, it automatically falls back to an internal **Semantic Keyword Heuristic Engine** without throwing 500 errors.
+- **REST Endpoints**:
+  - `POST /api/v1/ai/categorize`: Context-aware category recommendation from note/description.
+  - `POST /api/v1/ai/parse-expense`: Natural language sentence parsing into structured amount, category, payment method, date, and description.
+- **Frontend Form Enhancements**:
+  - **AI Quick Add**: Freeform input box in [`ExpenseFormDialog.tsx`](file:///e:/Projects/Paradox/frontend/src/features/expenses/components/ExpenseFormDialog.tsx) for 1-click parsing.
+  - **Live Category Recommendation**: Debounced suggestion badge under description input with 1-click apply.
+
+---
+
+## 5. Multi-Granularity Budget System
 - **Budgeting Granularities**:
   - **Monthly**: Target identified by `YYYY-MM` (e.g. `2026-08`).
   - **Weekly**: Target identified by ISO week `YYYY-Www` (e.g. `2026-W35`).
@@ -106,8 +120,9 @@ Paradox/
 
 ---
 
-## 6. Testing & Build Verification
+## 7. Testing & Build Verification
 - **Backend Tests (`pytest`)**:
+  - `tests/unit/test_ai.py`: Multi-provider auto-detection, Gemini/OpenAI/Claude mocks, heuristic parsing, error fallbacks. (PASSED)
   - `tests/unit/test_auth.py`: Password hashing, JWT sign/decode, token rotation, registration/login flows. (PASSED)
   - `tests/unit/test_email.py`: Brevo REST API, Resend REST API, and SMTP email dispatching, unconfigured safety, and provider resolution. (PASSED)
   - `tests/unit/test_pre_registration_verification.py`: Pre-registration token generation, token validation, user creation, and expiry handling. (PASSED)
@@ -115,13 +130,19 @@ Paradox/
   - `tests/unit/test_budget_granularity.py`: Budget schemas across all granularities. (PASSED)
   - `tests/unit/test_budget_status.py`: 90% / 100% budget threshold calculations. (PASSED)
   - `tests/unit/test_money.py`: Monetary rounding and decimal precision. (PASSED)
-  - **Result**: `23 passed in 2.02s` (100% green).
+  - **Result**: `28 passed in 2.25s` (100% green).
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 14 routes (including `/register/complete`).
 
 ---
 
-## 7. Next Session Handoff Notes
+## 8. Next Session Handoff Notes
+- **AI Quick Add & Smart Categorization (Phase 4)**:
+  - Multi-provider support via environment variables: Google Gemini (`GEMINI_API_KEY`), OpenAI (`OPENAI_API_KEY`), Anthropic (`ANTHROPIC_API_KEY`), with heuristic fallback.
+  - Endpoints: `POST /api/v1/ai/categorize` and `POST /api/v1/ai/parse-expense`.
+  - Frontend: Quick Add input bar on `ExpenseFormDialog` with autofill and real-time category suggestion badges.
+  - Sentence parsing cleanses dates, amounts, payment methods, and filler prepositions, strictly leaving the merchant or item name (e.g. `"Paid 450 for Zomato pizza via UPI yesterday"` -> `"Zomato pizza"`).
+  - All 28 backend unit tests pass (including 5 AI tests in `tests/unit/test_ai.py`).
 - **Pre-Registration Email Verification**:
   - Unverified accounts are never created in the database until the email magic link is clicked and validated.
   - Route `/register/complete?token=...` allows verified users to set their Display Name and Password.

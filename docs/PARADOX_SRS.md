@@ -1,11 +1,11 @@
 # Paradox — Software Requirements Specification (SRS)
 
-**Document Version:** 2.0
-**Status:** Final — Ready for Implementation (Authentication & Multi-Tenant User Isolation)
+**Document Version:** 2.1
+**Status:** Final — Ready for Implementation (Authentication, Multi-Tenant Data Isolation & AI Financial Intelligence)
 **Product:** Paradox
-**Source of Truth (Product):** `PARADOX_PRD_FINAL.md` (v1.0)
-**Source of Truth (Technical Decisions):** `PARADOX_SRS_CLAUDE_PROMPT.md` & Production Auth Specification
-**Guiding Principle:** Secure, robust, multi-tenant user data isolation with zero trust in frontend identity, maintaining simplicity and performance.
+**Source of Truth (Product):** `PARADOX_PRD_FINAL.md` (v2.1)
+**Source of Truth (Technical Decisions):** `PARADOX_SRS_CLAUDE_PROMPT.md`, Production Auth Specification & AI Engine Spec
+**Guiding Principle:** Secure, robust, multi-tenant user data isolation with zero trust in frontend identity, maintaining simplicity, performance, and non-intrusive AI assistance.
 
 ---
 
@@ -15,9 +15,9 @@
 |---|---|
 | Document Type | Software Requirements Specification |
 | Product | Paradox — Personal Expense Tracker |
-| Phase Covered | Phase 1 + Authentication & Row-Level Data Isolation |
-| Authoritative Product Spec | PARADOX_PRD_FINAL.md |
-| Authoritative Technical Decisions | PARADOX_SRS_CLAUDE_PROMPT.md & Auth Spec |
+| Phase Covered | Phase 1 to Phase 4 (Authentication, Isolation, Multi-Granularity Budgeting & AI Financial Intelligence) |
+| Authoritative Product Spec | PARADOX_PRD_FINAL.md (v2.1) |
+| Authoritative Technical Decisions | PARADOX_SRS_CLAUDE_PROMPT.md, Auth Spec & AI Engine Spec |
 | Intended Consumer | Development team / AI coding agent (e.g. Antigravity) |
 | Out-of-date Policy | Any change to product scope must first be reflected in the PRD, then propagated here |
 
@@ -28,6 +28,7 @@
 | 1.0 | Initial complete SRS for Phase 1. |
 | 1.1 | Narrowed V1 expense filtering to a single dimension (date OR category, not combined — Section 3.4.1); added explicit default-vs-custom create/edit/delete rule tables for categories (3.2.1) and payment methods (3.3.1); added frontend server-state management approach (11.8, TanStack Query); added CI/CD pipeline (20.6); expanded baseline security threat-category coverage (14.1: XSS, SQL injection, CSRF, secure headers, CORS, secret management); added database connection pooling, concurrency-control scoping, and idempotent-seeding clarifications (6.5); reinforced the three-layer validation principle (9.1); added Design System cross-reference (11.1) without duplicating visual rules; strengthened environment-file/secret-handling language (19.3); confirmed Zod as an explicit frontend dependency for schema validation (2.2, 9.2). |
 | 2.0 | Added production-ready Authentication Layer & Row-Level Multi-Tenant Data Isolation. Specified JWT authentication with short-lived access tokens (15 mins) and long-lived rotated refresh tokens (7–30 days) stored in HttpOnly, Secure, SameSite cookies with server-side SHA-256 token hashing; Google Sign-In via OAuth 2.0 / OpenID Connect with backend token verification and account linking; user registration, email/password login, forgot/reset password, change password, single session logout, and logout from all devices; added `refresh_tokens` and `password_reset_tokens` tables; updated `users`, `expenses`, `budgets`, `categories`, and `payment_methods` with mandatory `user_id` foreign keys and composite period constraints; established authoritative backend authorization (`get_current_user` SecurityContext) with zero trust in client-supplied user identifiers across all endpoints; added authentication rate limiting and CSRF protection. |
+| 2.1 | Added Multi-Provider AI Financial Recommendation & Natural Language Expense Parsing Engine (supporting Google Gemini, OpenAI, Anthropic Claude, and resilient offline semantic heuristics). Added API endpoints `POST /api/v1/ai/categorize` and `POST /api/v1/ai/parse-expense` with zero-trust authenticated user scoping; added frontend AI Quick-Add and real-time category suggestion chips to `ExpenseFormDialog`; documented upcoming AI capabilities roadmap (AI Financial Copilot, Predictive Budget Recommender, Receipt OCR Scanner). |
 
 ---
 
@@ -41,13 +42,17 @@ This document is written so that a developer or an AI coding agent can implement
 
 ## 1.2 Scope
 
-This SRS covers **Paradox with Secure Production-Ready Authentication & Multi-Tenant User Isolation**. It documents:
+This SRS covers **Paradox with Secure Production-Ready Authentication, Multi-Tenant User Isolation & AI Financial Intelligence**. It documents:
 
 - User Registration, Email/Password Login, and Google OAuth 2.0 / OpenID Connect Sign-In
 - JWT-based authentication: Short-lived access tokens (15 mins) and HttpOnly rotated refresh tokens (7–30 days)
 - Server-side refresh token revocation, secure single-session logout, and logout from all devices
 - Forgot password, reset password, and change password flows
 - Strict row-level multi-tenant user data isolation across all resources
+- Multi-Provider AI Engine supporting Google Gemini, OpenAI, Anthropic Claude, and offline keyword heuristics
+- Intelligent Financial Categorization Recommendations (`POST /api/v1/ai/categorize`)
+- Natural Language Expense Parsing ("AI Quick Add") (`POST /api/v1/ai/parse-expense`)
+- Planned AI features roadmap (Financial Copilot insights, Predictive Budget Planner, Receipt OCR scanner)
 - Expense creation, viewing, editing, deletion scoped strictly to the authenticated user
 - Starter and custom categories with user-scoping for custom entries
 - Payment methods with user-scoping for custom entries
@@ -1674,19 +1679,120 @@ See Section 1.3.
 
 A feature or release is considered done when:
 
-- [ ] User registration, email/password login, Google Sign-In, and token refresh are fully functional.
-- [ ] Access Tokens expire in 15 minutes; Refresh Tokens rotate on every refresh call and store only SHA-256 hashes in DB.
-- [ ] Single session logout and "Logout from all devices" correctly revoke token hashes in database and clear cookies.
-- [ ] Strict row-level multi-tenant user data isolation is enforced across all endpoints (`expenses`, `budgets`, `categories`, `payment_methods`).
-- [ ] Attempting to access another user's resources returns `404 Not Found` without data leakage.
-- [ ] Idempotent Alembic migration upgrades schema cleanly.
-- [ ] Pytest unit tests, user isolation tests, and Postman API collection pass 100% green.
-- [ ] Next.js frontend builds cleanly with 0 TypeScript/ESLint warnings and protected routes redirect unauthenticated users to `/login`.
+- [x] User registration, email/password login, Google Sign-In, and token refresh are fully functional.
+- [x] Access Tokens expire in 15 minutes; Refresh Tokens rotate on every refresh call and store only SHA-256 hashes in DB.
+- [x] Single session logout and "Logout from all devices" correctly revoke token hashes in database and clear cookies.
+- [x] Strict row-level multi-tenant user data isolation is enforced across all endpoints (`expenses`, `budgets`, `categories`, `payment_methods`).
+- [x] Attempting to access another user's resources returns `404 Not Found` without data leakage.
+- [x] Idempotent Alembic migration upgrades schema cleanly.
+- [x] Multi-provider AI engine dynamically detects Gemini, OpenAI, Claude, or falls back to offline semantic heuristics.
+- [x] AI categorization recommendation and natural language expense parsing endpoints operate reliably.
+- [x] Pytest unit tests (28/28), user isolation tests, and AI test suites pass 100% green.
+- [x] Next.js frontend builds cleanly with 0 TypeScript/ESLint warnings.
+
+---
+
+# 28. Multi-Provider AI Financial Intelligence & Smart Automation Specification
+
+## 28.1 Architectural Principles & Privacy
+
+1. **Zero Hardcoding & 100% Environment-Driven**: No API keys, model names, or provider endpoints are hardcoded in application logic.
+2. **Multi-Provider Priority & Auto-Detection**:
+   - Supported Providers: **Google Gemini** (`GEMINI_API_KEY`), **OpenAI** (`OPENAI_API_KEY`), **Anthropic Claude** (`ANTHROPIC_API_KEY`), and **Built-in Semantic Heuristics**.
+   - Default mode is `AI_PROVIDER=auto`. Priority order: `Gemini` → `OpenAI` → `Anthropic` → `Heuristic`.
+   - Explicit override: Setting `AI_PROVIDER=gemini|openai|anthropic` forces that engine when the corresponding API key exists.
+3. **Resilience & Zero-Failure Fallback**:
+   - If an external AI provider fails (rate limit, invalid key, network timeout), the backend catches the error and immediately falls back to the internal semantic keyword heuristic engine. End users never receive a 500 Internal Error.
+4. **Data Privacy & Ephemeral Processing**:
+   - Only non-sensitive text strings (expense note/description, category names) are sent to LLM APIs.
+   - User database UUIDs, emails, auth tokens, and account balances are strictly excluded from AI prompts.
+
+## 28.2 REST API Contracts
+
+### 28.2.1 Intelligent Category Recommendation
+* **Endpoint**: `POST /api/v1/ai/categorize`
+* **Security**: Bearer JWT (`current_user = Depends(get_current_user)`)
+* **Request Body** (`CategorizeRequest`):
+  ```json
+  {
+    "description": "Starbucks iced latte with muffin",
+    "available_categories": ["Food & Dining", "Transportation", "Utilities"]
+  }
+  ```
+  *(If `available_categories` is null or empty, backend dynamically retrieves the authenticated user's active categories).*
+* **Response Body** (`DataEnvelope[CategorizeResponse]`):
+  ```json
+  {
+    "data": {
+      "category_name": "Food & Dining",
+      "confidence": 0.95,
+      "reasoning": "Matched restaurant/cafe dining pattern",
+      "provider_used": "gemini"
+    }
+  }
+  ```
+
+### 28.2.2 Natural Language Expense Parsing ("AI Quick Add")
+* **Endpoint**: `POST /api/v1/ai/parse-expense`
+* **Security**: Bearer JWT (`current_user = Depends(get_current_user)`)
+* **Request Body** (`ParseExpenseRequest`):
+  ```json
+  {
+    "text": "Paid 450 for auto rickshaw via UPI yesterday",
+    "available_categories": ["Food & Dining", "Transportation", "Utilities"],
+    "available_payment_methods": ["Cash", "Credit Card", "UPI"]
+  }
+  ```
+* **Response Body** (`DataEnvelope[ParseExpenseResponse]`):
+  ```json
+  {
+    "data": {
+      "amount": "450.00",
+      "category_name": "Transportation",
+      "payment_method_name": "UPI",
+      "date": "2026-09-02",
+      "description": "Auto rickshaw",
+      "confidence": 0.90,
+      "reasoning": "Extracted monetary amount and recognized auto rickshaw as transportation via UPI",
+      "provider_used": "gemini"
+    }
+  }
+  ```
+
+## 28.3 Frontend UX & Form Integration
+
+1. **AI Quick Add Bar**:
+   - Placed at the top of [`ExpenseFormDialog.tsx`](file:///e:/Projects/Paradox/frontend/src/features/expenses/components/ExpenseFormDialog.tsx).
+   - Allows typing or pasting arbitrary text. Pressing "Enter" or clicking "Auto-Fill" queries `/api/v1/ai/parse-expense`.
+   - Pre-fills all matching fields (`amount`, `date`, `category_id`, `payment_method_id`, `description`) in under 3 seconds.
+2. **Debounced Real-Time Category Suggestion**:
+   - Monitored on the `description` input with 400ms debounce.
+   - Shows an interactive badge: `✨ AI Suggests: [Category Name] [Apply]`.
+   - Clicking `[Apply]` updates `category_id` immediately without overwriting other inputs.
+
+## 28.4 Planned AI Feature Specifications (Roadmap)
+
+### 28.4.1 AI Financial Copilot & Smart Insights Widget
+* **Scope**: Proactive dashboard analysis calculating:
+  - *Category Overspending*: Detects when category spend exceeds previous 4-week mean by >30%.
+  - *Budget Burn Rate & Exhaustion Forecast*: Linear regression on daily spend velocity to project exact date when monthly budget will breach 100%.
+  - *Actionable Savings Opportunities*: Highlights recurring small discretionary expenses.
+
+### 28.4.2 Predictive Budget Recommender
+* **Scope**: Evaluates 30–60 day historical expense aggregates scoped to `current_user.id`.
+* **Output**: Generates recommended `monthly`, `weekly`, and `daily` budget limits with a user-adjustable 10%–15% buffer.
+
+### 28.4.3 Smart Receipt & Invoice Scanner (OCR + LLM Multimodal)
+* **Scope**: Multipart image upload (`/api/v1/ai/scan-receipt`).
+* **Processing**: Multimodal vision analysis (Gemini 1.5 Flash Vision / GPT-4o Vision) extracting merchant, total amount, taxes, date, line items, and recommended category.
+
+### 28.4.4 Conversational Spending Assistant
+* **Scope**: In-app conversational chat interface (`/api/v1/ai/chat`) enabling users to query their expense data via natural language (e.g. *"How much did I spend on groceries in August vs July?"*).
 
 ---
 
 ## Document Status
 
-**Version 2.0 — Final, Implementation-Ready SRS for Paradox (Authentication & Row-Level Multi-Tenant Data Isolation).**
+**Version 2.1 — Final, Implementation-Ready SRS for Paradox (Authentication, Multi-Tenant Data Isolation & AI Financial Intelligence).**
 
-This document serves as the authoritative technical source of truth for implementing authentication, session lifecycle, and data isolation in Paradox. All architectural layers and endpoint contracts defined herein are binding.
+This document serves as the authoritative technical source of truth for implementing authentication, session lifecycle, data isolation, and AI capabilities in Paradox. All architectural layers and endpoint contracts defined herein are binding.

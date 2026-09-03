@@ -73,3 +73,15 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Impact**: Docker image size is larger than necessary.
 * **Future Work**:
   - Migrate to a multi-stage Dockerfile: a `builder` stage installs dependencies; a `runtime` stage copies only the necessary artifacts into a minimal base image.
+
+---
+
+## 9. AI Multi-Provider Integration & Natural Language Parser
+* **Status**: **IMPLEMENTED in Phase 4 (AI Quick Add & Smart Categorization)**.
+* **Architecture / Tradeoff**:
+  - `AIService` ([`backend/app/services/ai_service.py`](file:///e:/Projects/Paradox/backend/app/services/ai_service.py)) supports dynamic multi-provider configuration via environment variables: Google Gemini (`GEMINI_API_KEY`), OpenAI (`OPENAI_API_KEY`), and Anthropic Claude (`ANTHROPIC_API_KEY`).
+  - Zero hardcoding: Defaults to heuristic rule-based parsing and category scoring if no keys are provided or if an external API call times out / errors.
+  - Heuristic parser uses regex-based extraction for monetary values, payment methods, relative/absolute dates, and strips action verbs and prepositions to isolate the clean merchant or item name (e.g. `"Paid 450 for Zomato pizza via UPI yesterday"` -> `"Zomato pizza"`).
+* **Future Work**:
+  - Implement caching (Redis / in-memory LRU) for repeated merchant-to-category lookups to minimize external LLM token costs and latency.
+  - Add background rate-limiting and token quota tracking per user session.
