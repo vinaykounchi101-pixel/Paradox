@@ -175,7 +175,17 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Future Work**:
   - Add client-side local NLP or expanded regex packs for international SMS formats (US/UK/EU bank alerts).
 
+---
 
-
-
-
+## 17. Gemini Vision OCR Model Alignment & Dynamic Category Expansion
+* **Status**: **RESOLVED**.
+* **Architecture / Tradeoff**:
+  - Previous versions attempted to call an unverified model identifier (`gemini-3.6-flash`), resulting in HTTP 404 responses from Google's v1beta endpoint and falling back to a `0.00` placeholder amount.
+  - **Resolution**:
+    - Aligned backend Gemini API calls to verified models: `["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]`.
+    - Configured native JSON schema responses (`responseMimeType: "application/json"`).
+    - Hardened numeric regex and date extractors for receipt photos, supporting diverse receipt layouts, currencies (`₹`, `$`, `EUR`), and merchant names.
+    - Enhanced category recommendations: if an expense does not match the user's existing category list, both Gemini and semantic heuristics return `is_new_category: true`, prompting the user with a 1-click `[ + Add & Select ]` inline action that creates and selects the category instantly.
+    - Solved UI overflow in `ExpenseFormDialog` by transitioning the Quick Add container to a 2-tier responsive layout with full-width input and flexible tool badges.
+* **Future Work**:
+  - Add client-side WebAssembly OCR (e.g. Tesseract.js) for 100% offline receipt scanning in PWA mode.

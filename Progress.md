@@ -202,24 +202,45 @@ Paradox/
 
 ---
 
-## 9. Testing & Build Verification
+## 10. Responsive UI, Gemini Receipt OCR Auto-Fill, and Dynamic Category Expansion
+- **Responsive Layout Engine & AI Quick Add Redesign**:
+  - Reorganized `ExpenseFormDialog` into a 2-tier responsive structure:
+    - **Row 1**: 100% width natural language input with embedded Voice Recognition mic inside right edge + `Auto-Fill` primary button.
+    - **Row 2**: Secondary action tools `[ 📷 Scan Bill / Receipt ]` and `[ 💬 Paste Bank SMS ]` in a wrapping container (`flex-wrap gap-2`).
+    - Eliminates all horizontal modal overflow and button squishing on mobile (< 400px) and desktop viewports.
+  - Enhanced `Dialog.tsx` with responsive width scaling (`max-w-lg w-full`), mobile padding (`p-4 sm:p-6`), and safe vertical scroll containment (`max-h-[90vh] overflow-y-auto`).
+  - Wrapped period filter tabs in `DashboardView.tsx` (`flex-wrap sm:flex-nowrap w-full sm:w-auto`).
+- **Gemini Vision Receipt OCR Auto-Fill**:
+  - Aligned model calls to verified Google Generative AI models: `["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]` with `responseMimeType: "application/json"`.
+  - Hardened regex extractors for monetary amounts and dates (ISO, DD-MM-YYYY, DD/MM/YYYY).
+  - Scanning a receipt now immediately populates Amount, Date, Description (merchant/item), Category, and Payment Method.
+- **Dynamic Category Recommendation & 1-Click "Add & Select"**:
+  - Added `is_new_category` detection to Gemini categorization and semantic heuristic engines.
+  - When typing in Description, if the detected category exists in the user's category list, it suggests `AI Suggests: [Category Name] [ Apply ]`.
+  - If the category does not exist yet (e.g. Pets, Healthcare, Fitness, Travel, Subscriptions, Gifts), it displays:
+    `✨ Category "[Name]" doesn't exist yet. [ + Add & Select ] [ ✕ ]`
+  - Clicking `[ + Add & Select ]` creates the category in the backend database via `handleCreateCategory`, updates local category state, selects it immediately, and displays a confirmation toast.
+
+---
+
+## 11. Testing & Build Verification
 - **Backend Tests (`pytest`)**:
-  - `47 passed in 4.03s` (100% green).
-  - Added dedicated test suite [`test_ai_features_phase2.py`](backend/tests/unit/test_ai_features_phase2.py) verifying SMS parsing, duplicate detection, 50/30/20 arithmetic, and achievement streak logic.
+  - `49 passed in 4.42s` (100% green).
+  - Added test coverage in [`test_ai.py`](backend/tests/unit/test_ai.py) for receipt OCR payload extraction and `is_new_category` dynamic recommendations.
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 14 static/dynamic routes.
 
 ---
 
-## 10. Current Session Handoff Notes
-- All features across Phases 1 through 7 are fully operational, tested, and documented.
+## 12. Current Session Handoff Notes
+- All features across Phases 1 through 7, including Responsive Layouts, Gemini Vision OCR, and Category Expansion, are fully operational, tested, and documented.
 - Active servers:
   - Backend: `http://127.0.0.1:8000` (FastAPI + Uvicorn)
   - Frontend: `http://localhost:3000` (Next.js 16 App Router)
 - Database:
   - Latest migration: `a1b2c3d4e5f6` (OTP & is_verified on pending_registration_tokens).
 - Testing:
-  - Backend: `.venv\Scripts\pytest tests/ -q` -> 47/47 passed.
+  - Backend: `.venv\Scripts\pytest tests/ -v` -> 49/49 passed.
   - Frontend: `npm.cmd run build` -> 0 errors.
 - **Documentation & Agent Memory**:
   - `.agents/rules/paradox-architecture.md` & `.agents/rules/paradox-memory.md` maintained as persistent repo memory.

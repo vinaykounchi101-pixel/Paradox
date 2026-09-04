@@ -11,6 +11,7 @@ export interface CategorizeResponse {
   confidence: number;
   reasoning?: string;
   provider_used: string;
+  is_new_category?: boolean;
 }
 
 export interface ParseExpenseRequest {

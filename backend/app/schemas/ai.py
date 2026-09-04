@@ -16,6 +16,7 @@ class CategorizeResponse(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0")
     reasoning: Optional[str] = Field(default=None, description="Brief explanation for the recommendation")
     provider_used: str = Field(..., description="AI provider used (gemini, openai, anthropic, or heuristic)")
+    is_new_category: bool = Field(default=False, description="True if the category is newly recommended and not currently in available_categories")
 
 
 class ParseExpenseRequest(BaseModel):

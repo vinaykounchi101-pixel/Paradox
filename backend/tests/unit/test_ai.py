@@ -245,3 +245,69 @@ async def test_ai_parse_receipt():
     assert res.total_amount == Decimal("429.00")
     assert len(res.items) >= 2
 
+
+@pytest.mark.asyncio
+async def test_categorize_suggests_new_category_when_not_in_user_categories():
+    service = AIService()
+    service.gemini_key = None
+
+    # User only has Food & Dining and Transportation
+    user_cats = ["Food & Dining", "Transportation"]
+
+    # Expense is for a pet
+    res_pet = await service.categorize_expense("Bought pedigree dog food from pet shop", available_categories=user_cats)
+    assert res_pet.category_name == "Pets"
+    assert res_pet.is_new_category is True
+
+    # Expense is for existing Food & Dining
+    res_food = await service.categorize_expense("Starbucks coffee and croissant", available_categories=user_cats)
+    assert res_food.category_name == "Food & Dining"
+    assert res_food.is_new_category is False
+
+
+@pytest.mark.asyncio
+async def test_scan_receipt_image_mock(monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.GEMINI_API_KEY", "mock-test-key")
+    service = AIService()
+
+    mock_response = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": json.dumps({
+                                "amount": 850.50,
+                                "date": "2026-09-02",
+                                "description": "Starbucks Reserve",
+                                "category_name": "Food & Dining",
+                                "payment_method_name": "Credit Card"
+                            })
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+    mock_client = AsyncMock()
+    mock_client.post.return_value = httpx.Response(200, json=mock_response, request=httpx.Request("POST", "https://api"))
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+
+        res = await service.scan_receipt_image(
+            image_bytes=b"fake-image-bytes",
+            mime_type="image/jpeg",
+            categories=["Food & Dining", "Shopping"],
+            payment_methods=["Credit Card", "UPI"]
+        )
+
+        assert res.amount == Decimal("850.50")
+        assert res.date == "2026-09-02"
+        assert res.description == "Starbucks Reserve"
+        assert res.category_name == "Food & Dining"
+        assert res.payment_method_name == "Credit Card"
+        assert res.provider_used == "gemini-vision"
+

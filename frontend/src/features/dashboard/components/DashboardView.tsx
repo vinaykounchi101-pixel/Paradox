@@ -151,12 +151,12 @@ export default function DashboardView() {
           </Button>
 
           {/* Period selection tabs */}
-          <div className="flex bg-zinc-900 border border-border p-1 rounded-lg">
+          <div className="flex flex-wrap sm:flex-nowrap bg-zinc-900 border border-border p-1 rounded-lg w-full sm:w-auto justify-center">
             {(["current_month", "last_30_days", "current_week"] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-initial px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer text-center ${
                   period === p
                     ? "bg-primary text-primary-foreground shadow"
                     : "text-muted-foreground hover:text-foreground"

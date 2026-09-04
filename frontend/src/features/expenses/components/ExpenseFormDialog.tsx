@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Plus,
 } from "lucide-react";
 
 interface ExpenseFormDialogProps {
@@ -222,6 +223,8 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
   const [aiStatusMessage, setAiStatusMessage] = useState<string | null>(null);
 
   const [suggestedCategory, setSuggestedCategory] = useState<CategoryRead | null>(null);
+  const [suggestedNewCategory, setSuggestedNewCategory] = useState<string | null>(null);
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
   const [suggestedReason, setSuggestedReason] = useState<string | null>(null);
   const [isCategorizingAi, setIsCategorizingAi] = useState(false);
 
@@ -247,6 +250,8 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
       setAiInputText("");
       setAiStatusMessage(null);
       setSuggestedCategory(null);
+      setSuggestedNewCategory(null);
+      setIsAddingNewCategory(false);
       setSuggestedReason(null);
 
       if (expense) {
@@ -306,6 +311,7 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
   useEffect(() => {
     if (!description || description.trim().length < 3 || isEditMode) {
       setSuggestedCategory(null);
+      setSuggestedNewCategory(null);
       setSuggestedReason(null);
       return;
     }
@@ -320,12 +326,20 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
         });
         if (res.data?.category_name) {
           const matched = matchCategory(res.data.category_name, activeCats);
-          if (matched && matched.id !== categoryId) {
-            setSuggestedCategory(matched);
-            setSuggestedReason(res.data.reasoning || null);
+          if (matched) {
+            if (matched.id !== categoryId) {
+              setSuggestedCategory(matched);
+              setSuggestedReason(res.data.reasoning || null);
+            } else {
+              setSuggestedCategory(null);
+              setSuggestedReason(null);
+            }
+            setSuggestedNewCategory(null);
           } else {
+            // Category suggested by AI does NOT exist in user's category list!
             setSuggestedCategory(null);
-            setSuggestedReason(null);
+            setSuggestedNewCategory(res.data.category_name);
+            setSuggestedReason(res.data.reasoning || null);
           }
         }
       } catch {
@@ -443,6 +457,9 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
           const matchedCat = matchCategory(data.category_name, activeCats);
           if (matchedCat) {
             setCategoryId(matchedCat.id);
+            setSuggestedNewCategory(null);
+          } else {
+            setSuggestedNewCategory(data.category_name);
           }
         }
         if (data.payment_method_name) {
@@ -541,7 +558,12 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
         if (data.merchant) setDescription(data.merchant);
         if (data.category_name) {
           const matchedCat = matchCategory(data.category_name, activeCats);
-          if (matchedCat) setCategoryId(matchedCat.id);
+          if (matchedCat) {
+            setCategoryId(matchedCat.id);
+            setSuggestedNewCategory(null);
+          } else {
+            setSuggestedNewCategory(data.category_name);
+          }
         }
         if (data.payment_method_name) {
           matchAndSetPaymentMethod(data.payment_method_name);
@@ -633,6 +655,9 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
           }
           if (matched) {
             setCategoryId(matched.id);
+            setSuggestedNewCategory(null);
+          } else {
+            setSuggestedNewCategory(data.category_name);
           }
         }
         if (data.payment_method_name) {
@@ -753,91 +778,104 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                 </span>
               )}
             </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="e.g. 'Paid 350 for Zomato pizza via UPI' or 'Metro 40 cash'"
-                value={aiInputText}
-                onChange={(e) => setAiInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAiParse();
-                  }
-                }}
-                className="flex-1 bg-zinc-900/80 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500 transition"
-              />
+            {/* Row 1: Full-width Quick Add Input with embedded Voice button + Auto-Fill submit button */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="e.g. 'Paid 350 for Zomato pizza via UPI' or 'Metro 40 cash'"
+                  value={aiInputText}
+                  onChange={(e) => setAiInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAiParse();
+                    }
+                  }}
+                  className="w-full bg-zinc-900/90 border border-zinc-800 rounded-lg pl-3 pr-8 py-2 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500 transition"
+                />
+                <button
+                  type="button"
+                  onClick={toggleVoiceInput}
+                  disabled={isParsingAi}
+                  className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md transition cursor-pointer ${
+                    isListening
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/80"
+                  }`}
+                  title={isListening ? "Listening... Click to stop" : "Speak your expense (Voice Quick-Add)"}
+                >
+                  {isListening ? (
+                    <MicOff className="w-3.5 h-3.5 text-rose-400" />
+                  ) : (
+                    <Mic className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={handleAiParse}
                 disabled={isParsingAi || !aiInputText.trim()}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-sm"
               >
                 {isParsingAi ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Sparkles className="w-3.5 h-3.5" />
                 )}
-                Auto-Fill
+                <span>Auto-Fill</span>
               </button>
+            </div>
 
-              {/* Voice Recognition Button */}
-              <button
-                type="button"
-                onClick={toggleVoiceInput}
-                disabled={isParsingAi}
-                className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
-                  isListening
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse"
-                    : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
-                }`}
-                title={isListening ? "Listening... Click to stop" : "Speak your expense (Voice Quick-Add)"}
-              >
-                {isListening ? (
-                  <MicOff className="w-3.5 h-3.5 text-rose-400" />
-                ) : (
-                  <Mic className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
-                )}
-                <span className="hidden sm:inline">{isListening ? "Stop" : "Voice"}</span>
-              </button>
+            {/* Row 2: Secondary Quick Add Tools with flexible responsive wrapping */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Hidden file input for receipt photo upload */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleReceiptFileChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isScanningReceipt || isParsingAi}
+                  className="px-2.5 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5 border border-indigo-500/35 cursor-pointer disabled:opacity-50"
+                  title="Scan receipt, bill, or invoice image using Gemini Vision OCR"
+                >
+                  {isScanningReceipt ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                  ) : (
+                    <Camera className="w-3.5 h-3.5 text-indigo-400" />
+                  )}
+                  <span>{isScanningReceipt ? "Scanning Receipt..." : "Scan Bill / Receipt"}</span>
+                </button>
 
-              {/* Bank SMS Paste Toggle */}
-              <button
-                type="button"
-                onClick={() => setShowSmsBox(!showSmsBox)}
-                className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
-                  showSmsBox
-                    ? "bg-purple-500/30 text-purple-200 border-purple-500/50"
-                    : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
-                }`}
-                title="Paste Indian Banking or UPI SMS alert"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
-                <span className="hidden sm:inline">SMS</span>
-              </button>
+                {/* Bank SMS Paste Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowSmsBox(!showSmsBox)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
+                    showSmsBox
+                      ? "bg-purple-500/30 text-purple-200 border-purple-500/50"
+                      : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
+                  }`}
+                  title="Paste Indian Banking or UPI SMS alert"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Paste Bank SMS</span>
+                </button>
+              </div>
 
-              {/* Hidden file input for receipt photo upload */}
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept="image/*"
-                className="hidden"
-                onChange={handleReceiptFileChange}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isScanningReceipt || isParsingAi}
-                className="px-3 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 hover:text-white text-xs font-semibold transition flex items-center gap-1.5 border border-indigo-500/40 cursor-pointer disabled:opacity-50 shrink-0"
-                title="Scan photo or invoice of receipt with Gemini Vision"
-              >
-                {isScanningReceipt ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                ) : (
-                  <Camera className="w-3.5 h-3.5 text-indigo-400" />
-                )}
-                {isScanningReceipt ? "Scanning..." : "Scan Bill"}
-              </button>
+              {isListening && (
+                <span className="text-[11px] text-rose-300 animate-pulse flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                  Listening to voice...
+                </span>
+              )}
             </div>
 
             {/* Collapsible SMS Paste Box */}
@@ -947,6 +985,7 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
             onChange={(e) => setDescription(e.target.value)}
             error={errors.description}
           />
+          {/* Suggested existing category */}
           {suggestedCategory && suggestedCategory.id !== categoryId && (
             <div className="mt-1.5 flex items-center justify-between rounded-lg bg-indigo-500/10 border border-indigo-500/25 px-3 py-1.5 text-xs text-indigo-300 animate-in fade-in duration-200">
               <div className="flex items-center gap-1.5 truncate">
@@ -966,10 +1005,63 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                   setCategoryId(suggestedCategory.id);
                   setSuggestedCategory(null);
                 }}
-                className="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 text-[11px] text-white font-medium cursor-pointer transition shrink-0 ml-2"
+                className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-[11px] text-white font-medium cursor-pointer transition shrink-0 ml-2 shadow-sm"
               >
                 Apply
               </button>
+            </div>
+          )}
+
+          {/* Suggested new category that does not exist in user's category list */}
+          {suggestedNewCategory && (
+            <div className="mt-1.5 flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-200 animate-in fade-in duration-200">
+              <div className="flex items-center gap-1.5 truncate">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="truncate">
+                  Category <strong className="text-white font-semibold">&quot;{suggestedNewCategory}&quot;</strong> doesn&apos;t exist yet.
+                  {suggestedReason && (
+                    <span className="text-zinc-400 text-[11px] ml-1 hidden sm:inline">
+                      ({suggestedReason})
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                <button
+                  type="button"
+                  disabled={isAddingNewCategory}
+                  onClick={async () => {
+                    try {
+                      setIsAddingNewCategory(true);
+                      const created = await handleCreateCategory(suggestedNewCategory);
+                      setCategoryId(created.id);
+                      setSuggestedNewCategory(null);
+                      success(`Category "${created.name}" created and selected!`);
+                    } catch {
+                      toastError(`Failed to create category "${suggestedNewCategory}"`);
+                    } finally {
+                      setIsAddingNewCategory(false);
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-500 text-xs text-white font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm disabled:opacity-50"
+                  title={`Create category "${suggestedNewCategory}" and select it`}
+                >
+                  {isAddingNewCategory ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Plus className="w-3 h-3" />
+                  )}
+                  <span>Add &amp; Select</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSuggestedNewCategory(null)}
+                  className="p-1 text-amber-400/70 hover:text-amber-200 text-xs rounded transition"
+                  title="Dismiss suggestion"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           )}
         </div>

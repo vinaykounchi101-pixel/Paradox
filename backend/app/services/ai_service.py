@@ -120,6 +120,18 @@ HEURISTIC_KEYWORD_MAP = {
     "Investments": [
         "stocks", "mutual fund", "sip", "crypto", "shares", "gold", "fixed deposit"
     ],
+    "Pets": [
+        "dog", "cat", "pet", "puppy", "kitten", "pedigree", "veterinary", "vet", "aquarium", "pet food", "whiskas", "royal canin"
+    ],
+    "Fitness": [
+        "gym", "fitness", "yoga", "crossfit", "protein", "workout", "dumbbells", "creatine", "cult", "gold's gym"
+    ],
+    "Subscriptions": [
+        "subscription", "membership", "recurring", "saas", "software", "patreon", "sub"
+    ],
+    "Gifts": [
+        "gift", "donation", "charity", "present", "birthday gift", "flowers", "bouquet"
+    ],
     "Uncategorized": [
         "other", "misc", "miscellaneous", "general", "extra"
     ],
@@ -254,15 +266,19 @@ class AIService:
     async def _call_gemini_categorize(
         self, description: str, categories: List[str]
     ) -> Optional[CategorizeResponse]:
-        model = self.custom_model or "gemini-3.6-flash"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+        models_to_try = [self.custom_model] if self.custom_model else [
+            "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"
+        ]
 
         prompt = (
             f"You are an expert personal finance categorizer for the Paradox expense tracker.\n"
-            f"Allowed categories: {json.dumps(categories)}\n"
-            f"Expense description: \"{description}\"\n"
-            f"Respond strictly in valid JSON format with keys: \"category_name\" (one of the allowed categories), "
-            f"\"confidence\" (float 0.0 to 1.0), \"reasoning\" (one brief sentence)."
+            f"User's existing categories: {json.dumps(categories)}\n"
+            f"Expense description: \"{description}\"\n\n"
+            f"Task:\n"
+            f"1. Determine the single most accurate personal finance category for this expense.\n"
+            f"2. If one of the user's existing categories is a good fit, output that exact category name and set \"is_new_category\": false.\n"
+            f"3. If NONE of the user's existing categories fit this purchase (for example: user only has Food & Dining, but expense is for a pet vet clinic, dental checkup, books, gym membership, or flight tickets), suggest a clean, standard 1-2 word new category name (e.g. \"Healthcare\", \"Pets\", \"Fitness\", \"Education\", \"Travel\", \"Entertainment\", \"Groceries\", \"Investments\", \"Gifts\") and set \"is_new_category\": true.\n\n"
+            f"Respond strictly in valid JSON format with keys: \"category_name\", \"is_new_category\" (boolean), \"confidence\" (float 0.0 to 1.0), \"reasoning\" (one brief sentence)."
         )
 
         payload = {
@@ -273,26 +289,47 @@ class AIService:
             }
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code == 200:
-                data = resp.json()
-                content = data["candidates"][0]["content"]["parts"][0]["text"]
-                parsed = json.loads(content)
-                cat = self._match_closest(parsed.get("category_name"), categories)
-                return CategorizeResponse(
-                    category_name=cat,
-                    confidence=float(parsed.get("confidence", 0.85)),
-                    reasoning=parsed.get("reasoning"),
-                    provider_used="gemini",
-                )
+        for model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        content = data["candidates"][0]["content"]["parts"][0]["text"]
+                        parsed = json.loads(content)
+                        raw_cat = str(parsed.get("category_name", "")).strip()
+                        is_new = bool(parsed.get("is_new_category", False))
+
+                        matched = self._match_closest(raw_cat, categories) if categories else None
+                        if matched and not is_new:
+                            final_cat = matched
+                            final_is_new = False
+                        elif matched and matched.lower() == raw_cat.lower():
+                            final_cat = matched
+                            final_is_new = False
+                        else:
+                            final_cat = raw_cat.title() if raw_cat else (categories[0] if categories else "General")
+                            final_is_new = True
+
+                        return CategorizeResponse(
+                            category_name=final_cat,
+                            confidence=float(parsed.get("confidence", 0.85)),
+                            reasoning=parsed.get("reasoning"),
+                            provider_used="gemini",
+                            is_new_category=final_is_new,
+                        )
+            except Exception as exc:
+                logger.warning("Gemini categorize attempt with model %s failed: %s", model, exc)
+                continue
         return None
 
     async def _call_gemini_parse(
         self, text: str, categories: List[str], payment_methods: List[str]
     ) -> Optional[ParseExpenseResponse]:
-        model = self.custom_model or "gemini-3.6-flash"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+        models_to_try = [self.custom_model] if self.custom_model else [
+            "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"
+        ]
         today_str = date.today().isoformat()
 
         prompt = (
@@ -322,26 +359,32 @@ class AIService:
             }
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code == 200:
-                data = resp.json()
-                content = data["candidates"][0]["content"]["parts"][0]["text"]
-                parsed = json.loads(content)
-                amount = Decimal(str(parsed["amount"])) if parsed.get("amount") is not None else None
-                cat = self._match_closest(parsed.get("category_name"), categories) if parsed.get("category_name") else None
-                pm = self._match_closest(parsed.get("payment_method_name"), payment_methods) if parsed.get("payment_method_name") else None
+        for model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        content = data["candidates"][0]["content"]["parts"][0]["text"]
+                        parsed = json.loads(content)
+                        amount = Decimal(str(parsed["amount"])) if parsed.get("amount") is not None else None
+                        cat = self._match_closest(parsed.get("category_name"), categories) if parsed.get("category_name") else None
+                        pm = self._match_closest(parsed.get("payment_method_name"), payment_methods) if parsed.get("payment_method_name") else None
 
-                return ParseExpenseResponse(
-                    amount=amount,
-                    category_name=cat,
-                    payment_method_name=pm,
-                    date=parsed.get("date") or today_str,
-                    description=parsed.get("description"),
-                    confidence=float(parsed.get("confidence", 0.9)),
-                    reasoning=parsed.get("reasoning"),
-                    provider_used="gemini",
-                )
+                        return ParseExpenseResponse(
+                            amount=amount,
+                            category_name=cat,
+                            payment_method_name=pm,
+                            date=parsed.get("date") or today_str,
+                            description=parsed.get("description"),
+                            confidence=float(parsed.get("confidence", 0.9)),
+                            reasoning=parsed.get("reasoning"),
+                            provider_used="gemini",
+                        )
+            except Exception as exc:
+                logger.warning("Gemini parse attempt with model %s failed: %s", model, exc)
+                continue
         return None
 
     # =========================================================================
@@ -570,12 +613,44 @@ class AIService:
                 best_cat = cat
                 matched_reason = f"Matched {', '.join(matched_kws[:3])} for {cat}"
 
+        # Check all global domains in HEURISTIC_KEYWORD_MAP to see if an unadded category is a significantly better fit
+        global_best_cat = None
+        global_best_score = 0
+        global_kws = []
+        for g_cat, keywords in HEURISTIC_KEYWORD_MAP.items():
+            if any(c.lower() == g_cat.lower() for c in categories):
+                continue  # already evaluated in user's active categories
+            g_score = 0
+            g_matched = []
+            for kw in keywords:
+                if re.search(rf"\b{re.escape(kw)}\b", desc_lower):
+                    g_score += 2
+                    g_matched.append(kw)
+                elif len(kw) >= 4 and re.search(rf"\b{re.escape(kw)}", desc_lower):
+                    g_score += 1
+                    g_matched.append(kw)
+            if g_score > global_best_score:
+                global_best_score = g_score
+                global_best_cat = g_cat
+                global_kws = g_matched
+
+        # If a non-existent global domain scored higher than the user's best category, suggest it as a new category!
+        if global_best_score >= 2 and global_best_score > best_score and global_best_cat:
+            return CategorizeResponse(
+                category_name=global_best_cat,
+                confidence=0.88,
+                reasoning=f"Matched {', '.join(global_kws[:3])} (suggested new category)",
+                provider_used="heuristic",
+                is_new_category=True,
+            )
+
         confidence = 0.85 if best_score >= 2 else (0.65 if best_score == 1 else 0.40)
         return CategorizeResponse(
             category_name=best_cat,
             confidence=confidence,
             reasoning=matched_reason,
             provider_used="heuristic",
+            is_new_category=False,
         )
 
     def _heuristic_parse(
@@ -1152,21 +1227,23 @@ class AIService:
         import json
         import re
 
-        # If Gemini key is available, call Gemini 3.6 Flash Vision
+        # If Gemini key is available, call Gemini Flash Vision
         if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY != "mock-gemini-key":
             try:
                 base64_img = base64.b64encode(image_bytes).decode("utf-8")
-                prompt = f"""You are an expert financial receipt and invoice OCR reader for Paradox.
+                today_iso = date.today().isoformat()
+                prompt = f"""You are an expert financial receipt, bill, and invoice OCR reader for Paradox. Today is {today_iso}.
 Extract the transaction details from this receipt/bill image:
 - "amount": total final amount paid as numeric decimal/float (e.g. 540.00). Only numbers and dot.
-- "date": transaction date in YYYY-MM-DD format (if missing or cannot read, use today: {date.today().isoformat()}).
-- "description": concise merchant/store/service name or main purchase (max 40 chars, e.g. "Dmart", "Starbucks", "Shell Fuel").
-- "category_name": best matching category from this list: {json.dumps(categories)}.
+- "date": transaction date in YYYY-MM-DD format (if missing or cannot read, use {today_iso}).
+- "description": concise merchant/store/service name or main purchase item (max 40 chars, e.g. "Dmart", "Starbucks", "Shell Fuel", "Zomato", "Apollo Pharmacy").
+- "category_name": best matching category from this list: {json.dumps(categories)}, or suggest a clean standard category name (e.g. "Food & Dining", "Groceries", "Shopping", "Bills & Utilities", "Healthcare", "Pets", "Transportation").
 - "payment_method_name": best matching payment method from this list: {json.dumps(payment_methods)}.
 
 Return ONLY a valid raw JSON object with keys: "amount", "date", "description", "category_name", "payment_method_name". No markdown, no commentary."""
 
-                for model in ["gemini-3.6-flash", "gemini-flash-latest"]:
+                models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]
+                for model in models:
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
                     payload = {
                         "contents": [{
@@ -1180,7 +1257,10 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
                                 }
                             ]
                         }],
-                        "generationConfig": {"temperature": 0.1}
+                        "generationConfig": {
+                            "temperature": 0.1,
+                            "responseMimeType": "application/json"
+                        }
                     }
                     try:
                         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -1192,19 +1272,43 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
                                 if m:
                                     parsed = json.loads(m.group(0))
                                     raw_amount = parsed.get("amount")
-                                    amt_str = str(raw_amount).replace(",", "").replace("$", "").replace("₹", "").strip() if raw_amount is not None else "0"
-                                    try:
-                                        amount_dec = Decimal(amt_str)
-                                    except Exception:
+                                    # Resilient numeric extraction
+                                    amt_str = str(raw_amount).replace(",", "").replace("$", "").replace("₹", "").strip() if raw_amount is not None else ""
+                                    amt_num_match = re.search(r"(\d+(?:\.\d{1,2})?)", amt_str)
+                                    if amt_num_match:
+                                        try:
+                                            amount_dec = Decimal(amt_num_match.group(1))
+                                        except Exception:
+                                            amount_dec = Decimal("0.00")
+                                    else:
                                         amount_dec = Decimal("0.00")
 
-                                    cat_str = self._match_closest(parsed.get("category_name"), categories) if categories else "Shopping"
-                                    pm_str = self._match_closest(parsed.get("payment_method_name"), payment_methods) if payment_methods else "Cash"
+                                    # Date parsing
+                                    raw_date = str(parsed.get("date", "")).strip()
+                                    iso_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", raw_date)
+                                    if iso_match:
+                                        clean_date = iso_match.group(1)
+                                    else:
+                                        dmy_match = re.search(r"\b(\d{1,2})[-/](\d{1,2})[-/](\d{4})\b", raw_date)
+                                        if dmy_match:
+                                            d, m_val, y = dmy_match.groups()
+                                            clean_date = f"{y}-{int(m_val):02d}-{int(d):02d}"
+                                        else:
+                                            clean_date = today_iso
+
+                                    raw_desc = str(parsed.get("description", "")).strip()
+                                    clean_desc = raw_desc if raw_desc and raw_desc.lower() not in ["receipt", "bill", "invoice", "scanned receipt"] else (parsed.get("merchant") or "Scanned Receipt")
+
+                                    raw_cat = str(parsed.get("category_name", "")).strip()
+                                    cat_str = self._match_closest(raw_cat, categories) if categories else raw_cat or "Shopping"
+
+                                    raw_pm = str(parsed.get("payment_method_name", "")).strip()
+                                    pm_str = self._match_closest(raw_pm, payment_methods) if payment_methods else raw_pm or "Cash"
 
                                     return ParseExpenseResponse(
                                         amount=amount_dec,
-                                        date=parsed.get("date") or date.today().isoformat(),
-                                        description=parsed.get("description") or "Scanned Receipt",
+                                        date=clean_date,
+                                        description=clean_desc,
                                         category_name=cat_str,
                                         payment_method_name=pm_str,
                                         confidence=0.96,
