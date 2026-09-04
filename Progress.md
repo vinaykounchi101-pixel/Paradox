@@ -205,15 +205,18 @@ Paradox/
 ## 10. Responsive UI, Gemini Receipt OCR Auto-Fill, and Dynamic Category Expansion
 - **Responsive Layout Engine & AI Quick Add Redesign**:
   - Reorganized `ExpenseFormDialog` into a 2-tier responsive structure:
-    - **Row 1**: 100% width natural language input with embedded Voice Recognition mic inside right edge + `Auto-Fill` primary button.
-    - **Row 2**: Secondary action tools `[ 📷 Scan Bill / Receipt ]` and `[ 💬 Paste Bank SMS ]` in a wrapping container (`flex-wrap gap-2`).
-    - Eliminates all horizontal modal overflow and button squishing on mobile (< 400px) and desktop viewports.
+    - **Outer Container**: Hardened with `w-full max-w-full overflow-hidden p-2.5 sm:p-3` preventing any element from breaking outside modal boundaries.
+    - **Row 1**: Full-width input with `min-w-0` flex container, embedded Voice mic, streamlined placeholder text, and `Auto-Fill` primary button. Shrinks cleanly down to 320px screens.
+    - **Row 2**: Strict 2-column grid (`grid-cols-2 gap-2 w-full`) for `[ 📷 Scan Bill ]` and `[ 💬 Paste SMS ]` with `truncate` labels. Guarantees 50%-50% equal width and zero overflow.
+    - **Voice Listening Status**: Moved below button grid as a standalone banner with pulsing animation.
+    - **Category Suggestion Banners**: Formatted with `w-full min-w-0 truncate` for existing and missing category prompts.
   - Enhanced `Dialog.tsx` with responsive width scaling (`max-w-lg w-full`), mobile padding (`p-4 sm:p-6`), and safe vertical scroll containment (`max-h-[90vh] overflow-y-auto`).
   - Wrapped period filter tabs in `DashboardView.tsx` (`flex-wrap sm:flex-nowrap w-full sm:w-auto`).
 - **Gemini Vision Receipt OCR Auto-Fill**:
-  - Aligned model calls to verified Google Generative AI models: `["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]` with `responseMimeType: "application/json"`.
-  - Hardened regex extractors for monetary amounts and dates (ISO, DD-MM-YYYY, DD/MM/YYYY).
-  - Scanning a receipt now immediately populates Amount, Date, Description (merchant/item), Category, and Payment Method.
+  - **REST API Schema Alignment**: Converted image payload from snake_case `inline_data` to Google's v1beta REST standard: `inlineData: {"mimeType": ..., "data": base64_img}`.
+  - **Active Model Selection**: Aligned model calls to verified Google Generative AI models: `["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"]` with `responseMimeType: "application/json"`.
+  - **Resilient Key Extraction**: Hardened multi-key JSON parsing for `amount`, `total_amount`, `total`, `grand_total`, `merchant_name`, `store`, `vendor`, and flexible date formats.
+  - **Frontend Form Auto-Fill**: Scanning a receipt immediately populates Amount, Date, Description (merchant/item), Category (auto-select or missing category prompt), and Payment Method (via `matchAndSetPaymentMethod`).
 - **Dynamic Category Recommendation & 1-Click "Add & Select"**:
   - Added `is_new_category` detection to Gemini categorization and semantic heuristic engines.
   - When typing in Description, if the detected category exists in the user's category list, it suggests `AI Suggests: [Category Name] [ Apply ]`.
@@ -223,17 +226,27 @@ Paradox/
 
 ---
 
-## 11. Testing & Build Verification
-- **Backend Tests (`pytest`)**:
-  - `49 passed in 4.42s` (100% green).
-  - Added test coverage in [`test_ai.py`](backend/tests/unit/test_ai.py) for receipt OCR payload extraction and `is_new_category` dynamic recommendations.
-- **Frontend Builds (`next build`)**:
-  - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 14 static/dynamic routes.
+## 11. Master AI Documentation (`docs/AI_FEATURES.md`)
+- Authored a comprehensive master document detailing all 18 implemented AI features:
+  - Dual-Engine architecture (Cloud LLM + 100% Zero-Latency Offline Heuristic matrix).
+  - Complete endpoint specifications, HTTP methods, and parameter schemas.
+  - Frontend component wiring and responsive design rules.
+  - Configuration guide for `GEMINI_API_KEY`, `AI_PROVIDER`, and active models.
+  - Automated test coverage breakdown across all unit test suites.
 
 ---
 
-## 12. Current Session Handoff Notes
-- All features across Phases 1 through 7, including Responsive Layouts, Gemini Vision OCR, and Category Expansion, are fully operational, tested, and documented.
+## 12. Testing & Build Verification
+- **Backend Tests (`pytest`)**:
+  - `49 passed in 4.42s` (100% green).
+  - Full test coverage across auth, user isolation, budgets, and all AI features (`test_ai.py`, `test_ai_features_phase1.py`, `test_ai_features_phase2.py`).
+- **Frontend Builds (`next build`)**:
+  - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all static/dynamic routes.
+
+---
+
+## 13. Current Session Handoff & Memory State
+- All features across Phases 1 through 8, including Responsive AI Quick Add, Gemini Vision OCR Auto-Fill, Dynamic Category Expansion, and Master Documentation, are fully operational, tested, committed, and pushed.
 - Active servers:
   - Backend: `http://127.0.0.1:8000` (FastAPI + Uvicorn)
   - Frontend: `http://localhost:3000` (Next.js 16 App Router)
@@ -243,11 +256,13 @@ Paradox/
   - Backend: `.venv\Scripts\pytest tests/ -v` -> 49/49 passed.
   - Frontend: `npm.cmd run build` -> 0 errors.
 - **Documentation & Agent Memory**:
-  - `.agents/rules/paradox-architecture.md` & `.agents/rules/paradox-memory.md` maintained as persistent repo memory.
-  - `docs/PARADOX_AI_FEATURES_UPDATED.md` maintained as the master roadmap.
+  - Master AI Document: [`docs/AI_FEATURES.md`](docs/AI_FEATURES.md)
+  - Workspace Persistent Memory: `.agents/rules/paradox-architecture.md` & `.agents/rules/paradox-memory.md`
+  - Roadmap: `docs/PARADOX_AI_FEATURES_UPDATED.md`
 - For local testing:
   - PostgreSQL: `E:\PSQL\bin\postgres.exe -D "E:\PSQL\data"`
   - Backend: `.venv\Scripts\uvicorn app.main:app --port 8000`
   - Frontend: `npm.cmd run dev`
+
 
 

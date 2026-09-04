@@ -24,11 +24,16 @@ This document is the agent-level repository memory for Paradox, persisted across
   - Finny Financial Mood Mascot
   - Agent Repo Memory (`.agents/rules/`)
 - **Phase 8 (Responsive Engine & Vision OCR Alignment)**:
-  - AI Quick Add 2-tier responsive layout with zero modal horizontal overflow
-  - Verified Gemini multimodal OCR model alignment (`gemini-2.5-flash`, `gemini-flash-latest`)
+  - AI Quick Add 2-tier responsive layout with strict 2-column tools grid, input min-w-0, and zero modal horizontal overflow on all viewports down to 320px
+  - Verified Gemini multimodal OCR model alignment (`gemini-flash-latest`, `gemini-2.5-flash`, `gemini-flash-lite-latest`) with `inlineData` REST schema
   - Dynamic Category Expansion & 1-Click "Add & Select" prompt for unadded categories
   - Dialog responsive container scaling (`max-w-lg w-full`) and safe mobile vertical scroll
+- **Phase 9 (Complete AI Feature Suite & Master Documentation)**:
+  - Master documentation authored in `docs/AI_FEATURES.md` covering all 18 implemented AI features
+  - Full automated pytest coverage: 49/49 unit tests passing
+  - Clean production builds on Next.js 16.3.3 Turbopack (0 errors)
 
 ## 3. Database State
 - Latest Alembic Migration: `a1b2c3d4e5f6_add_otp_to_pending_registration.py`
 - Active Entities: `User`, `RefreshToken`, `PasswordResetToken`, `PendingRegistrationToken`, `Category`, `PaymentMethod`, `Expense`, `Budget`
+
