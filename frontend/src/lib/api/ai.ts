@@ -156,6 +156,79 @@ export interface SubscriptionAuditResponse {
   insights: string[];
 }
 
+export interface ParseSmsRequest {
+  text: string;
+  available_categories?: string[];
+  available_payment_methods?: string[];
+}
+
+export interface ParseSmsResponse {
+  amount?: number | string | null;
+  merchant?: string | null;
+  date?: string | null;
+  category_name?: string | null;
+  payment_method_name?: string | null;
+  reference_id?: string | null;
+  transaction_type: "debit" | "credit";
+  confidence: number;
+  provider_used: string;
+}
+
+export interface CheckDuplicateRequest {
+  amount: number | string;
+  date: string;
+  description?: string;
+  window_days?: number;
+}
+
+export interface CheckDuplicateResponse {
+  has_duplicate: boolean;
+  duplicate_id?: string | null;
+  duplicate_amount?: number | string | null;
+  duplicate_date?: string | null;
+  duplicate_description?: string | null;
+  message?: string | null;
+}
+
+export interface FiftyThirtyTwentyItem {
+  category_type: "needs" | "wants" | "savings";
+  label: string;
+  target_percentage: number;
+  actual_amount: number | string;
+  actual_percentage: number;
+  variance_amount: number | string;
+  status: "on_track" | "over" | "under";
+  top_categories: string[];
+}
+
+export interface FiftyThirtyTwentyResponse {
+  total_spent: number | string;
+  target_budget: number | string;
+  needs: FiftyThirtyTwentyItem;
+  wants: FiftyThirtyTwentyItem;
+  savings: FiftyThirtyTwentyItem;
+  rebalance_advice: string[];
+  adherence_score: number;
+}
+
+export interface AchievementBadge {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  tier: "bronze" | "silver" | "gold" | "diamond";
+  is_unlocked: boolean;
+  progress: number;
+  progress_label: string;
+}
+
+export interface AchievementsResponse {
+  badges: AchievementBadge[];
+  active_streak_days: number;
+  total_unlocked: number;
+  motivation_quote: string;
+}
+
 export const aiApi = {
   categorize: (data: CategorizeRequest) =>
     client.post<DataResponse<CategorizeResponse>>("/ai/categorize", data),
@@ -171,6 +244,12 @@ export const aiApi = {
 
   parseReceipt: (data: ParseReceiptRequest) =>
     client.post<DataResponse<ParseReceiptResponse>>("/ai/parse-receipt", data),
+
+  parseSms: (data: ParseSmsRequest) =>
+    client.post<DataResponse<ParseSmsResponse>>("/ai/parse-sms", data),
+
+  checkDuplicate: (data: CheckDuplicateRequest) =>
+    client.post<DataResponse<CheckDuplicateResponse>>("/ai/check-duplicate", data),
 
   scanReceipt: (file: File) => {
     const formData = new FormData();
@@ -192,6 +271,13 @@ export const aiApi = {
 
   getSubscriptionAudit: () =>
     client.get<DataResponse<SubscriptionAuditResponse>>("/ai/subscription-audit"),
+
+  getFiftyThirtyTwenty: () =>
+    client.get<DataResponse<FiftyThirtyTwentyResponse>>("/ai/fifty-thirty-twenty"),
+
+  getAchievements: () =>
+    client.get<DataResponse<AchievementsResponse>>("/ai/achievements"),
 };
+
 
 

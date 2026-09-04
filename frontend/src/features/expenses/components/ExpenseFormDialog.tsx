@@ -16,7 +16,19 @@ import { ExpenseRead } from "@/lib/api/expenses";
 import { CategoryRead } from "@/lib/api/expenses";
 import { aiApi } from "@/lib/api/ai";
 import { useCurrency } from "@/features/auth/context/CurrencyContext";
-import { Sparkles, Check, Loader2, ArrowRight, Camera } from "lucide-react";
+import {
+  Sparkles,
+  Check,
+  Loader2,
+  ArrowRight,
+  Camera,
+  Mic,
+  MicOff,
+  MessageSquare,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 
 interface ExpenseFormDialogProps {
   isOpen: boolean;
@@ -213,6 +225,18 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
   const [suggestedReason, setSuggestedReason] = useState<string | null>(null);
   const [isCategorizingAi, setIsCategorizingAi] = useState(false);
 
+  // Voice Speech Recognition State
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // SMS Parser State
+  const [showSmsBox, setShowSmsBox] = useState(false);
+  const [smsInputText, setSmsInputText] = useState("");
+  const [isParsingSms, setIsParsingSms] = useState(false);
+
+  // Duplicate Detection State
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+
   // Track dialog open transition to avoid clearing fields during background re-renders
   const prevIsOpenRef = useRef(false);
 
@@ -314,15 +338,92 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
     return () => clearTimeout(timer);
   }, [description, localCategories, categories, categoryId, isEditMode]);
 
+  // Debounced duplicate detection guard
+  useEffect(() => {
+    if (isEditMode || !amount || isNaN(Number(amount)) || Number(amount) <= 0 || !date) {
+      setDuplicateWarning(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await aiApi.checkDuplicate({
+          amount: Number(amount),
+          date,
+          description: description || undefined,
+          window_days: 2,
+        });
+        if (res.data?.has_duplicate) {
+          setDuplicateWarning(res.data.message || "Potential duplicate transaction detected.");
+        } else {
+          setDuplicateWarning(null);
+        }
+      } catch {
+        setDuplicateWarning(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [amount, date, description, isEditMode]);
+
+  // Helper to map and set payment method
+  const matchAndSetPaymentMethod = (pmTargetRaw?: string | null) => {
+    if (!pmTargetRaw) return;
+    const pmTarget = pmTargetRaw.toLowerCase().trim();
+    let matchedPm = paymentMethods.find((p) => p.name.toLowerCase() === pmTarget);
+    if (!matchedPm) {
+      if (
+        pmTarget === "upi" ||
+        pmTarget.includes("pay") ||
+        pmTarget.includes("wallet") ||
+        pmTarget.includes("phonepe") ||
+        pmTarget.includes("gpay") ||
+        pmTarget.includes("paytm")
+      ) {
+        matchedPm = paymentMethods.find((p) => {
+          const n = p.name.toLowerCase();
+          return n.includes("digital wallet") || n.includes("wallet") || n.includes("upi") || n.includes("pay");
+        });
+      } else if (
+        pmTarget.includes("bank") ||
+        pmTarget.includes("net") ||
+        pmTarget.includes("transfer") ||
+        pmTarget.includes("neft") ||
+        pmTarget.includes("imps")
+      ) {
+        matchedPm = paymentMethods.find((p) => {
+          const n = p.name.toLowerCase();
+          return n.includes("bank") || n.includes("transfer") || n.includes("net");
+        });
+      } else if (pmTarget.includes("credit")) {
+        matchedPm = paymentMethods.find((p) => p.name.toLowerCase().includes("credit"));
+      } else if (pmTarget.includes("debit") || pmTarget.includes("atm")) {
+        matchedPm = paymentMethods.find((p) => p.name.toLowerCase().includes("debit"));
+      } else if (pmTarget.includes("card")) {
+        matchedPm = paymentMethods.find((p) => p.name.toLowerCase().includes("card"));
+      } else if (pmTarget.includes("cash")) {
+        matchedPm = paymentMethods.find((p) => p.name.toLowerCase().includes("cash"));
+      }
+    }
+    if (!matchedPm) {
+      matchedPm = paymentMethods.find(
+        (p) => p.name.toLowerCase().includes(pmTarget) || pmTarget.includes(p.name.toLowerCase())
+      );
+    }
+    if (matchedPm) {
+      setPaymentMethodId(matchedPm.id);
+    }
+  };
+
   // Handle Natural Language Quick AI Parsing
-  const handleAiParse = async () => {
-    if (!aiInputText.trim()) return;
+  const executeAiParse = async (textToParse: string) => {
+    if (!textToParse.trim()) return;
     try {
       setIsParsingAi(true);
       setAiStatusMessage(null);
       const activeCats = localCategories.length > 0 ? localCategories : categories;
       const res = await aiApi.parseExpense({
-        text: aiInputText,
+        text: textToParse,
         available_categories: activeCats.map((c) => c.name),
         available_payment_methods: paymentMethods.map((p) => p.name),
       });
@@ -345,55 +446,7 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
           }
         }
         if (data.payment_method_name) {
-          const pmTarget = data.payment_method_name.toLowerCase().trim();
-          // 1. Exact match
-          let matchedPm = paymentMethods.find(
-            (p) => p.name.toLowerCase() === pmTarget
-          );
-          // 2. Known alias / synonym mapping
-          if (!matchedPm) {
-            if (
-              pmTarget === "upi" ||
-              pmTarget.includes("pay") ||
-              pmTarget.includes("wallet") ||
-              pmTarget.includes("phonepe") ||
-              pmTarget.includes("gpay") ||
-              pmTarget.includes("paytm")
-            ) {
-              matchedPm = paymentMethods.find((p) => {
-                const n = p.name.toLowerCase();
-                return n.includes("digital wallet") || n.includes("wallet") || n.includes("upi") || n.includes("pay");
-              });
-            } else if (
-              pmTarget.includes("bank") ||
-              pmTarget.includes("net") ||
-              pmTarget.includes("transfer") ||
-              pmTarget.includes("neft") ||
-              pmTarget.includes("imps")
-            ) {
-              matchedPm = paymentMethods.find((p) => {
-                const n = p.name.toLowerCase();
-                return n.includes("bank") || n.includes("transfer") || n.includes("net");
-              });
-            } else if (pmTarget.includes("credit")) {
-              matchedPm = paymentMethods.find((p) => p.name.toLowerCase().includes("credit"));
-            } else if (pmTarget.includes("debit") || pmTarget.includes("atm")) {
-              matchedPm = paymentMethods.find((p) => p.name.toLowerCase().includes("debit"));
-            } else if (pmTarget.includes("card")) {
-              matchedPm = paymentMethods.find((p) => p.name.toLowerCase().includes("card"));
-            } else if (pmTarget.includes("cash")) {
-              matchedPm = paymentMethods.find((p) => p.name.toLowerCase().includes("cash"));
-            }
-          }
-          // 3. Partial substring fallback
-          if (!matchedPm) {
-            matchedPm = paymentMethods.find(
-              (p) => p.name.toLowerCase().includes(pmTarget) || pmTarget.includes(p.name.toLowerCase())
-            );
-          }
-          if (matchedPm) {
-            setPaymentMethodId(matchedPm.id);
-          }
+          matchAndSetPaymentMethod(data.payment_method_name);
         }
 
         const providerLabel = data.provider_used.toUpperCase();
@@ -405,6 +458,104 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
       toastError(msg);
     } finally {
       setIsParsingAi(false);
+    }
+  };
+
+  const handleAiParse = () => executeAiParse(aiInputText);
+
+  // Web Speech API Voice Recognition Toggle
+  const toggleVoiceInput = () => {
+    const SpeechRecognitionAPI =
+      typeof window !== "undefined"
+        ? (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition ||
+          (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognitionAPI) {
+      toastError("Voice input is not supported in this browser. Please try Chrome, Edge, or Safari.");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.lang = "en-IN";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setAiStatusMessage("Listening... Speak now");
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setAiInputText(transcript);
+        setIsListening(false);
+        setAiStatusMessage(`Heard: "${transcript}"`);
+        executeAiParse(transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        setIsListening(false);
+        if (event.error !== "no-speech") {
+          toastError(`Voice error: ${event.error}`);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsListening(false);
+      toastError("Could not access microphone.");
+    }
+  };
+
+  // Indian Bank / UPI SMS Parsing
+  const handleSmsParse = async () => {
+    if (!smsInputText.trim()) return;
+    try {
+      setIsParsingSms(true);
+      const activeCats = localCategories.length > 0 ? localCategories : categories;
+      const res = await aiApi.parseSms({
+        text: smsInputText,
+        available_categories: activeCats.map((c) => c.name),
+        available_payment_methods: paymentMethods.map((p) => p.name),
+      });
+
+      const data = res.data;
+      if (data) {
+        if (data.amount) setAmount(String(data.amount));
+        if (data.date) setDate(data.date);
+        if (data.merchant) setDescription(data.merchant);
+        if (data.category_name) {
+          const matchedCat = matchCategory(data.category_name, activeCats);
+          if (matchedCat) setCategoryId(matchedCat.id);
+        }
+        if (data.payment_method_name) {
+          matchAndSetPaymentMethod(data.payment_method_name);
+        }
+        setShowSmsBox(false);
+        setSmsInputText("");
+        setAiStatusMessage(`SMS Parsed: ${data.merchant || "Transaction"} (${data.amount ? formatCurrency(data.amount) : ""})`);
+        success(`SMS parsed successfully (${data.provider_used})!`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to parse SMS";
+      toastError(msg);
+    } finally {
+      setIsParsingSms(false);
     }
   };
 
@@ -630,6 +781,41 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                 Auto-Fill
               </button>
 
+              {/* Voice Recognition Button */}
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
+                disabled={isParsingAi}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                  isListening
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse"
+                    : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
+                }`}
+                title={isListening ? "Listening... Click to stop" : "Speak your expense (Voice Quick-Add)"}
+              >
+                {isListening ? (
+                  <MicOff className="w-3.5 h-3.5 text-rose-400" />
+                ) : (
+                  <Mic className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
+                )}
+                <span className="hidden sm:inline">{isListening ? "Stop" : "Voice"}</span>
+              </button>
+
+              {/* Bank SMS Paste Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowSmsBox(!showSmsBox)}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                  showSmsBox
+                    ? "bg-purple-500/30 text-purple-200 border-purple-500/50"
+                    : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
+                }`}
+                title="Paste Indian Banking or UPI SMS alert"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
+                <span className="hidden sm:inline">SMS</span>
+              </button>
+
               {/* Hidden file input for receipt photo upload */}
               <input
                 type="file"
@@ -653,6 +839,58 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                 {isScanningReceipt ? "Scanning..." : "Scan Bill"}
               </button>
             </div>
+
+            {/* Collapsible SMS Paste Box */}
+            {showSmsBox && (
+              <div className="pt-2 border-t border-zinc-800/80 space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                  <span>Paste bank or UPI SMS (HDFC, SBI, ICICI, Axis, Paytm, GPay, etc.):</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowSmsBox(false)}
+                    className="text-zinc-500 hover:text-zinc-300 text-[10px]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. 'HDFC Bank: Rs 850.00 debited from a/c **1234 on 02-Sep-26 to ZOMATO. UPI Ref 324156'"
+                  value={smsInputText}
+                  onChange={(e) => setSmsInputText(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500 transition resize-none"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSmsParse}
+                    disabled={isParsingSms || !smsInputText.trim()}
+                    className="px-3 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isParsingSms ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    Parse & Auto-Fill
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Duplicate Transaction Warning Banner */}
+        {duplicateWarning && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200 flex items-start gap-2.5 animate-in fade-in duration-200">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-1">
+              <span className="font-semibold text-amber-300">Potential Duplicate Detected:</span>
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">{duplicateWarning}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDuplicateWarning(null)}
+              className="text-amber-400/80 hover:text-amber-300 text-[11px] px-1.5 py-0.5 rounded border border-amber-500/30 hover:bg-amber-500/20 transition cursor-pointer"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 

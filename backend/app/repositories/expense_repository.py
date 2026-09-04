@@ -1,5 +1,6 @@
 import uuid
-from datetime import date
+from datetime import date, timedelta
+from decimal import Decimal
 from typing import List, Optional, Tuple
 
 from sqlalchemy import func, select
@@ -171,3 +172,31 @@ class ExpenseRepository:
         stmt = stmt.order_by(Expense.date.desc(), Expense.id.desc())
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def find_potential_duplicates(
+        self,
+        user_id: uuid.UUID,
+        amount: Decimal,
+        target_date: date,
+        description: Optional[str] = None,
+        window_days: int = 2,
+    ) -> List[Expense]:
+        min_date = target_date - timedelta(days=window_days)
+        max_date = target_date + timedelta(days=window_days)
+        stmt = (
+            select(Expense)
+            .where(
+                Expense.user_id == user_id,
+                Expense.amount == amount,
+                Expense.date >= min_date,
+                Expense.date <= max_date,
+            )
+            .options(
+                selectinload(Expense.category),
+                selectinload(Expense.payment_method),
+            )
+            .order_by(Expense.date.desc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+

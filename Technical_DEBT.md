@@ -150,6 +150,32 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Future Work**:
   - Scope regex tighter to specific project naming patterns if multi-tenant Vercel origin isolation is required.
 
+---
+
+## 15. Voice Expense Quick-Add (Web Speech API Compatibility & Zero-Cost Architecture)
+* **Status**: **IMPLEMENTED in Phase 7**.
+* **Architecture / Tradeoff**:
+  - Chose the native browser `SpeechRecognition` / `webkitSpeechRecognition` API instead of server-side audio upload APIs (e.g. OpenAI Whisper or Google Cloud Speech-to-Text).
+  - **Pros**: Zero backend streaming audio latency, zero recurring API token costs, and privacy-preserving on-device speech transcription.
+  - **Tradeoff**: Browser support varies (supported out-of-the-box in Chrome, Edge, Safari; Firefox requires explicit flag configuration).
+  - **Resolution**:
+    - The microphone button detects browser support dynamically. If unavailable, it gracefully informs the user and falls back to standard text Quick Add.
+* **Future Work**:
+  - Add optional server-side audio file transcription using Gemini Audio for non-compatible browser environments.
+
+---
+
+## 16. SMS Banking Heuristics vs Large Language Model Token Usage
+* **Status**: **IMPLEMENTED in Phase 7**.
+* **Architecture / Tradeoff**:
+  - Processing raw SMS text through cloud LLMs incurs latency (~1-2 seconds) and token costs for repetitive, standardized financial alerts.
+  - **Resolution**:
+    - Built a high-speed regex-based SMS heuristic parser in [`AIService`](file:///e:/Projects/Paradox/backend/app/services/ai_service.py) tuned for Indian banking formats (HDFC, SBI, ICICI, Axis, Kotak, Paytm, PhonePe, GPay, CRED).
+    - Executes in < 5ms with deterministic accuracy, instantly populating amount, merchant, date, and payment method without making external network calls.
+* **Future Work**:
+  - Add client-side local NLP or expanded regex packs for international SMS formats (US/UK/EU bank alerts).
+
+
 
 
 

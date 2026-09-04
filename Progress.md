@@ -176,30 +176,57 @@ Paradox/
 
 ---
 
-## 8. Testing & Build Verification
+## 8. Phase 7: Supercharged Automation, Frameworks & Engagement
+- **Voice Expense Quick-Add (Web Speech API)**:
+  - Hands-free expense logging directly into the Quick Add bar in [`ExpenseFormDialog.tsx`](frontend/src/features/expenses/components/ExpenseFormDialog.tsx).
+  - Uses native browser `SpeechRecognition` / `webkitSpeechRecognition` API (zero third-party SDK dependencies or fees) with Indian English (`en-IN`) and general English support.
+  - Features real-time pulsing mic recording states and instant transcription auto-dispatch into the natural language parser pipeline.
+- **Indian Bank & UPI SMS Transaction Parser**:
+  - `POST /api/v1/ai/parse-sms` endpoint in [`ai_service.py`](backend/app/services/ai_service.py) with specialized heuristics for Indian financial SMS formats (HDFC, SBI, ICICI, Axis, Kotak, Paytm, PhonePe, Google Pay, CRED).
+  - Automatically extracts amount, merchant, date, payment method (UPI, Card, NetBanking), and UTR reference number while scrubbing sensitive card/account numbers.
+  - Frontend collapsible "📱 SMS" paste drawer inside [`ExpenseFormDialog.tsx`](frontend/src/features/expenses/components/ExpenseFormDialog.tsx) for 1-click autofill.
+- **Smart Duplicate Transaction Guard**:
+  - `POST /api/v1/ai/check-duplicate` and repository method `find_potential_duplicates` querying candidate transactions against user ledger within a ±2 day tolerance window.
+  - Frontend live warning banner in [`ExpenseFormDialog.tsx`](frontend/src/features/expenses/components/ExpenseFormDialog.tsx) alerting users to existing identical charges before recording.
+- **50/30/20 Budget Optimization Framework**:
+  - `GET /api/v1/ai/fifty-thirty-twenty` deterministically partitioning monthly expenses into Needs (50%), Wants (30%), and Savings (20%), computing variances, adherence scores (0–100), and personalized rebalancing tips.
+  - Frontend [`FiftyThirtyTwentyCard.tsx`](frontend/src/features/dashboard/components/FiftyThirtyTwentyCard.tsx) with tri-color segmented progress bar mounted on Dashboard and Budget views.
+- **Financial Streaks & Discipline Achievements**:
+  - `GET /api/v1/ai/achievements` tracking gamified streaks (Budget Champion, Leak Hunter Master, Consistency Ace, Discipline Titan) and dynamic motivational quotes.
+  - Frontend [`AchievementsCard.tsx`](frontend/src/features/dashboard/components/AchievementsCard.tsx) with progress rings and milestone badges on the Dashboard.
+- **"Finny" — Interactive Financial Mood Mascot**:
+  - Interactive SVG-based mascot [`FinnyMascot.tsx`](frontend/src/features/dashboard/components/FinnyMascot.tsx) in the Dashboard header.
+  - Dynamically updates facial expressions and glowing mood states (Joyful, Calm, Alert, Stressed) based on real-time financial health score and burn velocity, with interactive speech bubble advice.
+- **Persistent Workspace Agent Repo Memory (`.agents/`)**:
+  - Created `.agents/rules/paradox-architecture.md` and `.agents/rules/paradox-memory.md` to permanently anchor architectural constraints, database conventions, and milestone states across all future AI sessions.
+
+---
+
+## 9. Testing & Build Verification
 - **Backend Tests (`pytest`)**:
-  - `42 passed in 3.31s` (100% green).
-  - Added unit tests `test_auth_service_verify_otp_and_register` and `test_auth_service_check_registration_status`.
+  - `47 passed in 4.03s` (100% green).
+  - Added dedicated test suite [`test_ai_features_phase2.py`](backend/tests/unit/test_ai_features_phase2.py) verifying SMS parsing, duplicate detection, 50/30/20 arithmetic, and achievement streak logic.
 - **Frontend Builds (`next build`)**:
   - Next.js 16.3.3 + Turbopack compiles successfully with 0 TypeScript/ESLint errors across all 14 static/dynamic routes.
 
 ---
 
-## 9. Current Session Handoff Notes
-- All features, including Omnichannel Dual-Mode Registration and Multi-Account Switcher, are fully operational, tested, and documented.
+## 10. Current Session Handoff Notes
+- All features across Phases 1 through 7 are fully operational, tested, and documented.
 - Active servers:
   - Backend: `http://127.0.0.1:8000` (FastAPI + Uvicorn)
   - Frontend: `http://localhost:3000` (Next.js 16 App Router)
 - Database:
   - Latest migration: `a1b2c3d4e5f6` (OTP & is_verified on pending_registration_tokens).
 - Testing:
-  - Backend: `.venv\Scripts\pytest tests/ -q` -> 42/42 passed.
+  - Backend: `.venv\Scripts\pytest tests/ -q` -> 47/47 passed.
   - Frontend: `npm.cmd run build` -> 0 errors.
-- **Documentation**:
-  - `docs/PARADOX_AI_FEATURES_UPDATED.md` maintained as the master roadmap for upcoming AI phases.
-  - `docs/AI_FEATURES.md` maintained as the active dual-engine reference.
+- **Documentation & Agent Memory**:
+  - `.agents/rules/paradox-architecture.md` & `.agents/rules/paradox-memory.md` maintained as persistent repo memory.
+  - `docs/PARADOX_AI_FEATURES_UPDATED.md` maintained as the master roadmap.
 - For local testing:
   - PostgreSQL: `E:\PSQL\bin\postgres.exe -D "E:\PSQL\data"`
   - Backend: `.venv\Scripts\uvicorn app.main:app --port 8000`
   - Frontend: `npm.cmd run dev`
+
 

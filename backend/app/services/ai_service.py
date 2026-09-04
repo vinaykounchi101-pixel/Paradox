@@ -9,16 +9,21 @@ import httpx
 
 from app.core.config import settings
 from app.schemas.ai import (
+    AchievementBadge,
+    AchievementsResponse,
     AIInsightsResponse,
     AuditSubscriptionItem,
     CategorizeResponse,
     CategoryAllocation,
+    FiftyThirtyTwentyItem,
+    FiftyThirtyTwentyResponse,
     FinancialHealthScoreResponse,
     HealthScorePillar,
     LeakAnalysisResponse,
     ParsedReceiptItem,
     ParseExpenseResponse,
     ParseReceiptResponse,
+    ParseSmsResponse,
     SafeToSpendResponse,
     SimulatePurchaseResponse,
     SpendingLeakItem,
@@ -1669,6 +1674,406 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
             duplicate_warnings=warnings,
             potential_annual_savings=pot_savings.quantize(Decimal("0.01")),
             insights=insights,
+        )
+
+    # =========================================================================
+    # Indian Bank & UPI SMS Parser
+    # =========================================================================
+
+    async def parse_sms_text(
+        self,
+        text: str,
+        categories: Optional[List[str]] = None,
+        payment_methods: Optional[List[str]] = None,
+    ) -> ParseSmsResponse:
+        """
+        Extract transaction amount, merchant, date, payment method, and reference ID
+        from Indian banking and UPI SMS alerts (HDFC, SBI, ICICI, Axis, Paytm, PhonePe, GPay, etc.).
+        """
+        cats = categories or DEFAULT_SYSTEM_CATEGORIES
+        pms = payment_methods or DEFAULT_PAYMENT_METHODS
+        clean_text = text.strip()
+
+        # 1. Detect Transaction Type
+        lower_text = clean_text.lower()
+        if any(w in lower_text for w in ["credited", "received", "deposited"]):
+            txn_type = "credit"
+        else:
+            txn_type = "debit"
+
+        # 2. Extract Amount
+        amount: Optional[Decimal] = None
+        amt_match = re.search(
+            r"(?:(?:Rs\.?|INR)\s*|debited\s*(?:with\s*)?(?:Rs\.?|INR)?\s*)([0-9]+(?:,[0-9]+)*(?:\.[0-9]{1,2})?)",
+            clean_text,
+            re.IGNORECASE,
+        )
+        if not amt_match:
+            amt_match = re.search(r"([0-9]+(?:,[0-9]+)*(?:\.[0-9]{1,2})?)\s*(?:Rs\.?|INR)", clean_text, re.IGNORECASE)
+
+        if amt_match:
+            raw_amt_str = amt_match.group(1).replace(",", "")
+            try:
+                amount = Decimal(raw_amt_str)
+            except Exception:
+                amount = None
+
+        # 3. Extract Merchant / Payee
+        merchant: Optional[str] = None
+        merchant_match = re.search(
+            r"(?:to|at|towards|info:)\s+([A-Za-z0-9\s.&'-]{2,35}?)(?:\.|\s+on|\s+via|\s+using|\s+avl|\s+ref|\s+upi|\s+bal|$)",
+            clean_text,
+            re.IGNORECASE,
+        )
+        if merchant_match:
+            candidate = merchant_match.group(1).strip()
+            if candidate.lower() not in ["your", "vpa", "account", "a/c", "credit card", "debit card", "upi"]:
+                merchant = candidate
+
+        if not merchant:
+            words = re.findall(r"\b[A-Z]{3,20}\b", clean_text)
+            skip_words = {"HDFC", "ICICI", "AXIS", "KOTAK", "BANK", "INFO", "DEBITED", "CREDITED", "SPENT", "PAID", "CARD", "ACCT", "RS", "INR", "TXN", "REF", "UPI", "VPA"}
+            valid_words = [w for w in words if w not in skip_words]
+            if valid_words:
+                merchant = valid_words[0].title()
+
+        if not merchant:
+            merchant = "Bank Transaction"
+
+        # 4. Extract Date
+        extracted_date: Optional[str] = None
+        date_match = re.search(
+            r"\b(\d{1,2})[-/](\w{3}|\d{1,2})[-/](\d{2,4})\b",
+            clean_text,
+        )
+        if date_match:
+            d_day, d_month, d_year = date_match.groups()
+            try:
+                if len(d_year) == 2:
+                    d_year = f"20{d_year}"
+                
+                month_names = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+                if d_month.lower() in month_names:
+                    m_num = month_names.index(d_month.lower()) + 1
+                else:
+                    m_num = int(d_month)
+
+                dt_obj = date(int(d_year), m_num, int(d_day))
+                extracted_date = dt_obj.strftime("%Y-%m-%d")
+            except Exception:
+                extracted_date = None
+
+        if not extracted_date:
+            extracted_date = date.today().strftime("%Y-%m-%d")
+
+        # 5. Extract Reference / UTR ID
+        ref_id: Optional[str] = None
+        ref_match = re.search(
+            r"(?:Ref(?:\s*No|\s*ID)?|UPI(?:\s*Ref)?|Txn(?:\s*ID)?|UTR)[:\s]+([A-Za-z0-9]+)",
+            clean_text,
+            re.IGNORECASE,
+        )
+        if ref_match:
+            ref_id = ref_match.group(1).strip()
+
+        # 6. Infer Payment Method
+        if any(k in lower_text for k in ["upi", "vpa", "gpay", "phonepe", "paytm"]):
+            matched_pm = "UPI"
+        elif "credit card" in lower_text:
+            matched_pm = "Credit Card"
+        elif "debit card" in lower_text:
+            matched_pm = "Debit Card"
+        elif any(k in lower_text for k in ["netbanking", "net banking"]):
+            matched_pm = "Net Banking"
+        else:
+            matched_pm = "UPI"
+
+        final_pm = pms[0] if pms else "UPI"
+        for pm in pms:
+            if pm.lower() == matched_pm.lower():
+                final_pm = pm
+                break
+
+        # 7. Match Category from Merchant
+        matched_cat = cats[0] if cats else "Other"
+        merchant_lower = merchant.lower()
+        if any(w in merchant_lower for w in ["swiggy", "zomato", "restaurant", "cafe", "bistro", "starbucks", "mcdonalds", "kfc", "pizza", "burger", "food", "dining"]):
+            matched_cat = next((c for c in cats if "food" in c.lower() or "dining" in c.lower()), matched_cat)
+        elif any(w in merchant_lower for w in ["blinkit", "zepto", "instamart", "supermarket", "grocer", "mart"]):
+            matched_cat = next((c for c in cats if "grocer" in c.lower() or "food" in c.lower()), matched_cat)
+        elif any(w in merchant_lower for w in ["uber", "ola", "rapido", "petrol", "shell", "fuel", "metro", "transport"]):
+            matched_cat = next((c for c in cats if "transport" in c.lower() or "fuel" in c.lower()), matched_cat)
+        elif any(w in merchant_lower for w in ["amazon", "flipkart", "myntra", "zara", "h&m", "shop"]):
+            matched_cat = next((c for c in cats if "shop" in c.lower()), matched_cat)
+        elif any(w in merchant_lower for w in ["netflix", "prime", "hotstar", "spotify", "cinema", "movie"]):
+            matched_cat = next((c for c in cats if "entertain" in c.lower()), matched_cat)
+        elif any(w in merchant_lower for w in ["electricity", "bescom", "airtel", "jio", "broadband", "wifi", "bill"]):
+            matched_cat = next((c for c in cats if "utilit" in c.lower() or "bill" in c.lower()), matched_cat)
+        elif any(w in merchant_lower for w in ["apollo", "pharmacy", "clinic", "hospital", "1mg"]):
+            matched_cat = next((c for c in cats if "health" in c.lower()), matched_cat)
+
+        return ParseSmsResponse(
+            amount=amount,
+            merchant=merchant,
+            date=extracted_date,
+            category_name=matched_cat,
+            payment_method_name=final_pm,
+            reference_id=ref_id,
+            transaction_type=txn_type,
+            confidence=0.90 if amount else 0.60,
+            provider_used="heuristic_indian_sms",
+        )
+
+    # =========================================================================
+    # 50/30/20 Budget Optimization Framework
+    # =========================================================================
+
+    async def calculate_fifty_thirty_twenty(
+        self,
+        expenses: List[Any],
+        total_spent: Decimal,
+        budget_limit: Optional[Decimal] = None,
+    ) -> FiftyThirtyTwentyResponse:
+        """
+        Deterministically partition expenses into Needs (50%), Wants (30%), and Savings (20%)
+        and compute adherence score and actionable rebalancing advice.
+        """
+        needs_cats = {"housing", "rent", "groceries", "utilities", "bills & utilities", "bills", "healthcare", "health", "education", "transportation", "commute", "fuel", "insurance"}
+        savings_cats = {"investments", "investment", "savings", "mutual funds", "stocks", "sip", "emergency fund", "debt"}
+
+        needs_spent = Decimal("0.00")
+        wants_spent = Decimal("0.00")
+        savings_spent = Decimal("0.00")
+
+        needs_categories: Dict[str, Decimal] = {}
+        wants_categories: Dict[str, Decimal] = {}
+        savings_categories: Dict[str, Decimal] = {}
+
+        for e in expenses:
+            amt = Decimal(str(e.amount))
+            cat_name = e.category.name if hasattr(e, "category") and e.category else (getattr(e, "category_name", None) or "Other")
+            cat_lower = cat_name.lower()
+
+            if any(k in cat_lower for k in needs_cats):
+                needs_spent += amt
+                needs_categories[cat_name] = needs_categories.get(cat_name, Decimal("0.00")) + amt
+            elif any(k in cat_lower for k in savings_cats):
+                savings_spent += amt
+                savings_categories[cat_name] = savings_categories.get(cat_name, Decimal("0.00")) + amt
+            else:
+                wants_spent += amt
+                wants_categories[cat_name] = wants_categories.get(cat_name, Decimal("0.00")) + amt
+
+        if budget_limit and budget_limit > Decimal("0.00"):
+            base_budget = budget_limit
+        else:
+            base_budget = max(total_spent, Decimal("10000.00"))
+
+        target_needs = (base_budget * Decimal("0.50")).quantize(Decimal("0.01"))
+        target_wants = (base_budget * Decimal("0.30")).quantize(Decimal("0.01"))
+        target_savings = (base_budget * Decimal("0.20")).quantize(Decimal("0.01"))
+
+        if total_spent > Decimal("0.00"):
+            pct_needs = round(float((needs_spent / total_spent) * Decimal("100")), 1)
+            pct_wants = round(float((wants_spent / total_spent) * Decimal("100")), 1)
+            pct_savings = round(float((savings_spent / total_spent) * Decimal("100")), 1)
+        else:
+            pct_needs, pct_wants, pct_savings = 0.0, 0.0, 0.0
+
+        status_needs = "on_track" if needs_spent <= target_needs else "over"
+        status_wants = "on_track" if wants_spent <= target_wants else "over"
+        status_savings = "on_track" if savings_spent >= target_savings else "under"
+
+        advice: List[str] = []
+        if wants_spent > target_wants:
+            excess = wants_spent - target_wants
+            top_want = sorted(wants_categories.items(), key=lambda x: x[1], reverse=True)
+            top_want_name = top_want[0][0] if top_want else "lifestyle"
+            advice.append(f"Wants are {pct_wants}% of spending (exceeding 30% target by {excess:.2f}). Consider curbing {top_want_name} spending.")
+        
+        if needs_spent > target_needs:
+            excess = needs_spent - target_needs
+            advice.append(f"Essential needs account for {pct_needs}% of spending. Review utility bills or grocery shopping for bulk savings.")
+
+        if savings_spent < target_savings:
+            deficit = target_savings - savings_spent
+            advice.append(f"Savings & investments are {pct_savings}% (target is 20%). Automate a transfer of {deficit:.2f} at month start.")
+
+        if not advice:
+            advice.append("Outstanding balance! Your spending allocations perfectly honor the 50/30/20 wealth framework.")
+
+        var_needs = abs(pct_needs - 50.0)
+        var_wants = abs(pct_wants - 30.0)
+        var_savings = abs(pct_savings - 20.0)
+        score = max(0, min(100, int(100 - (var_needs * 0.8 + var_wants * 1.0 + var_savings * 1.2))))
+
+        top_needs_list = [k for k, _ in sorted(needs_categories.items(), key=lambda x: x[1], reverse=True)[:3]]
+        top_wants_list = [k for k, _ in sorted(wants_categories.items(), key=lambda x: x[1], reverse=True)[:3]]
+        top_savings_list = [k for k, _ in sorted(savings_categories.items(), key=lambda x: x[1], reverse=True)[:3]]
+
+        return FiftyThirtyTwentyResponse(
+            total_spent=total_spent.quantize(Decimal("0.01")),
+            target_budget=base_budget.quantize(Decimal("0.01")),
+            needs=FiftyThirtyTwentyItem(
+                category_type="needs",
+                label="Needs (50%)",
+                target_percentage=50.0,
+                actual_amount=needs_spent.quantize(Decimal("0.01")),
+                actual_percentage=pct_needs,
+                variance_amount=(needs_spent - target_needs).quantize(Decimal("0.01")),
+                status=status_needs,
+                top_categories=top_needs_list,
+            ),
+            wants=FiftyThirtyTwentyItem(
+                category_type="wants",
+                label="Wants (30%)",
+                target_percentage=30.0,
+                actual_amount=wants_spent.quantize(Decimal("0.01")),
+                actual_percentage=pct_wants,
+                variance_amount=(wants_spent - target_wants).quantize(Decimal("0.01")),
+                status=status_wants,
+                top_categories=top_wants_list,
+            ),
+            savings=FiftyThirtyTwentyItem(
+                category_type="savings",
+                label="Savings & Debt (20%)",
+                target_percentage=20.0,
+                actual_amount=savings_spent.quantize(Decimal("0.01")),
+                actual_percentage=pct_savings,
+                variance_amount=(savings_spent - target_savings).quantize(Decimal("0.01")),
+                status=status_savings,
+                top_categories=top_savings_list,
+            ),
+            rebalance_advice=advice,
+            adherence_score=score,
+        )
+
+    # =========================================================================
+    # Financial Streaks & Discipline Achievements
+    # =========================================================================
+
+    async def calculate_achievements(
+        self,
+        expenses: List[Any],
+        budget: Optional[Any],
+        past_expenses: List[Any],
+    ) -> AchievementsResponse:
+        """
+        Compute real financial discipline badges, active streaks, and milestone achievements.
+        """
+        today = date.today()
+        total_current_spent = sum((Decimal(str(e.amount)) for e in expenses), Decimal("0.00"))
+        budget_amt = Decimal(str(budget.amount)) if budget and getattr(budget, "amount", None) else None
+
+        badges: List[AchievementBadge] = []
+
+        # Badge 1: Budget Champion
+        if budget_amt and budget_amt > Decimal("0.00"):
+            pct_used = float((total_current_spent / budget_amt) * Decimal("100"))
+            is_unlocked = total_current_spent <= budget_amt
+            tier = "diamond" if pct_used <= 70.0 else "gold" if pct_used <= 85.0 else "silver" if is_unlocked else "bronze"
+            progress = max(0, min(100, int(100 - pct_used))) if is_unlocked else 0
+            label = f"{int(pct_used)}% of budget utilized"
+        else:
+            is_unlocked = False
+            tier = "bronze"
+            progress = 50
+            label = "Set a budget to unlock"
+
+        badges.append(
+            AchievementBadge(
+                id="budget_champion",
+                title="Budget Champion",
+                description="Maintain spending within your planned monthly limit.",
+                icon="ShieldCheck",
+                tier=tier,
+                is_unlocked=is_unlocked,
+                progress=progress,
+                progress_label=label,
+            )
+        )
+
+        # Badge 2: Leak Hunter Master
+        small_expenses = [e for e in expenses if Decimal(str(e.amount)) <= Decimal("150.00")]
+        is_leak_master = len(small_expenses) <= 5
+        badges.append(
+            AchievementBadge(
+                id="leak_hunter",
+                title="Leak Hunter Master",
+                description="Keep sub-₹150 impulsive micro-spending under 5 transactions this month.",
+                icon="Crosshair",
+                tier="gold" if len(small_expenses) <= 2 else "silver" if is_leak_master else "bronze",
+                is_unlocked=is_leak_master,
+                progress=max(0, 100 - len(small_expenses) * 15),
+                progress_label=f"{len(small_expenses)} / 5 micro-expenses logged",
+            )
+        )
+
+        # Badge 3: Consistent Tracker
+        unique_days = len(set(e.date for e in expenses if e.date))
+        is_consistent = unique_days >= 7
+        badges.append(
+            AchievementBadge(
+                id="consistent_tracker",
+                title="Consistency Ace",
+                description="Log expenses across at least 7 distinct days this month.",
+                icon="Flame",
+                tier="diamond" if unique_days >= 15 else "gold" if is_consistent else "bronze",
+                is_unlocked=is_consistent,
+                progress=min(100, int((unique_days / 7) * 100)),
+                progress_label=f"{unique_days} / 7 days logged",
+            )
+        )
+
+        # Badge 4: Smart Allocator
+        wants_cats = {"dining", "food", "shopping", "entertainment", "travel"}
+        wants_total = Decimal("0.00")
+        for e in expenses:
+            cat_name = e.category.name if hasattr(e, "category") and e.category else (getattr(e, "category_name", None) or "")
+            if any(w in cat_name.lower() for w in wants_cats):
+                wants_total += Decimal(str(e.amount))
+
+        wants_ratio = float((wants_total / total_current_spent) * Decimal("100")) if total_current_spent > 0 else 0.0
+        is_smart = wants_ratio <= 35.0 and total_current_spent > 0
+        badges.append(
+            AchievementBadge(
+                id="smart_allocator",
+                title="Discipline Titan",
+                description="Cap discretionary lifestyle purchases below 35% of total spend.",
+                icon="Award",
+                tier="gold" if is_smart else "silver" if wants_ratio <= 45.0 else "bronze",
+                is_unlocked=is_smart,
+                progress=max(0, min(100, int(100 - wants_ratio))),
+                progress_label=f"{int(wants_ratio)}% discretionary ratio",
+            )
+        )
+
+        # Active streak days
+        if budget_amt and budget_amt > Decimal("0.00"):
+            day_of_month = max(today.day, 1)
+            expected_spend_so_far = (budget_amt / Decimal("30")) * Decimal(str(day_of_month))
+            if total_current_spent <= expected_spend_so_far:
+                streak_days = day_of_month
+            else:
+                streak_days = max(1, day_of_month - int((total_current_spent - expected_spend_so_far) / (budget_amt / Decimal("30"))))
+        else:
+            streak_days = min(today.day, 5)
+
+        total_unlocked = sum(1 for b in badges if b.is_unlocked)
+
+        quotes = [
+            "Financial freedom is available to those who learn about it and work for it.",
+            "Small daily disciplines compound into generational wealth.",
+            "Every rupee saved today is an employee working for your future.",
+            "Discipline is choosing between what you want now and what you want most.",
+        ]
+        chosen_quote = quotes[today.day % len(quotes)]
+
+        return AchievementsResponse(
+            badges=badges,
+            active_streak_days=streak_days,
+            total_unlocked=total_unlocked,
+            motivation_quote=chosen_quote,
         )
 
 

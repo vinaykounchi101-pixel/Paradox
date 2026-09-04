@@ -8,17 +8,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.db.models.user import User
+from app.repositories.budget_repository import BudgetRepository
 from app.repositories.expense_repository import ExpenseRepository
 from app.schemas.ai import (
+    AchievementBadge,
+    AchievementsResponse,
     AIInsightsResponse,
     CategorizeRequest,
     CategorizeResponse,
+    CheckDuplicateRequest,
+    CheckDuplicateResponse,
+    FiftyThirtyTwentyResponse,
     FinancialHealthScoreResponse,
     LeakAnalysisResponse,
     ParseExpenseRequest,
     ParseExpenseResponse,
     ParseReceiptRequest,
     ParseReceiptResponse,
+    ParseSmsRequest,
+    ParseSmsResponse,
     SafeToSpendResponse,
     SimulatePurchaseRequest,
     SimulatePurchaseResponse,
@@ -346,5 +354,134 @@ async def get_subscription_audit(
         recurring_expenses=recurring_expenses,
     )
     return {"data": result}
+
+
+@router.post("/parse-sms", response_model=DataEnvelope[ParseSmsResponse], status_code=status.HTTP_200_OK)
+async def parse_sms(
+    payload: ParseSmsRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Parse an Indian banking or UPI SMS alert into a structured transaction draft.
+    """
+    cat_service = CategoryService(db)
+    user_cats = await cat_service.list_categories(current_user.id)
+    categories = [c.name for c in user_cats]
+
+    pm_service = PaymentMethodService(db)
+    user_pms = await pm_service.list_payment_methods(current_user.id)
+    payment_methods = [p.name for p in user_pms]
+
+    result = await ai_service.parse_sms_text(
+        text=payload.text,
+        categories=categories,
+        payment_methods=payment_methods,
+    )
+    return {"data": result}
+
+
+@router.post("/check-duplicate", response_model=DataEnvelope[CheckDuplicateResponse], status_code=status.HTTP_200_OK)
+async def check_duplicate(
+    payload: CheckDuplicateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Check if a candidate transaction matches an existing expense within a window of days.
+    """
+    expense_repo = ExpenseRepository(db)
+    try:
+        cand_date = date.fromisoformat(payload.date)
+    except ValueError:
+        cand_date = get_current_date()
+
+    duplicates = await expense_repo.find_potential_duplicates(
+        user_id=current_user.id,
+        amount=payload.amount,
+        target_date=cand_date,
+        description=payload.description,
+        window_days=payload.window_days,
+    )
+
+    if duplicates:
+        match = duplicates[0]
+        desc = match.description or "Expense"
+        cat = match.category.name if match.category else "Uncategorized"
+        msg = f"Potential duplicate found: A {match.amount} ({cat} - '{desc}') was logged on {match.date.strftime('%Y-%m-%d')}."
+        return {
+            "data": CheckDuplicateResponse(
+                has_duplicate=True,
+                duplicate_id=str(match.id),
+                duplicate_amount=match.amount,
+                duplicate_date=match.date.strftime("%Y-%m-%d"),
+                duplicate_description=match.description,
+                message=msg,
+            )
+        }
+
+    return {
+        "data": CheckDuplicateResponse(
+            has_duplicate=False,
+            message="No identical transaction detected in this date window.",
+        )
+    }
+
+
+@router.get("/fifty-thirty-twenty", response_model=DataEnvelope[FiftyThirtyTwentyResponse], status_code=status.HTTP_200_OK)
+async def get_fifty_thirty_twenty(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Compute 50/30/20 budget framework analysis (Needs, Wants, Savings) for current month.
+    """
+    today = get_current_date()
+    month_start = date(today.year, today.month, 1)
+    month_end = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+
+    expense_repo = ExpenseRepository(db)
+    current_expenses = await expense_repo.get_expenses_for_period(current_user.id, month_start, month_end)
+
+    dashboard_service = DashboardService(db)
+    dash_data = await dashboard_service.get_dashboard_data(user_id=current_user.id, period="current_month")
+
+    budget_limit = Decimal(dash_data.budget.amount) if dash_data.budget.amount else None
+    total_spent = Decimal(str(dash_data.total_spent))
+
+    result = await ai_service.calculate_fifty_thirty_twenty(
+        expenses=current_expenses,
+        total_spent=total_spent,
+        budget_limit=budget_limit,
+    )
+    return {"data": result}
+
+
+@router.get("/achievements", response_model=DataEnvelope[AchievementsResponse], status_code=status.HTTP_200_OK)
+async def get_achievements(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Retrieve gamified discipline streaks, milestone badges, and motivation quotes.
+    """
+    today = get_current_date()
+    month_start = date(today.year, today.month, 1)
+    month_end = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+
+    expense_repo = ExpenseRepository(db)
+    current_expenses = await expense_repo.get_expenses_for_period(current_user.id, month_start, month_end)
+    past_90_expenses = await expense_repo.get_expenses_for_period(current_user.id, today - timedelta(days=90), today)
+
+    budget_repo = BudgetRepository(db)
+    budget = await budget_repo.get_budget(current_user.id, period_type="month")
+
+    result = await ai_service.calculate_achievements(
+        expenses=current_expenses,
+        budget=budget,
+        past_expenses=past_90_expenses,
+    )
+    return {"data": result}
+
 
 

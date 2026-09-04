@@ -28,6 +28,7 @@ import { useToast } from "@/components/ui/toast";
 import { BudgetPeriodType } from "@/lib/api/budget";
 import { aiApi, SuggestBudgetResponse } from "@/lib/api/ai";
 import { useCurrency } from "@/features/auth/context/CurrencyContext";
+import { FiftyThirtyTwentyCard } from "@/features/dashboard/components/FiftyThirtyTwentyCard";
 
 // Helpers for default period keys
 function getDefaultPeriodKey(type: BudgetPeriodType): string {
@@ -608,6 +609,11 @@ export default function BudgetConfigView() {
           )}
         </CardContent>
       </Card>
+
+      {/* 50/30/20 Budget Framework Analytics */}
+      <div className="pt-2">
+        <FiftyThirtyTwentyCard />
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <Dialog

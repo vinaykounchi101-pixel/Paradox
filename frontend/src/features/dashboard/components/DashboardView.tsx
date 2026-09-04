@@ -34,6 +34,9 @@ import { LeakHunterDialog } from "./LeakHunterDialog";
 import { SubscriptionAuditDialog } from "./SubscriptionAuditDialog";
 import { ExpenseFormDialog } from "@/features/expenses/components/ExpenseFormDialog";
 import { Search } from "lucide-react";
+import { FinnyMascot } from "./FinnyMascot";
+import { FiftyThirtyTwentyCard } from "./FiftyThirtyTwentyCard";
+import { AchievementsCard } from "./AchievementsCard";
 
 export default function DashboardView() {
   const { formatCurrency, currency, currencySymbol } = useCurrency();
@@ -100,11 +103,14 @@ export default function DashboardView() {
     <div className="page-container space-y-6">
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-glow">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Real-time insights on your financial health.
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-glow">Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Real-time insights on your financial health.
+            </p>
+          </div>
+          <FinnyMascot />
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -367,10 +373,16 @@ export default function DashboardView() {
           </div>
         ) : (
           <p className="mt-3 text-xs text-muted-foreground">
-            No recurring subscriptions marked yet. When recording an expense, toggle "🔁 Recurring Subscription" to track your recurring burdens here.
+            No recurring subscriptions marked yet. When recording an expense, toggle &ldquo;🔁 Recurring Subscription&rdquo; to track your recurring burdens here.
           </p>
         )}
       </Card>
+
+      {/* 50/30/20 Wealth Framework & Achievements Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <FiftyThirtyTwentyCard />
+        <AchievementsCard />
+      </div>
 
       {/* Grid: Latest Transactions */}
       <div className="grid grid-cols-1 gap-6">
