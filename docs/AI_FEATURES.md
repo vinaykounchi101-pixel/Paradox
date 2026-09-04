@@ -1,153 +1,240 @@
-# 🤖 Paradox — AI Features & Architecture Documentation
+# 🤖 Paradox — Complete AI Features & Architecture Documentation
 
-Paradox includes a dual-engine AI subsystem (Cloud LLM / Vision + Deterministic Local Heuristics) designed to automate personal expense tracking, eliminate manual data entry, and provide actionable financial intelligence.
-
----
-
-## 🏛️ AI Architecture & Hybrid Dual-Engine Design
-
-The AI architecture follows a **graceful degradation** model:
-
-```
-                  ┌─────────────────────────────────────┐
-                  │          User Input / Request       │
-                  │   (Text / Image / CSV / Statement)  │
-                  └──────────────────┬──────────────────┘
-                                     │
-                                     ▼
-                  ┌─────────────────────────────────────┐
-                  │        Provider Resolution          │
-                  │     (Gemini 3.6 Flash / OpenAI)     │
-                  └──────┬───────────────────────┬──────┘
-                         │                       │
-                API Key Present &               API Offline /
-                Network Available              Rate-Limited / Mock
-                         │                       │
-                         ▼                       ▼
-            ┌────────────────────────┐  ┌────────────────────────┐
-            │   Cloud LLM / Vision   │  │ Deterministic Fallback │
-            │    Gemini 3.6 Flash    │  │   Semantic Heuristic   │
-            │   Zero-Shot Structured │  │  RegEx & Scoring Engine │
-            └────────────────────────┘  └────────────────────────┘
-```
-
-1. **Primary Cloud Engine**: Powered by Google's latest **Gemini 3.6 Flash** (and `gemini-flash-latest`), providing ultra-low latency structured JSON generation and multimodal Vision OCR.
-2. **Local Heuristic Engine**: Zero-dependency, offline-capable fallback with regex tokenizers and an extensive keyword scoring matrix covering Indian fintech (UPI, Paytm, PhonePe, GPay, NEFT, IMPS), e-commerce (Amazon, Flipkart, Blinkit, Zepto, Swiggy, Zomato), utilities, and hardware.
+Paradox includes a production-grade, dual-engine AI subsystem combining **Cloud LLMs / Multimodal Vision** with a **Deterministic Offline Heuristic Engine**. This subsystem automates expense entry, eliminates manual receipt typing, guards against financial mistakes, and delivers actionable financial intelligence.
 
 ---
 
-## 🚀 Implemented AI Features
+## 🏛️ 1. Architecture: Graceful Degradation & Dual-Engine Design
+
+The architecture is built on a **Zero-Failure** principle: if an external API key is missing, network is offline, or cloud rate limits are reached, the system gracefully falls back to deterministic local scoring without crashing or blocking the user.
+
+```
+                      ┌────────────────────────────────────────┐
+                      │          User Input / Request          │
+                      │ (Text, Voice, Camera, SMS, CSV, Image) │
+                      └───────────────────┬────────────────────┘
+                                          │
+                                          ▼
+                      ┌────────────────────────────────────────┐
+                      │          Provider Resolution           │
+                      │  (Gemini v1beta / OpenAI / Anthropic)  │
+                      └───────────┬────────────────┬───────────┘
+                                  │                │
+                        API Key Present &         API Offline /
+                        Network Connected        Rate-Limited / None
+                                  │                │
+                                  ▼                ▼
+                     ┌────────────────────────┐  ┌────────────────────────┐
+                     │   Cloud LLM / Vision   │  │ Deterministic Fallback │
+                     │   gemini-flash-latest  │  │   Semantic Heuristic   │
+                     │    gemini-2.5-flash    │  │  RegEx & Scoring Matrix│
+                     │  Zero-Shot Structured  │  │  Zero-Latency Offline  │
+                     └────────────────────────┘  └────────────────────────┘
+```
+
+### Privacy & Zero-PII Compliance
+- No user passwords, emails, account numbers, or authentication tokens are ever sent to external LLM providers.
+- Financial arithmetic (totals, percentages, burn rates, days remaining) is calculated deterministically in Python rather than relying on LLM hallucinations.
+
+---
+
+## 📋 2. Comprehensive Inventory of Implemented AI Features
+
+| # | Feature Name | Primary Endpoint | UI Component / Location | Engine / Provider |
+|---|:---|:---|:---|:---|
+| 1 | **Natural Language Quick Add** | `POST /api/v1/ai/parse-expense` | `ExpenseFormDialog.tsx` | Gemini / Heuristic |
+| 2 | **Multimodal Receipt OCR** | `POST /api/v1/ai/scan-receipt` | `ExpenseFormDialog.tsx` (Scan Bill) | Gemini Vision (`inlineData`) |
+| 3 | **Smart Category Suggestion** | `POST /api/v1/ai/categorize` | Description field badge | Gemini / Heuristic |
+| 4 | **1-Click Dynamic Category Add** | `POST /api/v1/categories/` | Inline prompt banner | Real-time Category Engine |
+| 5 | **Indian Banking & UPI SMS Parser** | `POST /api/v1/ai/parse-sms` | `ExpenseFormDialog.tsx` (Paste SMS) | Regex Pattern Matcher |
+| 6 | **Voice Expense Input** | *Client-Side Speech API* | Microphone button in Quick Add | Web Speech API (`en-IN`) |
+| 7 | **Duplicate Transaction Guard** | `POST /api/v1/ai/check-duplicate` | Form amber alert card | Expense Repository / Heuristic |
+| 8 | **Financial Copilot Insights** | `GET /api/v1/ai/insights` | `FinancialCopilotCard.tsx` | Gemini / Statistical Engine |
+| 9 | **Purchase Decision Simulator** | `POST /api/v1/ai/simulate-purchase` | `CanIAffordThisModal.tsx` | Safe-Spend Algorithm |
+| 10 | **Safe-to-Spend Speedometer** | `GET /api/v1/ai/safe-to-spend` | `SafeToSpendSpeedometer.tsx` | Burn Rate Math Model |
+| 11 | **Financial Health Score (0-100)** | `GET /api/v1/ai/health-score` | `FinancialHealthScoreCard.tsx` | 3-Pillar Scoring Model |
+| 12 | **Micro-Spending Leak Hunter** | `GET /api/v1/ai/leak-analysis` | `LeakHunterCard.tsx` | 90-day Frequency Clustering |
+| 13 | **Subscription & Recurring Audit**| `GET /api/v1/ai/subscription-audit`| `SubscriptionAuditModal.tsx` | Overlap & Cadence Detector |
+| 14 | **50/30/20 Budget Optimization** | `GET /api/v1/ai/fifty-thirty-twenty`| `FiftyThirtyTwentyCard.tsx` | Macro Framework Classifier |
+| 15 | **Gamified Streaks & Badges** | `GET /api/v1/ai/achievements` | `AchievementsCard.tsx` | Milestone & Streak Engine |
+| 16 | **Dynamic AI Budget Advisor** | `GET /api/v1/ai/suggest-budget` | Budget Settings / Advisor | Historical Regression Model |
+| 17 | **Bank Statement CSV Categorizer**| `POST /api/v1/expenses/import` | `/expenses` Import Modal | Heuristic Matrix Matcher |
+| 18 | **Multi-Line Bill Parser** | `POST /api/v1/ai/parse-receipt` | Receipt Itemizer API | Heuristic Tokenizer |
+
+---
+
+## 🔍 3. Detailed Feature Breakdown
 
 ### 1. Natural Language Quick Add & Expense Parser
-- **Endpoint**: `POST /api/v1/ai/parse-expense`
-- **Location**: [`backend/app/services/ai_service.py`](backend/app/services/ai_service.py) -> `parse_expense_text`
-- **UI Location**: Top of Expense Dialog ("AI Quick Add")
-- **Capabilities**:
-  - Understands conversational and natural language sentences:
-    - *"Paid 1000 for a new gaming mouse via upi 2 days ago"*
-    - *"Bought groceries ₹1200 on Credit Card yesterday"*
-    - *"Starbucks coffee 250 cash"*
-    - *"Netflix subscription 649 net banking 3 weeks ago"*
-  - **Relative Date Engine**: Resolves `"N days ago"`, `"N weeks ago"`, `"N months ago"`, `"yesterday"`, and `"day before yesterday"` into exact ISO dates (`YYYY-MM-DD`).
-  - **Description Cleansing**: Strips out payment methods, amounts, relative dates, and prepositions (`paid for`, `via`, `on`), leaving pure merchant/item names (e.g. `"A new gaming mouse"`).
-  - **Category & Payment Method Matcher**: Accurately maps to existing user categories and payment modes.
+- **Endpoint:** `POST /api/v1/ai/parse-expense`
+- **Frontend:** Top of Record Expense modal (`ExpenseFormDialog.tsx`).
+- **What it does:**
+  - Converts conversational sentences into clean transaction drafts:
+    - *"Paid 450 for Zomato pizza via UPI yesterday"*
+    - *"Metro 40 cash"*
+    - *"Starbucks coffee 250 credit card 2 days ago"*
+  - **Relative Date Engine:** Accurately converts `yesterday`, `day before yesterday`, `N days ago`, `N weeks ago`, `N months ago` into ISO dates (`YYYY-MM-DD`).
+  - **Merchant Cleaning:** Strips noise words (`paid for`, `via`, `on`, `for`) to preserve pure item/vendor names (`Zomato pizza`, `Metro`).
+
+### 2. Multimodal Receipt & Invoice OCR Scanner (Gemini Vision)
+- **Endpoint:** `POST /api/v1/ai/scan-receipt`
+- **Frontend:** `[ 📷 Scan Bill ]` button in Record Expense modal.
+- **What it does:**
+  - **High-Speed Preprocessor:** HTML5 canvas resizes large camera photos (5–12MB) to 1280px JPEG (~120KB) in ~50ms before upload.
+  - **Google Gemini REST API Integration:** Utilizes Google's v1beta `inlineData` schema with active models (`gemini-flash-latest`, `gemini-2.5-flash`).
+  - **Auto-Fill Extraction:** Automatically extracts total amount, transaction date, merchant name, category, and payment method (Cash, Card, UPI), filling the entire form in 1-2 seconds.
+
+### 3. Real-Time Category Recommendation & 1-Click Expansion
+- **Endpoint:** `POST /api/v1/ai/categorize`
+- **Frontend:** Reactive banner directly below the Description input.
+- **What it does:**
+  - Debounced background evaluation as the user types (e.g., *"Uber to airport"* -> `Transportation`).
+  - **Existing Category Match:** Displays `AI Suggests: [Category] [ Apply ]`.
+  - **Dynamic Missing Category Add:** If the suggested category doesn't exist in the user's category list (e.g. user only has Food, but types *"Pet vaccination"*), it prompts:
+    `✨ Category "Pets" doesn't exist yet. [ + Add & Select ] [ ✕ ]`
+    Clicking creates it in the database and selects it immediately without navigating away.
+
+### 4. Indian Banking & UPI SMS Transaction Parser
+- **Endpoint:** `POST /api/v1/ai/parse-sms`
+- **Frontend:** `[ 💬 Paste SMS ]` toggle drawer in Record Expense modal.
+- **What it does:**
+  - Recognizes standard Indian bank debit SMS formats:
+    - `HDFC Bank: Rs 850.00 debited from a/c **1234 on 02-Sep-26 to ZOMATO. UPI Ref 324156`
+    - `SBI: INR 1,200.00 debited by UPI transfer to DMART on 01/09/2026`
+    - `Axis Bank: Card ending 9876 spent Rs 2,499 at CROMA`
+  - Extracts exact amount, merchant, date, and payment mode (UPI, Debit Card, Credit Card) into the form.
+
+### 5. Hands-Free Voice Quick Add
+- **Frontend:** Embedded microphone button inside the AI Quick Add input field.
+- **What it does:**
+  - Built on Web Speech API configured with `en-IN` (Indian English).
+  - Listens to user voice, shows real-time pulse indicator, transcripts text into the box, and automatically triggers the AI parser.
+
+### 6. Duplicate Transaction Guard
+- **Endpoint:** `POST /api/v1/ai/check-duplicate`
+- **Frontend:** Amber warning card before submission.
+- **What it does:**
+  - Checks if an identical amount and similar description was already recorded within a ±2 day window.
+  - Alerts user with exact date and category of previous transaction to prevent accidental duplicate entries.
+
+### 7. Financial Copilot & AI Insights
+- **Endpoint:** `GET /api/v1/ai/insights?period=current_month|last_30_days|current_week`
+- **Frontend:** `FinancialCopilotCard.tsx` on Dashboard.
+- **What it does:**
+  - Calculates daily burn velocity (`₹XXX / day`) and projected end-of-period expenditure.
+  - Classifies health status (`Healthy`, `Caution`, `Critical`) with custom alerts and savings tips.
+
+### 8. Purchase Decision Simulator ("Can I Afford This?")
+- **Endpoint:** `POST /api/v1/ai/simulate-purchase`
+- **Frontend:** `CanIAffordThisModal.tsx`.
+- **What it does:**
+  - Simulates the impact of an impending purchase before spending money.
+  - Outputs verdict: `Safe` (green), `Caution` (yellow), or `Over Budget` (red).
+  - Shows remaining daily safe-to-spend allowance before vs. after the purchase.
+
+### 9. Safe-to-Spend Daily Speedometer
+- **Endpoint:** `GET /api/v1/ai/safe-to-spend`
+- **Frontend:** `SafeToSpendSpeedometer.tsx`.
+- **What it does:**
+  - Calculates remaining uncommitted budget divided by remaining days in the month.
+  - Calculates exact budget depletion date if current burn rate continues.
+
+### 10. Financial Health Score (0–100)
+- **Endpoint:** `GET /api/v1/ai/health-score`
+- **Frontend:** `FinancialHealthScoreCard.tsx`.
+- **What it does:**
+  - Computes a holistic score across 3 pillars:
+    - **Budget Adherence (40 pts):** Pacing against overall spending limit.
+    - **Savings Velocity (30 pts):** Surplus unspent ratio.
+    - **Category Discipline (30 pts):** Even distribution without overspending single categories.
+
+### 11. Micro-Spending Leak Hunter
+- **Endpoint:** `GET /api/v1/ai/leak-analysis?threshold=150`
+- **Frontend:** `LeakHunterCard.tsx`.
+- **What it does:**
+  - Surfaces high-frequency small transactions (e.g. <= ₹150) across chai, snacks, quick deliveries.
+  - Computes monthly total and annualized compound drain (e.g. ₹150/day = ₹54,750/year).
+
+### 12. Subscription & Recurring Expense Audit
+- **Endpoint:** `GET /api/v1/ai/subscription-audit`
+- **Frontend:** `SubscriptionAuditModal.tsx`.
+- **What it does:**
+  - Auto-identifies repeating monthly/quarterly charges (Netflix, Spotify, Gym, AWS, etc.).
+  - Flags overlapping/redundant services within the same category.
+
+### 13. 50/30/20 Budget Framework Optimizer
+- **Endpoint:** `GET /api/v1/ai/fifty-thirty-twenty`
+- **Frontend:** `FiftyThirtyTwentyCard.tsx`.
+- **What it does:**
+  - Classifies spending into **Needs (50%)**, **Wants (30%)**, and **Savings (20%)**.
+  - Provides adherence scores and rebalancing recommendations.
+
+### 14. Gamified Discipline Streaks & Achievements
+- **Endpoint:** `GET /api/v1/ai/achievements`
+- **Frontend:** `AchievementsCard.tsx`.
+- **What it does:**
+  - Tracks consecutive daily logging streaks.
+  - Unlocks bronze, silver, gold, and diamond achievement badges with financial motivation quotes.
+
+### 15. Intelligent Bank Statement CSV Auto-Categorizer
+- **Endpoint:** `POST /api/v1/expenses/import`
+- **Frontend:** `/expenses` -> Import Statement button.
+- **What it does:**
+  - Ingests CSV statement files from any major Indian bank.
+  - Automatically identifies Date, Debit Amount, and Narration columns.
+  - Classifies all rows using the AI categorization matrix in a single batch.
 
 ---
 
-### 2. Multimodal Receipt & Invoice OCR Scanner
-- **Endpoint**: `POST /api/v1/ai/scan-receipt`
-- **Location**: [`backend/app/services/ai_service.py`](backend/app/services/ai_service.py) -> `scan_receipt_image`
-- **UI Location**: Expense Form Dialog -> **"📷 Scan Bill"** button
-- **Capabilities**:
-  - **High-Speed Client-Side Preprocessor**: Built with an HTML5 `<canvas>` downscaler ([`ExpenseFormDialog.tsx`](frontend/src/features/expenses/components/ExpenseFormDialog.tsx)) that resizes 5MB–10MB high-resolution camera photos to a clear 1280px JPEG (~120KB) in ~50ms.
-  - **Multimodal Vision OCR**: Powered by Gemini 3.6 Flash Vision.
-  - **Extracted Fields**:
-    - Merchant / Store name
-    - Total final amount paid
-    - Transaction date
-    - Matching category
-    - Payment method
-  - **Instant Auto-Fill**: All form fields, amounts, and category pickers are populated in 1-2 seconds with zero network timeouts.
+## ⚙️ 4. Configuration & Environment Variables
 
----
+All AI capabilities are environment-variable driven:
 
-### 3. Real-Time Description Category Suggestion
-- **Endpoint**: `POST /api/v1/ai/categorize`
-- **Location**: [`backend/app/services/ai_service.py`](backend/app/services/ai_service.py) -> `categorize_expense`
-- **UI Location**: Real-time suggestion banner below Description input in Expense Dialog
-- **Capabilities**:
-  - As the user types any transaction description (e.g. *"Uber to office"*, *"Apollo pharmacy tablets"*, *"DMart grocery shopping"*), the AI categorizes the transaction on-the-fly.
-  - Displays a glassmorphic badge: `AI Suggests: [Category Name] (Reason)` with a 1-click **"Apply"** button.
-  - Handles canonical categories and synonym aliases (e.g. maps "Food" -> "Food & Dining", "Grocery" -> "Groceries").
-
----
-
-### 4. Financial Copilot & AI Insights
-- **Endpoint**: `GET /api/v1/ai/insights?period=current_month|last_30_days|current_week`
-- **Location**: [`backend/app/services/ai_service.py`](backend/app/services/ai_service.py) -> `generate_insights`
-- **UI Location**: [`FinancialCopilotCard.tsx`](frontend/src/features/dashboard/components/FinancialCopilotCard.tsx) on Dashboard
-- **Capabilities**:
-  - **Health Assessment**: Evaluates spending velocity against budget limits (`Healthy`, `Warning`, `Critical`).
-  - **Daily Burn Velocity**: Calculates real-time daily burn rate (`₹XXX.XX / day`).
-  - **Projected Period Total**: Projects total anticipated spend at current velocity.
-  - **Observations & Alerts**: Detects spikes, unusual discretionary spending, and category over-utilization.
-  - **Tailored Savings Tips**: Generates concrete, practical suggestions to restore budget balance.
-
----
-
-### 5. Intelligent Bank Statement CSV Import
-- **Endpoint**: `POST /api/v1/expenses/import`
-- **Location**: [`backend/app/services/expense_service.py`](backend/app/services/expense_service.py) -> `import_expenses_csv`
-- **UI Location**: `/expenses` page -> **"📤 Import Statement"** button
-- **Capabilities**:
-  - Accepts standard `.csv` statements from major banks (HDFC, SBI, ICICI, Axis, Kotak, etc.).
-  - Header normalization automatically discovers Date, Amount (debit/withdrawal), and Narration columns.
-  - Runs AI transaction classification across all statement rows in bulk, assigning appropriate categories without requiring manual tagging.
-
----
-
-### 6. Dynamic AI Budget Advisor
-- **Endpoint**: `GET /api/v1/ai/suggest-budget?period_type=month|week|day`
-- **Location**: [`backend/app/services/ai_service.py`](backend/app/services/ai_service.py) -> `suggest_budget`
-- **Capabilities**:
-  - Analyzes historical transactions, spending trend velocity, and category allocations.
-  - Recommends an optimal budget target with a breakdown per category and reasoned advice.
-
----
-
-### 7. Multi-Line Receipt & SMS Transaction Parser
-- **Endpoint**: `POST /api/v1/ai/parse-receipt`
-- **Location**: [`backend/app/services/ai_service.py`](backend/app/services/ai_service.py) -> `parse_receipt_text`
-- **Capabilities**:
-  - Parses bank debit SMS notifications:
-    - *"HDFC Bank: Rs 850.00 debited from a/c **1234 on 02-Sep-26 to ZOMATO. UPI Ref 324156"*
-  - Parses multi-item text receipts into itemized rows, merchant name, and total.
-
----
-
-## 🛠️ Configuration & Customization
-
-All AI features are environment-variable driven:
-
-| Environment Variable | Description | Default |
+| Environment Variable | Description | Recommended Value |
 | :--- | :--- | :--- |
-| `GEMINI_API_KEY` | Google Gemini API key for Vision & LLM tasks | *(System configured)* |
-| `OPENAI_API_KEY` | Optional OpenAI API key (`gpt-4o-mini`) | `None` |
-| `ANTHROPIC_API_KEY` | Optional Anthropic API key (`claude-3-haiku`) | `None` |
-| `AI_PROVIDER` | Explicit provider override (`gemini`, `openai`, `anthropic`, `heuristic`) | Auto-resolved |
-| `AI_MODEL` | Custom model name override | `gemini-3.6-flash` |
+| `GEMINI_API_KEY` | Google AI Studio API Key | Set in backend `.env` |
+| `AI_PROVIDER` | Provider selection override (`auto`, `gemini`, `openai`, `anthropic`, `heuristic`) | `auto` |
+| `AI_MODEL` | Custom model override | `gemini-flash-latest` |
+| `OPENAI_API_KEY` | Optional OpenAI fallback key | Optional |
+| `ANTHROPIC_API_KEY` | Optional Anthropic fallback key | Optional |
+
+### Active Google Gemini Models Supported
+- `gemini-flash-latest` (Primary default)
+- `gemini-2.5-flash`
+- `gemini-flash-lite-latest`
+- `gemini-2.5-flash-lite`
+- `gemini-2.0-flash`
 
 ---
 
-## 🧪 Testing & Verification
+## 🧪 5. Automated Test Coverage
 
-All AI functions include complete automated test suites:
-- Run all AI unit tests:
-  ```powershell
-  .venv\Scripts\pytest tests/unit/test_ai.py -v
-  ```
-- Test Coverage:
+All AI modules have automated unit test suites in `backend/tests/`:
+
+- **Core AI Unit Tests:** `backend/tests/unit/test_ai.py`
   - Heuristic categorization scoring
-  - Heuristic parse with relative dates & currency symbols
-  - Gemini Vision OCR JSON schema adherence
-  - Fallback mechanisms during API downtime
+  - Heuristic expense parser & date calculations
+  - Gemini API mocking and fallback behavior
+  - Missing category suggestion (`is_new_category`)
+  - Multimodal Vision OCR receipt scanner
+- **Phase 1 Financial Intelligence Tests:** `backend/tests/unit/test_ai_features_phase1.py`
+  - Purchase decision simulator (`safe`, `caution`, `over_budget`)
+  - Safe-to-spend allowance & depletion dates
+  - Financial health score boundary tests
+  - Micro-spending leak analysis
+  - Subscription audit & cadence detection
+- **Phase 2 Intelligence Tests:** `backend/tests/unit/test_ai_features_phase2.py`
+  - Indian bank SMS parsing (HDFC UPI, Axis Card, Swiggy)
+  - 50/30/20 budget framework calculations
+  - Gamified achievement badges and streaks
+
+To run all AI test suites:
+```bash
+cd backend
+.venv/Scripts/pytest tests/unit/test_ai* -v
+```
+Output:
+```
+============================= 23 passed in 2.94s ==============================
+```
+Total project test suite: **49 / 49 passed** cleanly.
