@@ -633,7 +633,13 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
       const res = await aiApi.scanReceipt(optimizedFile);
       const data = (res as any)?.data || res;
       if (data) {
-        if (data.amount !== undefined && data.amount !== null && String(data.amount) !== "0" && String(data.amount) !== "0.00") {
+        const validAmount =
+          data.amount !== undefined &&
+          data.amount !== null &&
+          !isNaN(Number(data.amount)) &&
+          Number(data.amount) > 0;
+
+        if (validAmount) {
           setAmount(String(data.amount));
         }
         if (data.date) {
@@ -645,14 +651,7 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
         }
         const activeCats = localCategories.length > 0 ? localCategories : categories;
         if (data.category_name) {
-          let matched = matchCategory(data.category_name, activeCats);
-          if (!matched) {
-            matched = activeCats.find(
-              (c) =>
-                c.name.toLowerCase().includes(data.category_name.toLowerCase()) ||
-                data.category_name.toLowerCase().includes(c.name.toLowerCase())
-            );
-          }
+          const matched = matchCategory(data.category_name, activeCats);
           if (matched) {
             setCategoryId(matched.id);
             setSuggestedNewCategory(null);
@@ -661,20 +660,17 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
           }
         }
         if (data.payment_method_name) {
-          const pmTarget = data.payment_method_name.toLowerCase();
-          let matchedPm = paymentMethods.find((p) => p.name.toLowerCase() === pmTarget);
-          if (!matchedPm) {
-            matchedPm = paymentMethods.find(
-              (p) => p.name.toLowerCase().includes(pmTarget) || pmTarget.includes(p.name.toLowerCase())
-            );
-          }
-          if (matchedPm) {
-            setPaymentMethodId(matchedPm.id);
-          }
+          matchAndSetPaymentMethod(data.payment_method_name);
         }
+
         const providerLabel = (data.provider_used || "Gemini").toUpperCase();
-        setAiStatusMessage(`Auto-filled: ${data.description || "Bill"} (${data.amount ? formatCurrency(data.amount) : ""})`);
-        success(`Bill scanned & form auto-filled with AI (${providerLabel})!`);
+        if (validAmount) {
+          setAiStatusMessage(`Auto-filled: ${data.description || "Bill"} (${formatCurrency(data.amount)})`);
+          success(`Bill scanned & auto-filled with AI (${providerLabel})!`);
+        } else {
+          setAiStatusMessage(`Scanned: ${data.description || "Bill"}. Enter amount.`);
+          success(`Bill scanned with AI (${providerLabel})! Please enter verified amount.`);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to scan receipt image";
@@ -766,24 +762,26 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Natural Language AI Quick Add (available when recording new expense) */}
         {!isEditMode && (
-          <div className="rounded-xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="w-full max-w-full overflow-hidden rounded-xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-2.5 sm:p-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5 shrink-0">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                 AI Quick Add
               </span>
               {aiStatusMessage && (
-                <span className="text-[11px] text-emerald-400 flex items-center gap-1">
-                  <Check className="w-3 h-3" /> {aiStatusMessage}
+                <span className="text-[11px] text-emerald-400 flex items-center gap-1 min-w-0 max-w-[170px] sm:max-w-xs text-right">
+                  <Check className="w-3 h-3 shrink-0" />
+                  <span className="truncate">{aiStatusMessage}</span>
                 </span>
               )}
             </div>
+
             {/* Row 1: Full-width Quick Add Input with embedded Voice button + Auto-Fill submit button */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
+            <div className="flex items-center gap-1.5 sm:gap-2 w-full min-w-0">
+              <div className="relative flex-1 min-w-0">
                 <input
                   type="text"
-                  placeholder="e.g. 'Paid 350 for Zomato pizza via UPI' or 'Metro 40 cash'"
+                  placeholder="e.g. 'Paid 350 for Zomato via UPI' or 'Petrol 500'"
                   value={aiInputText}
                   onChange={(e) => setAiInputText(e.target.value)}
                   onKeyDown={(e) => {
@@ -792,13 +790,13 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                       handleAiParse();
                     }
                   }}
-                  className="w-full bg-zinc-900/90 border border-zinc-800 rounded-lg pl-3 pr-8 py-2 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500 transition"
+                  className="w-full min-w-0 bg-zinc-900/90 border border-zinc-800 rounded-lg pl-2.5 sm:pl-3 pr-8 py-2 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500 transition"
                 />
                 <button
                   type="button"
                   onClick={toggleVoiceInput}
                   disabled={isParsingAi}
-                  className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md transition cursor-pointer ${
+                  className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md transition cursor-pointer ${
                     isListening
                       ? "bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse"
                       : "text-zinc-400 hover:text-white hover:bg-zinc-800/80"
@@ -817,7 +815,7 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                 type="button"
                 onClick={handleAiParse}
                 disabled={isParsingAi || !aiInputText.trim()}
-                className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-sm"
+                className="px-2.5 sm:px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-sm"
               >
                 {isParsingAi ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -828,65 +826,64 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
               </button>
             </div>
 
-            {/* Row 2: Secondary Quick Add Tools with flexible responsive wrapping */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Hidden file input for receipt photo upload */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleReceiptFileChange}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isScanningReceipt || isParsingAi}
-                  className="px-2.5 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5 border border-indigo-500/35 cursor-pointer disabled:opacity-50"
-                  title="Scan receipt, bill, or invoice image using Gemini Vision OCR"
-                >
-                  {isScanningReceipt ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                  ) : (
-                    <Camera className="w-3.5 h-3.5 text-indigo-400" />
-                  )}
-                  <span>{isScanningReceipt ? "Scanning Receipt..." : "Scan Bill / Receipt"}</span>
-                </button>
+            {/* Row 2: Secondary Quick Add Tools with strict 2-column grid to guarantee zero overflow */}
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2 w-full min-w-0 pt-0.5">
+              {/* Hidden file input for receipt photo upload */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handleReceiptFileChange}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isScanningReceipt || isParsingAi}
+                className="w-full min-w-0 justify-center px-2 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5 border border-indigo-500/35 cursor-pointer disabled:opacity-50 truncate"
+                title="Scan receipt, bill, or invoice image using Gemini Vision OCR"
+              >
+                {isScanningReceipt ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400 shrink-0" />
+                ) : (
+                  <Camera className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                )}
+                <span className="truncate">{isScanningReceipt ? "Scanning..." : "Scan Bill"}</span>
+              </button>
 
-                {/* Bank SMS Paste Toggle */}
-                <button
-                  type="button"
-                  onClick={() => setShowSmsBox(!showSmsBox)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
-                    showSmsBox
-                      ? "bg-purple-500/30 text-purple-200 border-purple-500/50"
-                      : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
-                  }`}
-                  title="Paste Indian Banking or UPI SMS alert"
-                >
-                  <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Paste Bank SMS</span>
-                </button>
-              </div>
-
-              {isListening && (
-                <span className="text-[11px] text-rose-300 animate-pulse flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                  Listening to voice...
-                </span>
-              )}
+              {/* Bank SMS Paste Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowSmsBox(!showSmsBox)}
+                className={`w-full min-w-0 justify-center px-2 py-1.5 rounded-lg border text-xs font-medium transition flex items-center gap-1.5 cursor-pointer truncate ${
+                  showSmsBox
+                    ? "bg-purple-500/30 text-purple-200 border-purple-500/50"
+                    : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
+                }`}
+                title="Paste Indian Banking or UPI SMS alert"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span className="truncate">{showSmsBox ? "Hide SMS" : "Paste SMS"}</span>
+              </button>
             </div>
+
+            {/* Voice listening status indicator */}
+            {isListening && (
+              <div className="flex items-center gap-1.5 text-[11px] text-rose-300 animate-pulse pt-0.5 min-w-0 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                <span className="truncate">Listening to your voice... Speak your expense</span>
+              </div>
+            )}
 
             {/* Collapsible SMS Paste Box */}
             {showSmsBox && (
-              <div className="pt-2 border-t border-zinc-800/80 space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                  <span>Paste bank or UPI SMS (HDFC, SBI, ICICI, Axis, Paytm, GPay, etc.):</span>
+              <div className="pt-2 border-t border-zinc-800/80 space-y-2 animate-in fade-in duration-200 w-full min-w-0">
+                <div className="flex items-center justify-between text-[11px] text-zinc-400 gap-2 min-w-0">
+                  <span className="truncate">Paste bank or UPI SMS (HDFC, SBI, ICICI, etc.):</span>
                   <button
                     type="button"
                     onClick={() => setShowSmsBox(false)}
-                    className="text-zinc-500 hover:text-zinc-300 text-[10px]"
+                    className="text-zinc-500 hover:text-zinc-300 text-[10px] shrink-0"
                   >
                     Cancel
                   </button>
@@ -896,17 +893,17 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                   placeholder="e.g. 'HDFC Bank: Rs 850.00 debited from a/c **1234 on 02-Sep-26 to ZOMATO. UPI Ref 324156'"
                   value={smsInputText}
                   onChange={(e) => setSmsInputText(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500 transition resize-none"
+                  className="w-full min-w-0 bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500 transition resize-none"
                 />
-                <div className="flex justify-end">
+                <div className="flex justify-end w-full min-w-0">
                   <button
                     type="button"
                     onClick={handleSmsParse}
                     disabled={isParsingSms || !smsInputText.trim()}
-                    className="px-3 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    className="px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-sm"
                   >
                     {isParsingSms ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                    Parse & Auto-Fill
+                    Parse &amp; Auto-Fill
                   </button>
                 </div>
               </div>
@@ -987,8 +984,8 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
           />
           {/* Suggested existing category */}
           {suggestedCategory && suggestedCategory.id !== categoryId && (
-            <div className="mt-1.5 flex items-center justify-between rounded-lg bg-indigo-500/10 border border-indigo-500/25 px-3 py-1.5 text-xs text-indigo-300 animate-in fade-in duration-200">
-              <div className="flex items-center gap-1.5 truncate">
+            <div className="mt-1.5 flex items-center justify-between rounded-lg bg-indigo-500/10 border border-indigo-500/25 px-2.5 sm:px-3 py-1.5 text-xs text-indigo-300 animate-in fade-in duration-200 w-full min-w-0 gap-2">
+              <div className="flex items-center gap-1.5 min-w-0 truncate">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                 <span className="truncate">
                   AI Suggests: <strong className="text-white font-medium">{suggestedCategory.name}</strong>
@@ -1005,7 +1002,7 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                   setCategoryId(suggestedCategory.id);
                   setSuggestedCategory(null);
                 }}
-                className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-[11px] text-white font-medium cursor-pointer transition shrink-0 ml-2 shadow-sm"
+                className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-[11px] text-white font-medium cursor-pointer transition shrink-0 shadow-sm"
               >
                 Apply
               </button>
@@ -1014,8 +1011,8 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
 
           {/* Suggested new category that does not exist in user's category list */}
           {suggestedNewCategory && (
-            <div className="mt-1.5 flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-200 animate-in fade-in duration-200">
-              <div className="flex items-center gap-1.5 truncate">
+            <div className="mt-1.5 flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 px-2.5 sm:px-3 py-2 text-xs text-amber-200 animate-in fade-in duration-200 w-full min-w-0 gap-2">
+              <div className="flex items-center gap-1.5 min-w-0 truncate">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span className="truncate">
                   Category <strong className="text-white font-semibold">&quot;{suggestedNewCategory}&quot;</strong> doesn&apos;t exist yet.
@@ -1026,7 +1023,7 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                   )}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   disabled={isAddingNewCategory}
@@ -1056,7 +1053,7 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                 <button
                   type="button"
                   onClick={() => setSuggestedNewCategory(null)}
-                  className="p-1 text-amber-400/70 hover:text-amber-200 text-xs rounded transition"
+                  className="p-1 text-amber-400/70 hover:text-amber-200 text-xs rounded transition cursor-pointer"
                   title="Dismiss suggestion"
                 >
                   ✕

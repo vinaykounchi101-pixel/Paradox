@@ -267,7 +267,7 @@ class AIService:
         self, description: str, categories: List[str]
     ) -> Optional[CategorizeResponse]:
         models_to_try = [self.custom_model] if self.custom_model else [
-            "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"
+            "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"
         ]
 
         prompt = (
@@ -328,7 +328,7 @@ class AIService:
         self, text: str, categories: List[str], payment_methods: List[str]
     ) -> Optional[ParseExpenseResponse]:
         models_to_try = [self.custom_model] if self.custom_model else [
-            "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"
+            "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"
         ]
         today_str = date.today().isoformat()
 
@@ -1242,16 +1242,17 @@ Extract the transaction details from this receipt/bill image:
 
 Return ONLY a valid raw JSON object with keys: "amount", "date", "description", "category_name", "payment_method_name". No markdown, no commentary."""
 
-                models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]
+                models = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
                 for model in models:
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
+                    # REST API schema requires inlineData (camelCase) and mimeType
                     payload = {
                         "contents": [{
                             "parts": [
                                 {"text": prompt},
                                 {
-                                    "inline_data": {
-                                        "mime_type": mime_type or "image/jpeg",
+                                    "inlineData": {
+                                        "mimeType": mime_type or "image/jpeg",
                                         "data": base64_img
                                     }
                                 }
@@ -1271,7 +1272,12 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
                                 m = re.search(r"\{.*\}", text_res, re.DOTALL)
                                 if m:
                                     parsed = json.loads(m.group(0))
-                                    raw_amount = parsed.get("amount")
+                                    raw_amount = (
+                                        parsed.get("amount")
+                                        or parsed.get("total_amount")
+                                        or parsed.get("total")
+                                        or parsed.get("grand_total")
+                                    )
                                     # Resilient numeric extraction
                                     amt_str = str(raw_amount).replace(",", "").replace("$", "").replace("₹", "").strip() if raw_amount is not None else ""
                                     amt_num_match = re.search(r"(\d+(?:\.\d{1,2})?)", amt_str)
@@ -1284,7 +1290,7 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
                                         amount_dec = Decimal("0.00")
 
                                     # Date parsing
-                                    raw_date = str(parsed.get("date", "")).strip()
+                                    raw_date = str(parsed.get("date") or parsed.get("transaction_date") or "").strip()
                                     iso_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", raw_date)
                                     if iso_match:
                                         clean_date = iso_match.group(1)
@@ -1296,13 +1302,29 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
                                         else:
                                             clean_date = today_iso
 
-                                    raw_desc = str(parsed.get("description", "")).strip()
-                                    clean_desc = raw_desc if raw_desc and raw_desc.lower() not in ["receipt", "bill", "invoice", "scanned receipt"] else (parsed.get("merchant") or "Scanned Receipt")
+                                    raw_desc = str(
+                                        parsed.get("description")
+                                        or parsed.get("merchant_name")
+                                        or parsed.get("merchant")
+                                        or parsed.get("store")
+                                        or parsed.get("vendor")
+                                        or ""
+                                    ).strip()
+                                    clean_desc = (
+                                        raw_desc
+                                        if raw_desc and raw_desc.lower() not in ["receipt", "bill", "invoice", "scanned receipt", "image"]
+                                        else (parsed.get("merchant") or parsed.get("merchant_name") or parsed.get("store") or "Scanned Receipt")
+                                    )
 
-                                    raw_cat = str(parsed.get("category_name", "")).strip()
+                                    raw_cat = str(parsed.get("category_name") or parsed.get("category") or "").strip()
                                     cat_str = self._match_closest(raw_cat, categories) if categories else raw_cat or "Shopping"
 
-                                    raw_pm = str(parsed.get("payment_method_name", "")).strip()
+                                    raw_pm = str(
+                                        parsed.get("payment_method_name")
+                                        or parsed.get("payment_method")
+                                        or parsed.get("payment_mode")
+                                        or ""
+                                    ).strip()
                                     pm_str = self._match_closest(raw_pm, payment_methods) if payment_methods else raw_pm or "Cash"
 
                                     return ParseExpenseResponse(
@@ -1315,6 +1337,8 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
                                         reasoning=f"Scanned with Gemini Vision OCR ({model})",
                                         provider_used="gemini-vision",
                                     )
+                            else:
+                                logger.warning(f"Vision model {model} HTTP status {resp.status_code}: {resp.text[:150]}")
                     except Exception as model_err:
                         logger.warning(f"Vision model {model} attempt error: {model_err}")
                         continue
