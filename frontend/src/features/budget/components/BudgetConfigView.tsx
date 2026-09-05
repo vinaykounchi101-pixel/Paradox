@@ -129,7 +129,7 @@ export default function BudgetConfigView() {
     if (aiSuggestion) {
       setAmount(String(aiSuggestion.suggested_amount));
       setError("");
-      success(`Applied AI suggested target: $${aiSuggestion.suggested_amount}`);
+      success(`Applied AI suggested target: ${currencySymbol}${aiSuggestion.suggested_amount}`);
     }
   };
 

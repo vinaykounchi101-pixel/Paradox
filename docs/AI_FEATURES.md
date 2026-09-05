@@ -60,6 +60,13 @@ The architecture is built on a **Zero-Failure** principle: if an external API ke
 | 16 | **Dynamic AI Budget Advisor** | `GET /api/v1/ai/suggest-budget` | Budget Settings / Advisor | Historical Regression Model |
 | 17 | **Bank Statement CSV Categorizer**| `POST /api/v1/expenses/import` | `/expenses` Import Modal | Heuristic Matrix Matcher |
 | 18 | **Multi-Line Bill Parser** | `POST /api/v1/ai/parse-receipt` | Receipt Itemizer API | Heuristic Tokenizer |
+| 19 | **Financial Assistant (RAG Chat)** | `POST /api/v1/ai/chat` | `FinancialAssistantChat.tsx` | Gemini / Live User Context RAG |
+| 20 | **Spending Spikes & Anomalies** | `GET /api/v1/ai/anomalies` | `AnomalyForecastCard.tsx` | Std-Deviation Outlier Detector |
+| 21 | **30-Day Predictive Forecast** | `GET /api/v1/ai/forecast` | `AnomalyForecastCard.tsx` | Rolling Trajectory Engine |
+| 22 | **Goal Savings Plan Optimizer** | `POST /api/v1/ai/savings-plan` | `SavingsPlannerDialog.tsx` | Category Discretionary Cuts |
+| 23 | **Sentiment / Remorse Guard** | `POST /api/v1/ai/analyze-sentiment` | `ExpenseFormDialog.tsx` | Behavioral Sentiment Engine |
+| 24 | **Paradox Monthly Wrapped** | `GET /api/v1/ai/monthly-wrapped` | `MonthlyWrappedModal.tsx` | Spotify-Story Archetypes |
+| 25 | **Finny Vibe Check & Roast Mode**| `GET /api/v1/ai/vibe-check` | `FinnyMascot.tsx` | Hinglish / Reality Check |
 
 ---
 
@@ -223,10 +230,14 @@ All AI modules have automated unit test suites in `backend/tests/`:
   - Financial health score boundary tests
   - Micro-spending leak analysis
   - Subscription audit & cadence detection
-- **Phase 2 Intelligence Tests:** `backend/tests/unit/test_ai_features_phase2.py`
-  - Indian bank SMS parsing (HDFC UPI, Axis Card, Swiggy)
-  - 50/30/20 budget framework calculations
-  - Gamified achievement badges and streaks
+- **Phase 3 Final Intelligence Tests:** `backend/tests/unit/test_ai_features_final.py`
+  - Financial assistant RAG and spending inquiry
+  - Spending anomaly outlier detection
+  - 30-day predictive spending forecast
+  - Goal-based savings planner category cuts
+  - Behavioral sentiment & buyer's remorse reflection
+  - Monthly wrapped storytelling and persona archetypes
+  - Finny burn-rate vibe check & Hinglish roast mode
 
 To run all AI test suites:
 ```bash
@@ -235,6 +246,6 @@ cd backend
 ```
 Output:
 ```
-============================= 23 passed in 2.94s ==============================
+============================= 31 passed in 1.45s ==============================
 ```
-Total project test suite: **49 / 49 passed** cleanly.
+Total project test suite: **57 / 57 passed** cleanly with 0 failures.

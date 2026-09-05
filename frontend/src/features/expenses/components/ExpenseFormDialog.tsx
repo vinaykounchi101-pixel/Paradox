@@ -14,7 +14,7 @@ import { CategoryPicker } from "@/components/ui/CategoryPicker";
 import { useToast } from "@/components/ui/toast";
 import { ExpenseRead } from "@/lib/api/expenses";
 import { CategoryRead } from "@/lib/api/expenses";
-import { aiApi } from "@/lib/api/ai";
+import { aiApi, AnalyzeSentimentResponse } from "@/lib/api/ai";
 import { useCurrency } from "@/features/auth/context/CurrencyContext";
 import {
   Sparkles,
@@ -240,6 +240,10 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
   // Duplicate Detection State
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
+  // Emotional Sentiment & Buyer's Remorse Reflection State
+  const [sentimentResult, setSentimentResult] = useState<AnalyzeSentimentResponse | null>(null);
+  const [showSentimentTip, setShowSentimentTip] = useState(true);
+
   // Track dialog open transition to avoid clearing fields during background re-renders
   const prevIsOpenRef = useRef(false);
 
@@ -253,6 +257,8 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
       setSuggestedNewCategory(null);
       setIsAddingNewCategory(false);
       setSuggestedReason(null);
+      setSentimentResult(null);
+      setShowSentimentTip(true);
 
       if (expense) {
         setAmount(String(expense.amount));
@@ -379,6 +385,31 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
 
     return () => clearTimeout(timer);
   }, [amount, date, description, isEditMode]);
+
+  // Debounced Emotional Sentiment & Buyer's Remorse Analysis
+  useEffect(() => {
+    if (!description || description.trim().length < 4 || isEditMode) {
+      setSentimentResult(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await aiApi.analyzeSentiment({
+          text: description,
+          amount: amount && !isNaN(Number(amount)) ? Number(amount) : undefined,
+        });
+        if (res.data) {
+          setSentimentResult(res.data);
+          setShowSentimentTip(true);
+        }
+      } catch {
+        // Silent fallback
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [description, amount, isEditMode]);
 
   // Helper to map and set payment method
   const matchAndSetPaymentMethod = (pmTargetRaw?: string | null) => {
@@ -1059,6 +1090,38 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                   ✕
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Mindful Spending & Buyer's Remorse Reflection Banner */}
+          {sentimentResult && showSentimentTip && (
+            <div
+              className={`mt-2 p-2.5 rounded-xl border text-xs animate-in fade-in duration-200 ${
+                sentimentResult.sentiment === "remorse" || sentimentResult.sentiment === "stress"
+                  ? "bg-rose-500/10 border-rose-500/30 text-rose-200"
+                  : "bg-indigo-500/10 border-indigo-500/25 text-indigo-200"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Mindful Check:</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-900/80 border border-zinc-700 text-zinc-300">
+                    {sentimentResult.spending_tag}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSentimentTip(false)}
+                  className="text-zinc-400 hover:text-zinc-200 text-xs px-1 rounded transition cursor-pointer"
+                  title="Dismiss reflection prompt"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="mt-1 text-[11px] text-zinc-300 leading-relaxed">
+                {sentimentResult.reflection}
+              </p>
             </div>
           )}
         </div>

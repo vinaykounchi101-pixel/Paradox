@@ -33,10 +33,14 @@ import { SafeToSpendCard } from "./SafeToSpendCard";
 import { LeakHunterDialog } from "./LeakHunterDialog";
 import { SubscriptionAuditDialog } from "./SubscriptionAuditDialog";
 import { ExpenseFormDialog } from "@/features/expenses/components/ExpenseFormDialog";
-import { Search } from "lucide-react";
+import { Search, Target, Gift } from "lucide-react";
 import { FinnyMascot } from "./FinnyMascot";
 import { FiftyThirtyTwentyCard } from "./FiftyThirtyTwentyCard";
 import { AchievementsCard } from "./AchievementsCard";
+import { AnomalyForecastCard } from "./AnomalyForecastCard";
+import { SavingsPlannerDialog } from "./SavingsPlannerDialog";
+import { MonthlyWrappedModal } from "./MonthlyWrappedModal";
+import { FinancialAssistantChat } from "./FinancialAssistantChat";
 
 export default function DashboardView() {
   const { formatCurrency, currency, currencySymbol } = useCurrency();
@@ -46,6 +50,8 @@ export default function DashboardView() {
   const [isLeakHunterOpen, setIsLeakHunterOpen] = useState(false);
   const [isSubAuditOpen, setIsSubAuditOpen] = useState(false);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+  const [isSavingsPlannerOpen, setIsSavingsPlannerOpen] = useState(false);
+  const [isWrappedOpen, setIsWrappedOpen] = useState(false);
 
   const handleSimulatorAddExpense = () => {
     setIsExpenseDialogOpen(true);
@@ -126,6 +132,30 @@ export default function DashboardView() {
             Can I Afford This?
           </Button>
 
+          {/* Goal-Based Savings Planner Button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsSavingsPlannerOpen(true)}
+            className="cursor-pointer text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+            title="Calculate milestone plan to save for a major purchase or goal"
+          >
+            <Target className="h-3.5 w-3.5 mr-1.5 text-emerald-400" />
+            Savings Goal
+          </Button>
+
+          {/* Paradox Monthly Wrapped Button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsWrappedOpen(true)}
+            className="cursor-pointer text-xs bg-gradient-to-r from-purple-500/15 to-pink-500/15 hover:from-purple-500/25 hover:to-pink-500/25 text-purple-200 border border-purple-500/30"
+            title="View your monthly financial story and archetype"
+          >
+            <Gift className="h-3.5 w-3.5 mr-1.5 text-pink-400" />
+            Wrapped
+          </Button>
+
           {/* Leak Hunter Button */}
           <Button
             variant="secondary"
@@ -173,6 +203,9 @@ export default function DashboardView() {
 
       {/* AI Financial Copilot Insights Card */}
       <FinancialCopilotCard period={period} />
+
+      {/* Real-time Spending Anomalies & 30-Day Predictive Forecast */}
+      <AnomalyForecastCard />
 
       {/* Top row cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:items-stretch">
@@ -560,6 +593,21 @@ export default function DashboardView() {
         isOpen={isExpenseDialogOpen}
         onClose={() => setIsExpenseDialogOpen(false)}
       />
+
+      {/* Goal-Based Savings Planner Modal */}
+      <SavingsPlannerDialog
+        isOpen={isSavingsPlannerOpen}
+        onClose={() => setIsSavingsPlannerOpen(false)}
+      />
+
+      {/* Paradox Monthly Wrapped 5-Slide Modal */}
+      <MonthlyWrappedModal
+        isOpen={isWrappedOpen}
+        onClose={() => setIsWrappedOpen(false)}
+      />
+
+      {/* Floating RAG Financial Assistant Assistant Drawer */}
+      <FinancialAssistantChat />
     </div>
   );
 }

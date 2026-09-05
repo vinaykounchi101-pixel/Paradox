@@ -248,3 +248,130 @@ class AchievementsResponse(BaseModel):
     motivation_quote: str = Field(..., description="Punchy gamified motivation quote")
 
 
+# =========================================================================
+# New AI Suite Feature Schemas
+# =========================================================================
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., description="'user' or 'assistant'")
+    content: str = Field(..., description="Message content")
+
+
+class AIChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=1000, description="User question or statement")
+    history: List[ChatMessage] = Field(default_factory=list, description="Recent conversation history")
+
+
+class AIChatResponse(BaseModel):
+    reply: str = Field(..., description="Conversational financial assistant response")
+    suggested_followups: List[str] = Field(default_factory=list, description="Quick followup question chips")
+    provider_used: str = Field(..., description="AI provider used")
+
+
+class SpendingAnomalyItem(BaseModel):
+    id: str = Field(..., description="Expense ID")
+    date: str = Field(..., description="Transaction date (YYYY-MM-DD)")
+    amount: Decimal = Field(..., description="Expense amount")
+    category_name: str = Field(..., description="Category")
+    description: Optional[str] = Field(default=None, description="Merchant or item description")
+    severity: str = Field(..., description="'moderate', 'high', or 'critical'")
+    reason: str = Field(..., description="Explanation of why this transaction is an anomaly")
+
+
+class AnomaliesResponse(BaseModel):
+    anomalies: List[SpendingAnomalyItem] = Field(default_factory=list, description="List of detected anomalies")
+    total_anomalies: int = Field(..., description="Number of anomalies flagged")
+    summary: str = Field(..., description="Brief health summary of spending spikes")
+
+
+class CategoryForecastItem(BaseModel):
+    category_name: str = Field(..., description="Category name")
+    current_spent: Decimal = Field(..., description="Spend in current period")
+    projected_next_month: Decimal = Field(..., description="Predicted spend for next month")
+    trend_direction: str = Field(..., description="'up', 'down', or 'stable'")
+    confidence: float = Field(default=0.85, ge=0.0, le=1.0)
+
+
+class SpendingForecastResponse(BaseModel):
+    total_projected_next_month: Decimal = Field(..., description="Predicted total spend for next 30 days")
+    category_forecasts: List[CategoryForecastItem] = Field(default_factory=list, description="Category-wise projections")
+    growth_rate_pct: float = Field(..., description="Projected spend change percentage relative to current month")
+    confidence: float = Field(default=0.85, ge=0.0, le=1.0)
+    forecast_insights: List[str] = Field(default_factory=list, description="Actionable insights on upcoming trends")
+
+
+class SavingsPlanRequest(BaseModel):
+    goal_name: str = Field(..., min_length=2, max_length=100, description="Name of the savings goal (e.g. 'Emergency Fund')")
+    target_amount: Decimal = Field(..., gt=0, description="Target savings amount to accumulate")
+    target_months: int = Field(..., ge=1, le=120, description="Timeframe in months")
+
+
+class SavingsPlanCategoryCut(BaseModel):
+    category_name: str = Field(..., description="Category to trim")
+    current_monthly_spend: Decimal = Field(..., description="Current monthly average spend")
+    suggested_monthly_spend: Decimal = Field(..., description="Target monthly spend after cut")
+    monthly_cut_amount: Decimal = Field(..., description="Monthly reduction amount")
+    cut_percentage: float = Field(..., description="Percentage reduction")
+
+
+class SavingsPlanResponse(BaseModel):
+    goal_name: str = Field(..., description="Savings goal name")
+    target_amount: Decimal = Field(..., description="Total target amount")
+    target_months: int = Field(..., description="Target duration in months")
+    required_monthly_savings: Decimal = Field(..., description="Required savings per month")
+    current_discretionary_spend: Decimal = Field(..., description="Total monthly spend in trimmable categories")
+    feasibility: str = Field(..., description="'highly_achievable', 'achievable', 'challenging', or 'unrealistic'")
+    category_cuts: List[SavingsPlanCategoryCut] = Field(default_factory=list, description="Category-wise budget cuts")
+    action_steps: List[str] = Field(default_factory=list, description="Step-by-step roadmap to achieve goal")
+
+
+class AnalyzeSentimentRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=500, description="Expense description or note to analyze")
+    amount: Optional[Decimal] = Field(default=None, description="Optional transaction amount for context")
+
+
+class AnalyzeSentimentResponse(BaseModel):
+    sentiment: str = Field(..., description="'positive', 'neutral', 'negative', 'remorse', or 'stress'")
+    spending_tag: str = Field(..., description="Behavioral spending tag (e.g. 'Buyer\'s Remorse', 'Stress Spending', 'Celebration', 'Essential')")
+    confidence: float = Field(default=0.85, ge=0.0, le=1.0)
+    reflection: str = Field(..., description="Mindful reflection or tip regarding this spending behavior")
+
+
+class WrappedTopCategory(BaseModel):
+    category_name: str = Field(..., description="Category name")
+    amount: Decimal = Field(..., description="Total spent in category")
+    percentage: float = Field(..., description="Percentage of monthly spend")
+
+
+class WrappedSplurge(BaseModel):
+    amount: Decimal = Field(..., description="Splurge transaction amount")
+    description: str = Field(..., description="Item or merchant")
+    date: str = Field(..., description="Transaction date")
+    category_name: str = Field(..., description="Category")
+
+
+class MonthlyWrappedResponse(BaseModel):
+    month: str = Field(..., description="Formatted month (e.g. 'August 2026')")
+    total_spent: Decimal = Field(..., description="Total spend for month")
+    total_transactions: int = Field(..., description="Total transactions recorded")
+    active_streak_days: int = Field(..., description="Discipline streak recorded in month")
+    archetype_title: str = Field(..., description="Personal financial archetype title (e.g. 'The Mindful Strategist')")
+    archetype_description: str = Field(..., description="Flavor text explaining the archetype")
+    top_categories: List[WrappedTopCategory] = Field(default_factory=list, description="Top 3 spending categories")
+    biggest_splurge: Optional[WrappedSplurge] = Field(default=None, description="Single largest purchase of the month")
+    most_frequent_merchant: Optional[str] = Field(default=None, description="Most visited merchant")
+    savings_achieved: Decimal = Field(..., description="Estimated savings or surplus relative to budget")
+    personalized_recap: List[str] = Field(default_factory=list, description="Personalized highlight cards")
+
+
+class VibeCheckResponse(BaseModel):
+    vibe_emoji: str = Field(..., description="Primary emoji representation (e.g. 🤑, 🧘, 💀, ☕)")
+    vibe_title: str = Field(..., description="Vibe title (e.g. 'Living Large', 'Zen Saver', 'Down Bad')")
+    burn_rate_status: str = Field(..., description="'chill', 'steady', 'spicy', 'critical'")
+    roast_commentary: str = Field(..., description="Witty, humorous financial reality check")
+    is_roast_mode: bool = Field(default=True, description="Whether roast mode is active")
+    daily_burn_rate: Decimal = Field(..., description="Current daily spend rate")
+    budget_percent_consumed: float = Field(..., description="Percentage of monthly budget spent")
+
+
+

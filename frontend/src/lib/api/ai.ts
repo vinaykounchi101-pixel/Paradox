@@ -230,6 +230,128 @@ export interface AchievementsResponse {
   motivation_quote: string;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AIChatRequest {
+  message: string;
+  history?: ChatMessage[];
+}
+
+export interface AIChatResponse {
+  reply: string;
+  suggested_followups: string[];
+  provider_used: string;
+}
+
+export interface SpendingAnomalyItem {
+  id: string;
+  date: string;
+  amount: number | string;
+  category_name: string;
+  description?: string | null;
+  severity: "moderate" | "high" | "critical";
+  reason: string;
+}
+
+export interface AnomaliesResponse {
+  anomalies: SpendingAnomalyItem[];
+  total_anomalies: number;
+  summary: string;
+}
+
+export interface CategoryForecastItem {
+  category_name: string;
+  current_spent: number | string;
+  projected_next_month: number | string;
+  trend_direction: "up" | "down" | "stable";
+  confidence: number;
+}
+
+export interface SpendingForecastResponse {
+  total_projected_next_month: number | string;
+  category_forecasts: CategoryForecastItem[];
+  growth_rate_pct: number;
+  confidence: number;
+  forecast_insights: string[];
+}
+
+export interface SavingsPlanRequest {
+  goal_name: string;
+  target_amount: number;
+  target_months: number;
+}
+
+export interface SavingsPlanCategoryCut {
+  category_name: string;
+  current_monthly_spend: number | string;
+  suggested_monthly_spend: number | string;
+  monthly_cut_amount: number | string;
+  cut_percentage: number;
+}
+
+export interface SavingsPlanResponse {
+  goal_name: string;
+  target_amount: number | string;
+  target_months: number;
+  required_monthly_savings: number | string;
+  current_discretionary_spend: number | string;
+  feasibility: "highly_achievable" | "achievable" | "challenging" | "unrealistic";
+  category_cuts: SavingsPlanCategoryCut[];
+  action_steps: string[];
+}
+
+export interface AnalyzeSentimentRequest {
+  text: string;
+  amount?: number;
+}
+
+export interface AnalyzeSentimentResponse {
+  sentiment: "positive" | "neutral" | "negative" | "remorse" | "stress";
+  spending_tag: string;
+  confidence: number;
+  reflection: string;
+}
+
+export interface WrappedTopCategory {
+  category_name: string;
+  amount: number | string;
+  percentage: number;
+}
+
+export interface WrappedSplurge {
+  amount: number | string;
+  description: string;
+  date: string;
+  category_name: string;
+}
+
+export interface MonthlyWrappedResponse {
+  month: string;
+  total_spent: number | string;
+  total_transactions: number;
+  active_streak_days: number;
+  archetype_title: string;
+  archetype_description: string;
+  top_categories: WrappedTopCategory[];
+  biggest_splurge?: WrappedSplurge | null;
+  most_frequent_merchant?: string | null;
+  savings_achieved: number | string;
+  personalized_recap: string[];
+}
+
+export interface VibeCheckResponse {
+  vibe_emoji: string;
+  vibe_title: string;
+  burn_rate_status: "chill" | "steady" | "spicy" | "critical";
+  roast_commentary: string;
+  is_roast_mode: boolean;
+  daily_burn_rate: number | string;
+  budget_percent_consumed: number;
+}
+
 export const aiApi = {
   categorize: (data: CategorizeRequest) =>
     client.post<DataResponse<CategorizeResponse>>("/ai/categorize", data),
@@ -278,7 +400,29 @@ export const aiApi = {
 
   getAchievements: () =>
     client.get<DataResponse<AchievementsResponse>>("/ai/achievements"),
+
+  chat: (data: AIChatRequest) =>
+    client.post<DataResponse<AIChatResponse>>("/ai/chat", data),
+
+  getAnomalies: () =>
+    client.get<DataResponse<AnomaliesResponse>>("/ai/anomalies"),
+
+  getForecast: () =>
+    client.get<DataResponse<SpendingForecastResponse>>("/ai/forecast"),
+
+  createSavingsPlan: (data: SavingsPlanRequest) =>
+    client.post<DataResponse<SavingsPlanResponse>>("/ai/savings-plan", data),
+
+  analyzeSentiment: (data: AnalyzeSentimentRequest) =>
+    client.post<DataResponse<AnalyzeSentimentResponse>>("/ai/analyze-sentiment", data),
+
+  getMonthlyWrapped: (month?: string) =>
+    client.get<DataResponse<MonthlyWrappedResponse>>(`/ai/monthly-wrapped${month ? `?month=${month}` : ""}`),
+
+  getVibeCheck: (roastMode: boolean = true) =>
+    client.get<DataResponse<VibeCheckResponse>>(`/ai/vibe-check?roast_mode=${roastMode}`),
 };
+
 
 
 

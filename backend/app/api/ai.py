@@ -13,7 +13,12 @@ from app.repositories.expense_repository import ExpenseRepository
 from app.schemas.ai import (
     AchievementBadge,
     AchievementsResponse,
+    AIChatRequest,
+    AIChatResponse,
     AIInsightsResponse,
+    AnalyzeSentimentRequest,
+    AnalyzeSentimentResponse,
+    AnomaliesResponse,
     CategorizeRequest,
     CategorizeResponse,
     CheckDuplicateRequest,
@@ -21,6 +26,7 @@ from app.schemas.ai import (
     FiftyThirtyTwentyResponse,
     FinancialHealthScoreResponse,
     LeakAnalysisResponse,
+    MonthlyWrappedResponse,
     ParseExpenseRequest,
     ParseExpenseResponse,
     ParseReceiptRequest,
@@ -28,15 +34,20 @@ from app.schemas.ai import (
     ParseSmsRequest,
     ParseSmsResponse,
     SafeToSpendResponse,
+    SavingsPlanRequest,
+    SavingsPlanResponse,
     SimulatePurchaseRequest,
     SimulatePurchaseResponse,
+    SpendingForecastResponse,
     SubscriptionAuditResponse,
     SuggestBudgetResponse,
+    VibeCheckResponse,
 )
 from app.schemas.common import DataEnvelope
 from app.services.ai_service import ai_service
 from app.services.category_service import CategoryService
 from app.services.dashboard_service import DashboardService
+from app.services.expense_service import ExpenseService
 from app.services.payment_method_service import PaymentMethodService
 from app.utils.datetime import get_current_date
 
@@ -482,6 +493,219 @@ async def get_achievements(
         past_expenses=past_90_expenses,
     )
     return {"data": result}
+
+
+@router.post("/chat", response_model=DataEnvelope[AIChatResponse], status_code=status.HTTP_200_OK)
+async def chat_assistant(
+    payload: AIChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Interactive conversational AI Financial Assistant grounded in live financial data.
+    """
+    dashboard_service = DashboardService(db)
+    dash_data = await dashboard_service.get_dashboard_data(user_id=current_user.id, period="current_month")
+
+    today = get_current_date()
+    days_elapsed = today.day
+    total_days = calendar.monthrange(today.year, today.month)[1]
+    budget_limit = Decimal(dash_data.budget.amount) if dash_data.budget.amount else None
+    total_spent = Decimal(str(dash_data.total_spent))
+
+    safe_spend_res = await ai_service.calculate_safe_to_spend(
+        total_spent=total_spent,
+        budget_limit=budget_limit,
+        days_elapsed=days_elapsed,
+        total_days=total_days,
+    )
+
+    top_cats = [
+        {"name": c.category_name, "amount": str(c.total), "percentage": c.percentage}
+        for c in dash_data.category_breakdown[:3]
+    ]
+
+    recent_txs = [
+        {"desc": e.description or "Expense", "amount": str(e.amount), "date": str(e.date)}
+        for e in dash_data.recent_expenses[:5]
+    ]
+
+    context = {
+        "current_month_spent": str(total_spent),
+        "budget_limit": str(budget_limit) if budget_limit else None,
+        "safe_daily_spend": str(safe_spend_res.safe_daily_spend),
+        "burn_rate": str(safe_spend_res.daily_burn_rate),
+        "days_elapsed": days_elapsed,
+        "days_remaining": safe_spend_res.days_remaining,
+        "top_categories": top_cats,
+        "recent_transactions": recent_txs,
+    }
+
+    result = await ai_service.chat_with_financial_assistant(
+        message=payload.message,
+        history=payload.history,
+        context=context,
+    )
+    return {"data": result}
+
+
+@router.get("/anomalies", response_model=DataEnvelope[AnomaliesResponse], status_code=status.HTTP_200_OK)
+async def get_spending_anomalies(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Flag statistically abnormal spending spikes and out-of-pattern transactions.
+    """
+    today = get_current_date()
+    date_from = today - timedelta(days=90)
+
+    expense_repo = ExpenseRepository(db)
+    past_expenses = await expense_repo.get_expenses_for_period(current_user.id, date_from, today)
+
+    budget_repo = BudgetRepository(db)
+    budget = await budget_repo.get_budget(current_user.id, period_type="month")
+    budget_limit = Decimal(str(budget.amount)) if budget and budget.amount else None
+
+    result = ai_service.detect_spending_anomalies(
+        expenses=past_expenses,
+        budget_limit=budget_limit,
+    )
+    return {"data": result}
+
+
+@router.get("/forecast", response_model=DataEnvelope[SpendingForecastResponse], status_code=status.HTTP_200_OK)
+async def get_spending_forecast(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Predictive 30-day category-wise and overall spend forecast based on moving velocity.
+    """
+    today = get_current_date()
+    month_start = date(today.year, today.month, 1)
+    month_end = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+
+    expense_repo = ExpenseRepository(db)
+    current_expenses = await expense_repo.get_expenses_for_period(current_user.id, month_start, month_end)
+    past_90_expenses = await expense_repo.get_expenses_for_period(current_user.id, today - timedelta(days=90), today)
+
+    result = ai_service.generate_spending_forecast(
+        current_expenses=current_expenses,
+        past_expenses=past_90_expenses,
+        days_elapsed=today.day,
+        total_days=calendar.monthrange(today.year, today.month)[1],
+    )
+    return {"data": result}
+
+
+@router.post("/savings-plan", response_model=DataEnvelope[SavingsPlanResponse], status_code=status.HTTP_200_OK)
+async def create_savings_plan(
+    payload: SavingsPlanRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Generate an actionable goal-based savings roadmap with category cut recommendations.
+    """
+    today = get_current_date()
+    date_from = today - timedelta(days=90)
+
+    expense_repo = ExpenseRepository(db)
+    past_expenses = await expense_repo.get_expenses_for_period(current_user.id, date_from, today)
+
+    result = ai_service.generate_savings_plan(
+        target_amount=payload.target_amount,
+        target_months=payload.target_months,
+        goal_name=payload.goal_name,
+        past_expenses=past_expenses,
+    )
+    return {"data": result}
+
+
+@router.post("/analyze-sentiment", response_model=DataEnvelope[AnalyzeSentimentResponse], status_code=status.HTTP_200_OK)
+async def analyze_sentiment(
+    payload: AnalyzeSentimentRequest,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Analyze expense note or description for psychological spending triggers and remorse/stress.
+    """
+    result = ai_service.analyze_expense_sentiment(
+        text=payload.text,
+        amount=payload.amount,
+    )
+    return {"data": result}
+
+
+@router.get("/monthly-wrapped", response_model=DataEnvelope[MonthlyWrappedResponse], status_code=status.HTTP_200_OK)
+async def get_monthly_wrapped(
+    month: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$", description="Month in YYYY-MM format"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Spotify-Wrapped-style monthly spending retrospective and financial personality archetype.
+    """
+    today = get_current_date()
+    if not month:
+        month = today.strftime("%Y-%m")
+
+    year_val, month_val = [int(p) for p in month.split("-")]
+    m_start = date(year_val, month_val, 1)
+    m_end = date(year_val, month_val, calendar.monthrange(year_val, month_val)[1])
+
+    expense_repo = ExpenseRepository(db)
+    month_expenses = await expense_repo.get_expenses_for_period(current_user.id, m_start, m_end)
+
+    budget_repo = BudgetRepository(db)
+    budget = await budget_repo.get_budget(current_user.id, period_type="month", period_key=month)
+    budget_limit = Decimal(str(budget.amount)) if budget and budget.amount else None
+
+    achievements_res = await ai_service.calculate_achievements(
+        expenses=month_expenses,
+        budget=budget,
+        past_expenses=month_expenses,
+    )
+
+    month_name = date(year_val, month_val, 1).strftime("%B %Y")
+    result = ai_service.generate_monthly_wrapped(
+        expenses=month_expenses,
+        month_str=month_name,
+        budget_limit=budget_limit,
+        active_streak_days=achievements_res.active_streak_days,
+    )
+    return {"data": result}
+
+
+@router.get("/vibe-check", response_model=DataEnvelope[VibeCheckResponse], status_code=status.HTTP_200_OK)
+async def get_vibe_check(
+    roast_mode: bool = Query(True, description="Enable spicy Hinglish / humorous roast commentary"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Live emoji vibe check and roast commentary tied to burn velocity.
+    """
+    dashboard_service = DashboardService(db)
+    dash_data = await dashboard_service.get_dashboard_data(user_id=current_user.id, period="current_month")
+
+    today = get_current_date()
+    days_elapsed = today.day
+    total_days = calendar.monthrange(today.year, today.month)[1]
+
+    budget_limit = Decimal(dash_data.budget.amount) if dash_data.budget.amount else None
+    total_spent = Decimal(str(dash_data.total_spent))
+
+    result = ai_service.generate_vibe_check(
+        total_spent=total_spent,
+        budget_limit=budget_limit,
+        days_elapsed=days_elapsed,
+        total_days=total_days,
+        is_roast_mode=roast_mode,
+    )
+    return {"data": result}
+
 
 
 

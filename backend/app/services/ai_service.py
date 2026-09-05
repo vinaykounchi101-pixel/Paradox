@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -11,24 +12,40 @@ from app.core.config import settings
 from app.schemas.ai import (
     AchievementBadge,
     AchievementsResponse,
+    AIChatRequest,
+    AIChatResponse,
     AIInsightsResponse,
+    AnalyzeSentimentRequest,
+    AnalyzeSentimentResponse,
+    AnomaliesResponse,
     AuditSubscriptionItem,
     CategorizeResponse,
     CategoryAllocation,
+    CategoryForecastItem,
+    ChatMessage,
     FiftyThirtyTwentyItem,
     FiftyThirtyTwentyResponse,
     FinancialHealthScoreResponse,
     HealthScorePillar,
     LeakAnalysisResponse,
+    MonthlyWrappedResponse,
     ParsedReceiptItem,
     ParseExpenseResponse,
     ParseReceiptResponse,
     ParseSmsResponse,
     SafeToSpendResponse,
+    SavingsPlanCategoryCut,
+    SavingsPlanRequest,
+    SavingsPlanResponse,
     SimulatePurchaseResponse,
+    SpendingAnomalyItem,
+    SpendingForecastResponse,
     SpendingLeakItem,
     SubscriptionAuditResponse,
     SuggestBudgetResponse,
+    VibeCheckResponse,
+    WrappedSplurge,
+    WrappedTopCategory,
 )
 
 logger = logging.getLogger(__name__)
@@ -883,16 +900,17 @@ class AIService:
         days_elapsed: int,
         total_days: int,
     ) -> Optional[AIInsightsResponse]:
-        model = self.custom_model or "gemini-1.5-flash"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+        models_to_try = [self.custom_model] if self.custom_model else [
+            "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"
+        ]
 
         prompt = (
             f"You are the Paradox AI Financial Copilot. Generate actionable, encouraging financial insights for this user.\n"
             f"Period: {period} ({days_elapsed} of {total_days} days elapsed)\n"
-            f"Total Spent: ₹{total_spent}\n"
-            f"Budget Limit: ₹{budget_limit if budget_limit else 'None'}\n"
-            f"Daily Burn Rate: ₹{daily_burn_rate}\n"
-            f"Projected Month-end Spend: ₹{projected_spend}\n"
+            f"Total Spent: {total_spent}\n"
+            f"Budget Limit: {budget_limit if budget_limit else 'None'}\n"
+            f"Daily Burn Rate: {daily_burn_rate}\n"
+            f"Projected Month-end Spend: {projected_spend}\n"
             f"Category Breakdown: {json.dumps(category_breakdown[:5])}\n"
             f"Respond STRICTLY in JSON with keys:\n"
             f"- \"health_status\": \"healthy\" | \"cautious\" | \"critical\"\n"
@@ -907,22 +925,28 @@ class AIService:
             "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code == 200:
-                data = resp.json()
-                raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                parsed = json.loads(raw_text)
-                return AIInsightsResponse(
-                    health_status=parsed.get("health_status", "healthy"),
-                    headline=parsed.get("headline", "Financial tracking active"),
-                    alerts=parsed.get("alerts", []),
-                    saving_tips=parsed.get("saving_tips", []),
-                    projected_spend=projected_spend,
-                    daily_burn_rate=daily_burn_rate,
-                    confidence=float(parsed.get("confidence", 0.9)),
-                    provider_used="gemini",
-                )
+        for model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                        parsed = json.loads(raw_text)
+                        return AIInsightsResponse(
+                            health_status=parsed.get("health_status", "healthy"),
+                            headline=parsed.get("headline", "Financial tracking active"),
+                            alerts=parsed.get("alerts", []),
+                            saving_tips=parsed.get("saving_tips", []),
+                            projected_spend=projected_spend,
+                            daily_burn_rate=daily_burn_rate,
+                            confidence=float(parsed.get("confidence", 0.9)),
+                            provider_used="gemini",
+                        )
+            except Exception as exc:
+                logger.warning("Gemini insights attempt with model %s failed: %s", model, exc)
+                continue
         return None
 
     async def _openai_insights(
@@ -941,7 +965,7 @@ class AIService:
 
         prompt = (
             f"You are the Paradox AI Financial Copilot. Generate actionable financial insights in strict JSON.\n"
-            f"Period: {period} ({days_elapsed}/{total_days} days). Spent: ₹{total_spent}. Budget: ₹{budget_limit}. Burn rate: ₹{daily_burn_rate}/day. Projected: ₹{projected_spend}.\n"
+            f"Period: {period} ({days_elapsed}/{total_days} days). Spent: {total_spent}. Budget: {budget_limit}. Burn rate: {daily_burn_rate}/day. Projected: {projected_spend}.\n"
             f"Top categories: {json.dumps(category_breakdown[:5])}\n"
             f"Keys required: health_status (healthy/cautious/critical), headline, alerts (array), saving_tips (array), confidence (float)."
         )
@@ -953,13 +977,17 @@ class AIService:
             "temperature": 0.2,
         }
 
-        headers = {"Authorization": f"Bearer {self.openai_key}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {self.openai_key}",
+            "Content-Type": "application/json",
+        }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(url, json=payload, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
-                parsed = json.loads(data["choices"][0]["message"]["content"])
+                content = data["choices"][0]["message"]["content"]
+                parsed = json.loads(content)
                 return AIInsightsResponse(
                     health_status=parsed.get("health_status", "healthy"),
                     headline=parsed.get("headline", "Financial tracking active"),
@@ -987,13 +1015,18 @@ class AIService:
         url = "https://api.anthropic.com/v1/messages"
 
         prompt = (
-            f"You are the Paradox AI Financial Copilot. Generate financial insights strictly in JSON format.\n"
-            f"Period: {period} ({days_elapsed}/{total_days} days). Spent: ₹{total_spent}. Budget: ₹{budget_limit}. Burn rate: ₹{daily_burn_rate}/day. Projected: ₹{projected_spend}.\n"
+            f"You are the Paradox AI Financial Copilot. Generate actionable financial insights in strict JSON.\n"
+            f"Period: {period} ({days_elapsed}/{total_days} days). Spent: {total_spent}. Budget: {budget_limit}. Burn rate: {daily_burn_rate}/day. Projected: {projected_spend}.\n"
             f"Top categories: {json.dumps(category_breakdown[:5])}\n"
-            f"JSON format: {{\"health_status\": \"healthy\"|\"cautious\"|\"critical\", \"headline\": \"...\", \"alerts\": [...], \"saving_tips\": [...], \"confidence\": 0.9}}"
+            f"Respond ONLY with valid JSON having keys: health_status, headline, alerts, saving_tips, confidence."
         )
 
-        payload = {"model": model, "max_tokens": 512, "messages": [{"role": "user", "content": prompt}]}
+        payload = {
+            "model": model,
+            "max_tokens": 512,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
         headers = {
             "x-api-key": self.anthropic_key,
             "anthropic-version": "2023-06-01",
@@ -1043,7 +1076,7 @@ class AIService:
             if proj_pct > 115.0 or pct_spent >= 100.0:
                 health_status = "critical"
                 headline = f"Budget pace critical: projected to exceed by {int(proj_pct - 100)}%"
-                alerts.append(f"At your current pace of ₹{daily_burn_rate}/day, total spend will reach ₹{projected_spend} vs budget ₹{budget_limit}.")
+                alerts.append(f"At your current pace of {daily_burn_rate}/day, total spend will reach {projected_spend} vs budget {budget_limit}.")
             elif proj_pct >= 90.0 or pct_spent >= 80.0:
                 health_status = "cautious"
                 headline = "Spending on high pace: approaching budget limit"
@@ -1051,12 +1084,12 @@ class AIService:
             else:
                 health_status = "healthy"
                 headline = "Great pacing: safely within your target budget"
-                alerts.append(f"Projected to finish comfortably under budget with ~₹{budget_limit - projected_spend} in savings.")
+                alerts.append(f"Projected to finish comfortably under budget with ~{budget_limit - projected_spend} in surplus.")
         else:
             health_status = "healthy"
-            headline = f"Tracking active: ₹{total_spent} spent across {days_elapsed} days"
+            headline = f"Tracking active: {total_spent} spent across {days_elapsed} days"
             if total_spent > Decimal("0.00"):
-                alerts.append(f"Current daily burn rate is ₹{daily_burn_rate}/day.")
+                alerts.append(f"Current daily burn rate is {daily_burn_rate}/day.")
 
         # Top category analysis & tips
         if category_breakdown:
@@ -1066,7 +1099,7 @@ class AIService:
             if total_spent > Decimal("0.00"):
                 cat_pct = float((cat_amount / total_spent) * Decimal("100"))
                 if cat_pct >= 35.0:
-                    alerts.append(f"{cat_name} accounts for {int(cat_pct)}% of all spending (₹{cat_amount}).")
+                    alerts.append(f"{cat_name} accounts for {int(cat_pct)}% of all spending ({cat_amount}).")
                     saving_tips.append(f"Consider trimming discretionary expenses in {cat_name} to optimize savings.")
 
         if not saving_tips:
@@ -2204,7 +2237,777 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
             motivation_quote=chosen_quote,
         )
 
+    # =========================================================================
+    # 13. Conversational AI Financial Assistant (RAG Chat)
+    # =========================================================================
+
+    async def chat_with_financial_assistant(
+        self,
+        message: str,
+        history: List[ChatMessage],
+        context: Dict[str, Any],
+    ) -> AIChatResponse:
+        """
+        RAG-grounded conversational personal finance assistant.
+        Uses user's active financial context to provide accurate, grounded answers.
+        """
+        provider = self.resolve_provider()
+
+        if provider == "gemini":
+            try:
+                res = await self._call_gemini_chat(message, history, context)
+                if res:
+                    return res
+            except Exception as exc:
+                logger.warning("Gemini chat call failed (%s), falling back to heuristic", exc)
+        elif provider == "openai":
+            try:
+                res = await self._call_openai_chat(message, history, context)
+                if res:
+                    return res
+            except Exception as exc:
+                logger.warning("OpenAI chat call failed (%s), falling back to heuristic", exc)
+        elif provider == "anthropic":
+            try:
+                res = await self._call_anthropic_chat(message, history, context)
+                if res:
+                    return res
+            except Exception as exc:
+                logger.warning("Anthropic chat call failed (%s), falling back to heuristic", exc)
+
+        return self._heuristic_chat(message, history, context)
+
+    async def _call_gemini_chat(
+        self, message: str, history: List[ChatMessage], context: Dict[str, Any]
+    ) -> Optional[AIChatResponse]:
+        models_to_try = [self.custom_model] if self.custom_model else [
+            "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"
+        ]
+
+        system_instruction = (
+            "You are the Paradox AI Financial Assistant. You are strictly an intelligent, empathetic, "
+            "and concise personal finance copilot for the Paradox expense tracker.\n"
+            "Rules:\n"
+            "1. Ground your answers strictly in the user's live financial data provided below.\n"
+            "2. Never hallucinate transactions not in the data. Do NOT provide legal, tax, or investment advice.\n"
+            "3. Keep answers concise, clear, and encouraging (2 to 4 sentences or clean markdown bullet points).\n"
+            f"User Financial Context: {json.dumps(context)}\n"
+            f"Today's Date: {date.today().isoformat()}\n"
+            "Respond strictly in JSON format with keys: \"reply\" (markdown string) and \"suggested_followups\" (list of 2-3 short questions)."
+        )
+
+        formatted_contents = [{"parts": [{"text": system_instruction}]}]
+        for h in history[-4:]:
+            formatted_contents.append({"parts": [{"text": f"{h.role.title()}: {h.content}"}]})
+        formatted_contents.append({"parts": [{"text": f"User: {message}"}]})
+
+        payload = {
+            "contents": formatted_contents,
+            "generationConfig": {
+                "temperature": 0.3,
+                "responseMimeType": "application/json",
+            },
+        }
+
+        for model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+            try:
+                async with httpx.AsyncClient(timeout=12.0) as client:
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                        parsed = json.loads(raw_text)
+                        return AIChatResponse(
+                            reply=parsed.get("reply", "I analyzed your financial records."),
+                            suggested_followups=parsed.get("suggested_followups", [
+                                "How much did I spend this week?",
+                                "What is my biggest expense category?",
+                                "Can I afford dinner tonight?",
+                            ]),
+                            provider_used="gemini",
+                        )
+            except Exception as exc:
+                logger.warning("Gemini chat attempt with model %s failed: %s", model, exc)
+                continue
+        return None
+
+    async def _call_openai_chat(
+        self, message: str, history: List[ChatMessage], context: Dict[str, Any]
+    ) -> Optional[AIChatResponse]:
+        model = self.custom_model or "gpt-4o-mini"
+        url = "https://api.openai.com/v1/chat/completions"
+
+        system_msg = (
+            "You are the Paradox AI Financial Assistant. Ground answers strictly in user's financial context:\n"
+            f"{json.dumps(context)}\n"
+            f"Today is {date.today().isoformat()}.\n"
+            "Respond strictly in JSON with keys: reply, suggested_followups."
+        )
+
+        messages = [{"role": "system", "content": system_msg}]
+        for h in history[-4:]:
+            messages.append({"role": "user" if h.role == "user" else "assistant", "content": h.content})
+        messages.append({"role": "user", "content": message})
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+            "temperature": 0.3,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {self.openai_key}",
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                parsed = json.loads(content)
+                return AIChatResponse(
+                    reply=parsed.get("reply", "I reviewed your financial information."),
+                    suggested_followups=parsed.get("suggested_followups", [
+                        "What is my current burn rate?",
+                        "How is my 50/30/20 budget looking?",
+                    ]),
+                    provider_used="openai",
+                )
+        return None
+
+    async def _call_anthropic_chat(
+        self, message: str, history: List[ChatMessage], context: Dict[str, Any]
+    ) -> Optional[AIChatResponse]:
+        model = self.custom_model or "claude-3-5-haiku-20241022"
+        url = "https://api.anthropic.com/v1/messages"
+
+        prompt = (
+            "You are the Paradox AI Financial Assistant. Answer user's question grounded in this context:\n"
+            f"{json.dumps(context)}\n"
+            f"User message: {message}\n"
+            "Respond ONLY with valid JSON having keys: reply (markdown string), suggested_followups (list of strings)."
+        )
+
+        payload = {
+            "model": model,
+            "max_tokens": 512,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
+        headers = {
+            "x-api-key": self.anthropic_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw_text = data["content"][0]["text"]
+                m = re.search(r"\{.*\}", raw_text, re.DOTALL)
+                if m:
+                    parsed = json.loads(m.group())
+                    return AIChatResponse(
+                        reply=parsed.get("reply", "Here is what I found in your records."),
+                        suggested_followups=parsed.get("suggested_followups", [
+                            "How much can I safely spend today?",
+                            "Show my top spending category.",
+                        ]),
+                        provider_used="anthropic",
+                    )
+        return None
+
+    def _heuristic_chat(
+        self, message: str, history: List[ChatMessage], context: Dict[str, Any]
+    ) -> AIChatResponse:
+        msg = message.lower().strip()
+        spent = context.get("current_month_spent", "0.00")
+        budget = context.get("budget_limit")
+        safe_daily = context.get("safe_daily_spend", "0.00")
+        top_cats = context.get("top_categories", [])
+
+        # 1. "Can I afford" queries
+        if any(w in msg for w in ["afford", "can i spend", "buy"]):
+            nums = re.findall(r"\d+(?:\.\d{1,2})?", msg)
+            if nums:
+                amt = Decimal(nums[0])
+                safe_d = Decimal(str(safe_daily))
+                if budget:
+                    rem = Decimal(str(budget)) - Decimal(str(spent))
+                    if amt > rem:
+                        reply = (
+                            f"⚠️ **Not Recommended**: Spending **{amt}** will exceed your remaining period budget "
+                            f"of **{rem}**. Consider holding off or trimming other discretionary categories first."
+                        )
+                    elif amt > (safe_d * Decimal("2.0")):
+                        reply = (
+                            f"⚡ **Proceed with Caution**: **{amt}** is within your remaining budget ({rem}), but "
+                            f"is more than double your safe daily pace (**{safe_daily}**/day). You'll need to pace lighter over the next few days."
+                        )
+                    else:
+                        reply = (
+                            f"✅ **Safe to Spend**: **{amt}** fits comfortably within your current daily allowance of "
+                            f"**{safe_daily}**/day and remaining budget ({rem})."
+                        )
+                else:
+                    reply = (
+                        f"You have spent **{spent}** so far this month with a daily pace of **{safe_daily}**/day. "
+                        f"Since no budget limit is set, spending **{amt}** is feasible, but setting a monthly target helps track surplus!"
+                    )
+            else:
+                reply = (
+                    f"To simulate a purchase, tell me the amount (e.g. *'Can I afford 1500 for shoes?'*). "
+                    f"Your current daily safe-to-spend allowance is **{safe_daily}**."
+                )
+            return AIChatResponse(
+                reply=reply,
+                suggested_followups=["What is my safe daily limit?", "Show my top spending categories", "How much have I spent this month?"],
+                provider_used="heuristic",
+            )
+
+        # 2. Spending inquiry
+        if any(w in msg for w in ["how much", "total spent", "my spending", "spent so far"]):
+            reply = f"📊 You have spent **{spent}** so far this period."
+            if budget:
+                rem = Decimal(str(budget)) - Decimal(str(spent))
+                pct = int((Decimal(str(spent)) / Decimal(str(budget))) * 100) if Decimal(str(budget)) > 0 else 0
+                reply += f" That's **{pct}%** of your **{budget}** budget, leaving **{rem}** remaining."
+            return AIChatResponse(
+                reply=reply,
+                suggested_followups=["What is my daily burn rate?", "Where did most of my money go?", "Can I afford dinner tonight?"],
+                provider_used="heuristic",
+            )
+
+        # 3. Top categories inquiry
+        if any(w in msg for w in ["category", "categories", "where", "biggest", "highest", "most"]):
+            if top_cats:
+                cat_lines = [f"- **{c.get('name', 'Category')}**: {c.get('amount', '0.00')} ({c.get('percentage', 0)}%)" for c in top_cats[:3]]
+                reply = "🏆 **Your top spending categories this month:**\n" + "\n".join(cat_lines)
+            else:
+                reply = "You don't have enough recorded transactions yet to establish top category rankings."
+            return AIChatResponse(
+                reply=reply,
+                suggested_followups=["How can I optimize these categories?", "Suggest a budget plan", "Check for spending leaks"],
+                provider_used="heuristic",
+            )
+
+        # 4. Daily safe spend inquiry
+        if any(w in msg for w in ["safe", "burn rate", "daily", "allowance", "pace"]):
+            reply = f"🔥 Your calculated safe daily spending allowance is **{safe_daily}**/day to finish comfortably within budget."
+            return AIChatResponse(
+                reply=reply,
+                suggested_followups=["Can I afford 1000 today?", "What is my total spent?", "How are my streaks?"],
+                provider_used="heuristic",
+            )
+
+        # 5. Greeting / Help
+        reply = (
+            f"👋 Hello! I'm your Paradox Financial Assistant. You have spent **{spent}** this period "
+            f"with a safe allowance of **{safe_daily}**/day. What would you like to check or simulate?"
+        )
+        return AIChatResponse(
+            reply=reply,
+            suggested_followups=[
+                "Can I afford a 2500 purchase?",
+                "What are my biggest expenses?",
+                "Give me a savings plan",
+            ],
+            provider_used="heuristic",
+        )
+
+    # =========================================================================
+    # 14. Statistical Anomaly Detection
+    # =========================================================================
+
+    def detect_spending_anomalies(
+        self,
+        expenses: List[Any],
+        budget_limit: Optional[Decimal] = None,
+    ) -> AnomaliesResponse:
+        anomalies: List[SpendingAnomalyItem] = []
+        if not expenses:
+            return AnomaliesResponse(
+                anomalies=[],
+                total_anomalies=0,
+                summary="No expense records found to analyze for anomalies.",
+            )
+
+        # Group by category
+        cat_expenses: Dict[str, List[Any]] = {}
+        for e in expenses:
+            cat_name = getattr(e, "category_name", None) or (e.category.name if hasattr(e, "category") and e.category else "Uncategorized")
+            cat_expenses.setdefault(cat_name, []).append(e)
+
+        for cat_name, cat_list in cat_expenses.items():
+            if len(cat_list) >= 3:
+                amounts = [Decimal(str(e.amount)) for e in cat_list]
+                avg = sum(amounts) / Decimal(str(len(amounts)))
+                variance = sum((a - avg) ** 2 for a in amounts) / Decimal(str(len(amounts)))
+                std_dev = Decimal(str(math.sqrt(float(variance)))) if variance > 0 else Decimal("0.00")
+
+                threshold = avg + (std_dev * Decimal("2.0"))
+                for e in cat_list:
+                    amt = Decimal(str(e.amount))
+                    if amt > threshold and amt >= Decimal("500.00") and std_dev > 0:
+                        multiple = (amt / avg).quantize(Decimal("0.1"))
+                        severity = "critical" if multiple >= Decimal("3.5") else ("high" if multiple >= Decimal("2.5") else "moderate")
+                        desc = e.description or cat_name
+                        date_str = e.date.isoformat() if hasattr(e.date, "isoformat") else str(e.date)
+                        anomalies.append(
+                            SpendingAnomalyItem(
+                                id=str(e.id),
+                                date=date_str,
+                                amount=amt,
+                                category_name=cat_name,
+                                description=desc,
+                                severity=severity,
+                                reason=f"Amount {amt} is {multiple}x higher than your average {cat_name} spend ({avg:.2f}).",
+                            )
+                        )
+
+        # Check for single transactions exceeding 25% of period budget
+        if budget_limit and budget_limit > Decimal("0.00"):
+            budget_threshold = budget_limit * Decimal("0.25")
+            for e in expenses:
+                amt = Decimal(str(e.amount))
+                if amt >= budget_threshold:
+                    if not any(a.id == str(e.id) for a in anomalies):
+                        pct = int((amt / budget_limit) * 100)
+                        cat_name = getattr(e, "category_name", None) or (e.category.name if hasattr(e, "category") and e.category else "General")
+                        desc = e.description or cat_name
+                        date_str = e.date.isoformat() if hasattr(e.date, "isoformat") else str(e.date)
+                        anomalies.append(
+                            SpendingAnomalyItem(
+                                id=str(e.id),
+                                date=date_str,
+                                amount=amt,
+                                category_name=cat_name,
+                                description=desc,
+                                severity="critical" if pct >= 40 else "high",
+                                reason=f"Single purchase consumed {pct}% of your monthly budget ({budget_limit:.2f}).",
+                            )
+                        )
+
+        anomalies.sort(key=lambda x: x.amount, reverse=True)
+        summary = (
+            f"Flagged {len(anomalies)} spending anomalies outside typical statistical patterns."
+            if anomalies
+            else "Spending behavior is highly consistent with zero statistical outliers detected."
+        )
+
+        return AnomaliesResponse(
+            anomalies=anomalies,
+            total_anomalies=len(anomalies),
+            summary=summary,
+        )
+
+    # =========================================================================
+    # 15. Predictive Category Spending Forecast
+    # =========================================================================
+
+    def generate_spending_forecast(
+        self,
+        current_expenses: List[Any],
+        past_expenses: List[Any],
+        days_elapsed: int,
+        total_days: int,
+    ) -> SpendingForecastResponse:
+        days_elapsed_safe = max(days_elapsed, 1)
+
+        current_cat_totals: Dict[str, Decimal] = {}
+        for e in current_expenses:
+            cat = getattr(e, "category_name", None) or (e.category.name if hasattr(e, "category") and e.category else "Other")
+            current_cat_totals[cat] = current_cat_totals.get(cat, Decimal("0.00")) + Decimal(str(e.amount))
+
+        past_cat_totals: Dict[str, Decimal] = {}
+        for e in past_expenses:
+            cat = getattr(e, "category_name", None) or (e.category.name if hasattr(e, "category") and e.category else "Other")
+            past_cat_totals[cat] = past_cat_totals.get(cat, Decimal("0.00")) + Decimal(str(e.amount))
+
+        forecast_items: List[CategoryForecastItem] = []
+        total_projected = Decimal("0.00")
+        total_current = sum(current_cat_totals.values(), Decimal("0.00"))
+
+        all_cats = set(list(current_cat_totals.keys()) + list(past_cat_totals.keys()))
+        for cat in sorted(all_cats):
+            curr_spent = current_cat_totals.get(cat, Decimal("0.00"))
+            daily_curr = curr_spent / Decimal(str(days_elapsed_safe))
+            projected_curr = daily_curr * Decimal("30")
+
+            past_monthly_avg = (past_cat_totals.get(cat, Decimal("0.00")) / Decimal("3")) if past_cat_totals.get(cat) else Decimal("0.00")
+
+            if past_monthly_avg > Decimal("0.00") and curr_spent > Decimal("0.00"):
+                blended = (projected_curr * Decimal("0.60")) + (past_monthly_avg * Decimal("0.40"))
+            elif curr_spent > Decimal("0.00"):
+                blended = projected_curr
+            else:
+                blended = past_monthly_avg
+
+            blended = blended.quantize(Decimal("0.01"))
+            total_projected += blended
+
+            if past_monthly_avg > 0:
+                diff_pct = float((blended - past_monthly_avg) / past_monthly_avg) * 100
+                if diff_pct > 10:
+                    trend = "up"
+                elif diff_pct < -10:
+                    trend = "down"
+                else:
+                    trend = "stable"
+            else:
+                trend = "up" if blended > 0 else "stable"
+
+            forecast_items.append(
+                CategoryForecastItem(
+                    category_name=cat,
+                    current_spent=curr_spent,
+                    projected_next_month=blended,
+                    trend_direction=trend,
+                    confidence=0.88 if len(past_expenses) > 20 else 0.72,
+                )
+            )
+
+        forecast_items.sort(key=lambda x: x.projected_next_month, reverse=True)
+
+        growth_rate = 0.0
+        if total_current > Decimal("0.00"):
+            current_projected = (total_current / Decimal(str(days_elapsed_safe))) * Decimal(str(total_days))
+            if current_projected > 0:
+                growth_rate = float(((total_projected - current_projected) / current_projected) * 100)
+
+        insights = [
+            f"Next 30-day forecast projects {total_projected} total spending based on historical burn velocity.",
+        ]
+        if forecast_items:
+            top_projected = forecast_items[0]
+            insights.append(f"{top_projected.category_name} is projected as your highest expense area ({top_projected.projected_next_month}).")
+            trending_up = [f.category_name for f in forecast_items if f.trend_direction == "up"]
+            if trending_up:
+                insights.append(f"Categories showing accelerating spending pace: {', '.join(trending_up[:3])}.")
+
+        return SpendingForecastResponse(
+            total_projected_next_month=total_projected,
+            category_forecasts=forecast_items[:8],
+            growth_rate_pct=round(growth_rate, 1),
+            confidence=0.85,
+            forecast_insights=insights,
+        )
+
+    # =========================================================================
+    # 16. Goal-Based Savings Planner
+    # =========================================================================
+
+    def generate_savings_plan(
+        self,
+        target_amount: Decimal,
+        target_months: int,
+        goal_name: str,
+        past_expenses: List[Any],
+    ) -> SavingsPlanResponse:
+        target_months_safe = max(target_months, 1)
+        required_monthly = (target_amount / Decimal(str(target_months_safe))).quantize(Decimal("0.01"))
+
+        discretionary_keywords = ["shopping", "entertainment", "dining", "food", "cafe", "coffee", "restaurant", "personal", "travel", "other", "sub"]
+        
+        cat_monthly_spend: Dict[str, Decimal] = {}
+        for e in past_expenses:
+            cat = getattr(e, "category_name", None) or (e.category.name if hasattr(e, "category") and e.category else "Other")
+            cat_monthly_spend[cat] = cat_monthly_spend.get(cat, Decimal("0.00")) + (Decimal(str(e.amount)) / Decimal("3"))
+
+        discretionary_spend = Decimal("0.00")
+        trimmable_cats: Dict[str, Decimal] = {}
+        for cat, amt in cat_monthly_spend.items():
+            if any(k in cat.lower() for k in discretionary_keywords):
+                discretionary_spend += amt
+                trimmable_cats[cat] = amt
+
+        if discretionary_spend < Decimal("2000.00"):
+            discretionary_spend = max(discretionary_spend, required_monthly * Decimal("1.5"))
+            if not trimmable_cats:
+                trimmable_cats = {
+                    "Dining & Food": discretionary_spend * Decimal("0.40"),
+                    "Shopping": discretionary_spend * Decimal("0.35"),
+                    "Entertainment": discretionary_spend * Decimal("0.25"),
+                }
+
+        ratio = float(required_monthly / discretionary_spend) if discretionary_spend > 0 else 1.0
+        if ratio <= 0.25:
+            feasibility = "highly_achievable"
+        elif ratio <= 0.50:
+            feasibility = "achievable"
+        elif ratio <= 0.85:
+            feasibility = "challenging"
+        else:
+            feasibility = "unrealistic"
+
+        cuts: List[SavingsPlanCategoryCut] = []
+        total_trimmable = sum(trimmable_cats.values(), Decimal("0.00"))
+
+        for cat, amt in sorted(trimmable_cats.items(), key=lambda x: x[1], reverse=True):
+            if total_trimmable > 0:
+                share = amt / total_trimmable
+                cut_amt = (required_monthly * share).quantize(Decimal("0.01"))
+                cut_pct = min(float((cut_amt / amt) * 100), 50.0) if amt > 0 else 20.0
+                cut_amt = min(cut_amt, amt * Decimal("0.50"))
+                suggested_spend = max(amt - cut_amt, Decimal("0.00")).quantize(Decimal("0.01"))
+
+                cuts.append(
+                    SavingsPlanCategoryCut(
+                        category_name=cat,
+                        current_monthly_spend=amt.quantize(Decimal("0.01")),
+                        suggested_monthly_spend=suggested_spend,
+                        monthly_cut_amount=cut_amt,
+                        cut_percentage=round(cut_pct, 1),
+                    )
+                )
+
+        action_steps = [
+            f"Set up an automated recurring transfer of {required_monthly} on the 1st of every month to your {goal_name} fund.",
+            f"Cap your monthly discretionary purchases to {max(discretionary_spend - required_monthly, Decimal('0.00')):.2f}.",
+            f"Track your weekly burn velocity using the Safe-to-Spend Speedometer to prevent mid-month leakage.",
+            f"Review subscriptions and audit micro-leaks to free up extra cashflow without sacrificing lifestyle essentials.",
+        ]
+
+        return SavingsPlanResponse(
+            goal_name=goal_name,
+            target_amount=target_amount,
+            target_months=target_months,
+            required_monthly_savings=required_monthly,
+            current_discretionary_spend=discretionary_spend.quantize(Decimal("0.01")),
+            feasibility=feasibility,
+            category_cuts=cuts[:5],
+            action_steps=action_steps,
+        )
+
+    # =========================================================================
+    # 17. Sentiment & Behavioral Tone Analysis
+    # =========================================================================
+
+    def analyze_expense_sentiment(
+        self,
+        text: str,
+        amount: Optional[Decimal] = None,
+    ) -> AnalyzeSentimentResponse:
+        txt = text.lower()
+
+        remorse_keywords = ["regret", "waste", "unnecessary", "shouldn't", "expensive", "foolish", "guilt", "stupid", "impulse", "costly", "cheat day"]
+        stress_keywords = ["stress", "stressed", "tired", "exhausted", "bad day", "rough day", "comfort food", "hospital", "clinic", "headache", "emergency", "dentist"]
+        joyful_keywords = ["celebrate", "celebration", "party", "birthday", "anniversary", "treat", "gift", "vacation", "trip", "happy", "won", "family dinner", "outing"]
+        essential_keywords = ["rent", "grocery", "groceries", "milk", "electricity", "water", "gas", "petrol", "fuel", "wifi", "broadband", "medicine", "tablets", "fees", "tuition"]
+
+        if any(w in txt for w in remorse_keywords):
+            return AnalyzeSentimentResponse(
+                sentiment="remorse",
+                spending_tag="Buyer's Remorse",
+                confidence=0.92,
+                reflection="Acknowledge the impulse without self-blame. Consider a 48-hour cooling-off rule before similar non-essential purchases.",
+            )
+        elif any(w in txt for w in stress_keywords):
+            return AnalyzeSentimentResponse(
+                sentiment="stress",
+                spending_tag="Stress Spending",
+                confidence=0.89,
+                reflection="Notice if difficult emotions or tiredness triggered this transaction. Taking a walk or listening to music can recharge you without spending.",
+            )
+        elif any(w in txt for w in joyful_keywords):
+            return AnalyzeSentimentResponse(
+                sentiment="positive",
+                spending_tag="Celebration & Joy",
+                confidence=0.90,
+                reflection="Investing in meaningful experiences and loved ones brings lasting life satisfaction when kept within your monthly budget!",
+            )
+        elif any(w in txt for w in essential_keywords):
+            return AnalyzeSentimentResponse(
+                sentiment="neutral",
+                spending_tag="Essential Routine",
+                confidence=0.95,
+                reflection="Essential baseline living cost. Ensure these fixed commitments are budgeted in your 50% Needs pillar.",
+            )
+
+        if amount and amount >= Decimal("5000.00"):
+            return AnalyzeSentimentResponse(
+                sentiment="neutral",
+                spending_tag="High Value Item",
+                confidence=0.75,
+                reflection="Significant capital outlay. Verify warranty, return policy, and update your purchase records.",
+            )
+
+        return AnalyzeSentimentResponse(
+            sentiment="neutral",
+            spending_tag="Everyday Spend",
+            confidence=0.80,
+            reflection="Regular daily transaction tracked cleanly.",
+        )
+
+    # =========================================================================
+    # 18. Executive Wrapped Monthly Digest
+    # =========================================================================
+
+    def generate_monthly_wrapped(
+        self,
+        expenses: List[Any],
+        month_str: str,
+        budget_limit: Optional[Decimal] = None,
+        active_streak_days: int = 0,
+    ) -> MonthlyWrappedResponse:
+        total_spent = sum((Decimal(str(e.amount)) for e in expenses), Decimal("0.00"))
+        total_tx = len(expenses)
+
+        cat_totals: Dict[str, Decimal] = {}
+        merchants: Dict[str, int] = {}
+        biggest_splurge = None
+        max_amt = Decimal("0.00")
+
+        for e in expenses:
+            amt = Decimal(str(e.amount))
+            cat = getattr(e, "category_name", None) or (e.category.name if hasattr(e, "category") and e.category else "General")
+            cat_totals[cat] = cat_totals.get(cat, Decimal("0.00")) + amt
+
+            desc = (e.description or "").strip()
+            if desc and len(desc) >= 3:
+                merchants[desc.title()] = merchants.get(desc.title(), 0) + 1
+
+            if amt > max_amt:
+                max_amt = amt
+                d_str = e.date.isoformat() if hasattr(e.date, "isoformat") else str(e.date)
+                biggest_splurge = WrappedSplurge(
+                    amount=amt,
+                    description=desc or cat,
+                    date=d_str,
+                    category_name=cat,
+                )
+
+        top_categories: List[WrappedTopCategory] = []
+        for cat, c_tot in sorted(cat_totals.items(), key=lambda x: x[1], reverse=True)[:3]:
+            pct = float((c_tot / total_spent) * 100) if total_spent > 0 else 0.0
+            top_categories.append(
+                WrappedTopCategory(
+                    category_name=cat,
+                    amount=c_tot,
+                    percentage=round(pct, 1),
+                )
+            )
+
+        most_freq_merchant = sorted(merchants.items(), key=lambda x: x[1], reverse=True)[0][0] if merchants else None
+        savings_achieved = max(budget_limit - total_spent, Decimal("0.00")) if budget_limit else Decimal("0.00")
+
+        top_cat_name = top_categories[0].category_name.lower() if top_categories else ""
+        if savings_achieved > Decimal("5000.00") or (budget_limit and total_spent < budget_limit * Decimal("0.80")):
+            archetype_title = "The Mindful Strategist"
+            archetype_desc = "You kept spending tightly constrained, protected your surplus, and finished with formidable discipline."
+        elif "food" in top_cat_name or "dining" in top_cat_name or "cafe" in top_cat_name:
+            archetype_title = "The Culinary Enthusiast"
+            archetype_desc = "Good food was your primary love language this month. Delicious memories, though your dining category took center stage!"
+        elif "shopping" in top_cat_name:
+            archetype_title = "The Retail Adventurer"
+            archetype_desc = "Packages and purchases dominated your statement. Next month, try testing purchases with a 48-hour pause."
+        elif active_streak_days >= 14:
+            archetype_title = "The Discipline Titan"
+            archetype_desc = "Incredible streak consistency! Tracking daily expenses without skipping a beat."
+        else:
+            archetype_title = "The Balanced Realist"
+            archetype_desc = "Navigated living expenses with a practical touch. Steady, grounded, and building sustainable financial habits."
+
+        recaps = [
+            f"You recorded {total_tx} transactions totaling {total_spent:.2f} across the month.",
+        ]
+        if top_categories:
+            recaps.append(f"{top_categories[0].category_name} was your #1 spending territory ({top_categories[0].percentage}% of budget).")
+        if biggest_splurge:
+            recaps.append(f"Biggest splurge: {biggest_splurge.amount:.2f} on '{biggest_splurge.description}'.")
+        if savings_achieved > 0:
+            recaps.append(f"Successfully locked in {savings_achieved:.2f} under your target budget threshold!")
+
+        return MonthlyWrappedResponse(
+            month=month_str,
+            total_spent=total_spent,
+            total_transactions=total_tx,
+            active_streak_days=max(active_streak_days, 1),
+            archetype_title=archetype_title,
+            archetype_description=archetype_desc,
+            top_categories=top_categories,
+            biggest_splurge=biggest_splurge,
+            most_frequent_merchant=most_freq_merchant,
+            savings_achieved=savings_achieved,
+            personalized_recap=recaps,
+        )
+
+    # =========================================================================
+    # 19. Financial Vibe Check & Roast Mode
+    # =========================================================================
+
+    def generate_vibe_check(
+        self,
+        total_spent: Decimal,
+        budget_limit: Optional[Decimal],
+        days_elapsed: int,
+        total_days: int,
+        is_roast_mode: bool = True,
+    ) -> VibeCheckResponse:
+        days_safe = max(days_elapsed, 1)
+        daily_burn = (total_spent / Decimal(str(days_safe))).quantize(Decimal("0.01"))
+
+        if budget_limit and budget_limit > Decimal("0.00"):
+            pct_consumed = float((total_spent / budget_limit) * 100)
+            proj_total = (daily_burn * Decimal(str(total_days))).quantize(Decimal("0.01"))
+            proj_pct = float((proj_total / budget_limit) * 100)
+        else:
+            pct_consumed = 50.0
+            proj_pct = 50.0
+
+        if proj_pct <= 70.0:
+            emoji = "🧘"
+            title = "Zen Master"
+            status = "chill"
+            roast = (
+                "Dekh rahe ho financial self-control? Warren Buffett is taking notes. You might actually end the month with money left over!"
+                if is_roast_mode
+                else "Exemplary pacing! You are safely under budget with strong savings momentum."
+            )
+        elif proj_pct <= 90.0:
+            emoji = "☕"
+            title = "Steady Cruising"
+            status = "steady"
+            roast = (
+                "Living responsibly! Neither crying in the club nor splurging on Gucci. Balanced as all things should be."
+                if is_roast_mode
+                else "Healthy spending velocity. Maintain this cadence to meet your monthly budget target."
+            )
+        elif proj_pct <= 110.0:
+            emoji = "⚠️"
+            title = "Walking on Thin Ice"
+            status = "spicy"
+            roast = (
+                "Bhai thoda sambhal ke! That burn rate is hotter than your morning tea. Time to choose between Zomato and your savings."
+                if is_roast_mode
+                else "Spending velocity is picking up. Trim discretionary purchases to prevent exceeding your budget limit."
+            )
+        else:
+            emoji = "💀"
+            title = "Down Bad"
+            status = "critical"
+            roast = (
+                "Account balance is in ICU! Budget exhausted and the month is still looking at you like 👁️👄👁️. Maggi diet starts now!"
+                if is_roast_mode
+                else "Critical budget breach: current pace exceeds monthly allowance. Halt non-essential spending immediately."
+            )
+
+        return VibeCheckResponse(
+            vibe_emoji=emoji,
+            vibe_title=title,
+            burn_rate_status=status,
+            roast_commentary=roast,
+            is_roast_mode=is_roast_mode,
+            daily_burn_rate=daily_burn,
+            budget_percent_consumed=round(pct_consumed, 1),
+        )
+
 
 ai_service = AIService()
+
 
 
