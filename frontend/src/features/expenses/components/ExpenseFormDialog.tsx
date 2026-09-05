@@ -37,67 +37,128 @@ interface ExpenseFormDialogProps {
   expense?: ExpenseRead | null;
 }
 
-const PREDICTIVE_CATEGORIES: Record<string, string[]> = {
+export const PREDICTIVE_CATEGORIES: Record<string, string[]> = {
   "Alcohol": [
-    "brandy", "whiskey", "whisky", "beer", "wine", "vodka", "rum", "gin", "tequila",
-    "liquor", "alcohol", "bar", "pub", "cocktail", "scotch", "champagne", "bourbon",
-    "brewery", "theka", "daaru", "drinks", "corona", "budweiser", "bira", "kingfisher",
-    "bacardi", "old monk", "smirnoff", "absolut", "jack daniels", "johnnie walker"
+    "brandy", "whiskey", "whisky", "scotch", "bourbon", "single malt", "rye", "vodka", "rum", "gin", "tequila",
+    "beer", "craft beer", "lager", "ale", "stout", "cider", "draught", "wine", "red wine", "white wine", "rose wine",
+    "champagne", "prosecco", "sangria", "port wine", "liquor", "alcohol", "booze", "theka", "daaru", "daru",
+    "bar", "pub", "brewery", "cocktail", "old monk", "royal stag", "blenders pride", "imperial blue", "mcdowell",
+    "officers choice", "antiquity", "signature", "magic moments", "smirnoff", "absolut", "grey goose", "bacardi",
+    "captain morgan", "kingfisher", "bira", "budweiser", "corona", "carlsberg", "tuborg", "heineken", "stella artois",
+    "guinness", "jack daniels", "johnnie walker", "red label", "black label", "double black", "gold label", "chivas",
+    "chivas regal", "glenlivet", "glenfiddich", "macallan", "jameson", "ballantines", "monkey shoulder", "black dog",
+    "teachers", "100 pipers", "sula", "jacobs creek", "baileys", "jagermeister", "bombay sapphire", "tanqueray",
+    "hendricks", "don julio", "patron", "breezer", "liquor store", "wines"
   ],
   "Gaming": [
-    "ps5", "playstation", "playstation 5", "ps4", "ps3", "xbox", "xbox series",
-    "nintendo", "switch", "gaming", "steam", "game", "games", "epic games", "gta",
-    "fifa", "valorant", "console", "controller", "pc gaming", "roblox", "minecraft",
-    "steam deck", "bgmi", "pubg", "game pass", "dualsense", "dualshock"
+    "ps5", "ps4", "ps3", "playstation", "playstation 5", "playstation 4", "dualsense", "dualshock", "psp", "psvita",
+    "xbox", "xbox series", "xbox series x", "xbox series s", "xbox one", "xbox 360", "nintendo", "nintendo switch",
+    "switch oled", "switch lite", "switch", "steam", "steam deck", "rog ally", "legion go", "vr headset", "oculus", "meta quest",
+    "gpu", "graphics card", "rtx", "gtx", "geforce", "radeon", "gaming pc", "gaming laptop", "gaming monitor",
+    "mechanical keyboard", "gaming mouse", "controller", "gamepad", "joystick", "arcade stick", "capture card", "elgato",
+    "epic games", "riot games", "battlenet", "game pass", "gta", "gta 5", "gta 6", "fifa", "fc 24", "fc 25",
+    "call of duty", "cod", "warzone", "valorant", "csgo", "cs2", "pubg", "bgmi", "apex legends", "fortnite",
+    "roblox", "minecraft", "cyberpunk", "elden ring", "god of war", "spiderman", "assassin's creed", "rdr2",
+    "witcher", "hogwarts legacy", "zelda", "pokemon", "mario", "dark souls", "sekiro", "overwatch", "dota", "gaming", "game", "games"
   ],
   "Food & Dining": [
-    "swiggy", "zomato", "restaurant", "cafe", "coffee", "tea", "chai", "lunch", "dinner",
-    "breakfast", "snack", "burger", "pizza", "starbucks", "biryani", "bakery", "mcdonald",
-    "kfc", "dominos", "subway", "eats", "dosa", "idli", "shawarma"
+    "swiggy", "zomato", "eatclub", "magicpin", "restaurant", "cafe", "coffee", "tea", "chai", "lunch", "dinner",
+    "breakfast", "snack", "brunch", "meal", "mcdonald", "mcdonalds", "kfc", "burger king", "subway", "dominos",
+    "pizza hut", "mojo pizza", "ovenstory", "behrouz", "faasos", "taco bell", "popeyes", "starbucks", "ccd",
+    "cafe coffee day", "chaayos", "chai point", "third wave", "blue tokai", "baskin robbins", "theobroma", "haldirams",
+    "barbeque nation", "bbq", "pizza", "burger", "biryani", "fried chicken", "momos", "noodles", "fried rice",
+    "shawarma", "roll", "sandwich", "wrap", "pasta", "tacos", "dosa", "idli", "vada", "pav bhaji", "samosa",
+    "chaat", "pani puri", "thali", "paneer tikka", "butter chicken", "bakery", "dessert", "pastry", "cake", "ice cream", "eats"
   ],
   "Groceries": [
-    "blinkit", "zepto", "instamart", "grocery", "groceries", "supermarket", "milk",
-    "bread", "eggs", "vegetables", "fruits", "veggies", "provisions", "ration", "mart"
+    "blinkit", "zepto", "instamart", "bigbasket", "bb daily", "dmart", "kirana", "grocery", "groceries", "supermarket",
+    "ration", "fruits", "vegetables", "milk", "bread", "eggs", "veggies", "provisions", "mart", "amul", "mother dairy",
+    "nandini", "gokul", "dahi", "curd", "paneer", "butter", "cheese", "ghee", "atta", "flour", "aashirvaad", "rice",
+    "basmati", "daal", "dal", "pulses", "oil", "cooking oil", "fortune", "saffola", "salt", "tata salt", "sugar",
+    "spices", "masala", "mdh", "everest", "maggi", "noodles", "yippee", "oats", "kelloggs", "cornflakes", "biscuits",
+    "cookies", "parle", "britannia", "good day", "bourbon", "oreo", "hide & seek", "dark fantasy", "chips", "lays",
+    "kurkure", "doritos", "pringles", "bingo", "namkeen", "bikaji", "chocolate", "cadbury", "dairy milk", "silk",
+    "kitkat", "5 star", "perk", "snickers", "ketchup", "sauce", "mayonnaise", "jam", "honey", "dabur", "pickle"
   ],
   "Transportation": [
-    "uber", "ola", "auto", "cab", "rickshaw", "metro", "bus", "train", "flight",
-    "petrol", "diesel", "fuel", "cng", "parking", "fastag", "toll", "rapido"
+    "uber", "ola", "auto", "cab", "rickshaw", "metro", "bus", "train", "flight", "fuel", "petrol", "diesel", "cng",
+    "parking", "fastag", "toll", "rapido", "blu smart", "indrive", "air india", "indigo", "vistara", "spicejet",
+    "akasa", "makemytrip", "mmt", "easemytrip", "redbus", "irctc", "railway", "iocl", "indian oil", "bpcl",
+    "bharat petroleum", "hpcl", "shell", "speed", "car wash", "service center", "mechanic", "puncture", "tyre"
   ],
   "Bills & Utilities": [
-    "electricity", "water", "gas", "wifi", "internet", "broadband", "mobile recharge",
-    "phone bill", "cylinder", "dth", "power", "airtel", "jio", "vi", "piped gas"
+    "electricity", "water", "gas", "wifi", "internet", "broadband", "mobile recharge", "phone bill", "cylinder",
+    "dth", "power", "airtel", "jio", "vi", "bsnl", "prepaid", "postpaid", "jiofiber", "airtel xtream", "act fibernet",
+    "tata play", "dish tv", "piped gas", "lpg", "indane", "bharat gas", "hp gas"
   ],
   "Healthcare": [
-    "doctor", "hospital", "clinic", "medicine", "medicines", "pharmacy", "medical",
-    "apollo", "pharmeasy", "dentist", "tablets", "syrup", "1mg", "health checkup"
+    "doctor", "hospital", "clinic", "medicine", "medicines", "pharmacy", "medical", "apollo", "pharmeasy", "1mg",
+    "netmeds", "medplus", "dentist", "health", "healthcare", "crocin", "paracetamol", "dolo", "dolo 650", "combiflam",
+    "saridon", "disprin", "vicks", "strepsils", "cough syrup", "allegra", "cetirizine", "pantocid", "pan d", "omez",
+    "digene", "gelusil", "eno", "orsl", "vitamin", "multivitamin", "becosules", "supradyn", "calcium", "shelcal",
+    "eye drops", "nasal spray", "otrivin", "volini", "moov", "iodex", "bandaid", "bandage", "dettol", "savlon",
+    "betadine", "thermometer", "spectacles", "glasses", "lens", "blood test", "physiotherapy", "health checkup"
+  ],
+  "Personal Care": [
+    "salon", "spa", "haircut", "cosmetics", "skincare", "massage", "parlour", "barber", "shaving", "beard", "facial",
+    "cleanup", "manicure", "pedicure", "urban company", "nykaa", "purplle", "tira", "sephora", "lakme", "maybelline",
+    "loreal", "sugar cosmetics", "mamaearth", "wow skin", "plum", "minimalist", "derma co", "biotique", "himalaya",
+    "nivea", "ponds", "garnier", "dove", "olay", "cetaphil", "cerave", "vaseline", "shampoo", "conditioner", "hair oil",
+    "parachute", "tresemme", "pantene", "sunsilk", "head & shoulders", "body wash", "shower gel", "soap", "lux",
+    "lifebuoy", "cinthol", "pears", "dettol soap", "facewash", "moisturizer", "sunscreen", "deodorant", "deo",
+    "perfume", "fragrance", "axe", "fogg", "gillette", "razor", "trimmer", "sanitary pads", "whisper", "stayfree"
   ],
   "Shopping": [
-    "clothes", "shoes", "amazon", "flipkart", "myntra", "shopping", "mall", "zara",
-    "h&m", "electronics", "gadget", "headphones", "laptop", "ajio", "meesho"
+    "clothes", "shoes", "amazon", "flipkart", "myntra", "shopping", "mall", "electronics", "gadget", "appliances",
+    "accessories", "headphones", "headset", "earphones", "earbuds", "laptop", "pc", "computer", "hardware", "tech",
+    "device", "ipad", "watch", "smartwatch", "iphone", "macbook", "imac", "airpods", "apple watch", "samsung", "galaxy",
+    "oneplus", "xiaomi", "redmi", "realme", "vivo", "oppo", "motorola", "pixel", "boat", "noise", "fireboltt",
+    "fastrack", "boult", "mivi", "zebronics", "portronics", "sony headphones", "sennheiser", "jbl", "bose", "marshall",
+    "skullcandy", "bluetooth speaker", "charger", "powerbank", "dell", "hp", "lenovo", "thinkpad", "asus", "acer",
+    "msi", "monitor", "printer", "nike", "adidas", "puma", "reebok", "under armour", "new balance", "skechers",
+    "asics", "converse", "vans", "woodland", "red tape", "bata", "crocs", "zara", "h&m", "uniqlo", "levis", "levi's",
+    "marks & spencer", "allen solly", "van heusen", "louis philippe", "peter england", "blackberrys", "raymond",
+    "fabindia", "manyavar", "biba", "vero moda", "only", "mango", "us polo", "tommy hilfiger", "calvin klein",
+    "armani", "gucci", "prada", "fossil", "titan", "timex", "casio", "g-shock", "rayban", "lenskart", "sunglasses",
+    "sneakers", "sandals", "boots", "shirt", "tshirt", "t-shirt", "jeans", "jacket", "hoodie", "suit", "saree",
+    "kurta", "bag", "backpack", "wallet", "luggage", "american tourister", "safari", "skybags", "samsonite", "ajio",
+    "meesho", "nykaa fashion"
   ],
   "Subscriptions": [
-    "netflix", "spotify", "prime", "youtube", "hotstar", "subscription", "patreon",
-    "apple music", "disney", "chatgpt"
+    "netflix", "spotify", "prime", "prime video", "amazon prime", "youtube", "youtube premium", "hotstar", "disney",
+    "sonyliv", "zee5", "jio cinema", "subscription", "patreon", "apple music", "amazon music", "gaana", "jiosaavn",
+    "audible", "kindle", "chatgpt", "openai", "claude", "google one", "icloud", "apple one", "dropbox", "microsoft 365",
+    "canva", "adobe", "figma", "midjourney", "github", "linkedin premium"
   ],
   "Fitness": [
-    "gym", "fitness", "yoga", "workout", "protein", "whey", "creatine", "cult", "crossfit"
+    "gym", "fitness", "yoga", "crossfit", "protein", "workout", "dumbbells", "creatine", "cult", "cult.fit",
+    "cult pass", "gold's gym", "anytime fitness", "zumba", "swimming", "badminton", "turf", "whey", "whey protein",
+    "isolate", "bcaa", "pre-workout", "muscleblaze", "optimum nutrition", "on whey", "myprotein", "avvatar", "asitis",
+    "gnc", "protein bar", "yoga mat", "decathlon"
   ],
   "Pet Care": [
-    "dog", "cat", "pet", "pets", "puppy", "kitten", "pedigree", "veterinary", "vet", "whiskas", "royal canin"
-  ],
-  "Education": [
-    "tuition", "course", "udemy", "coursera", "school", "college", "fees", "books"
+    "dog", "cat", "pet", "pets", "puppy", "kitten", "pedigree", "veterinary", "vet", "aquarium", "pet food",
+    "whiskas", "royal canin", "drools", "purina", "chappi", "dog food", "cat food", "dog chew", "cat litter",
+    "pet clinic", "dog vaccination", "pet grooming", "heads up for tails", "huft", "supertails"
   ],
   "Housing": [
-    "rent", "brokerage", "maintenance", "maid", "repair", "plumber", "electrician"
+    "rent", "brokerage", "maintenance", "maid", "repair", "plumber", "electrician", "furniture", "cook", "house rent",
+    "society maintenance", "carpenter", "painting", "pest control", "ikea", "urban ladder", "pepperfry"
+  ],
+  "Education": [
+    "tuition", "course", "udemy", "coursera", "school", "college", "fees", "books", "training", "edx", "skillshare",
+    "unacademy", "byjus", "physicswallah", "pw", "allen", "aakash", "school fees", "college fees", "coaching",
+    "exam fees", "textbook", "notebook", "stationery"
   ],
   "Investments": [
-    "stocks", "sip", "mutual fund", "crypto", "shares", "gold", "zerodha", "groww"
+    "stocks", "sip", "mutual fund", "crypto", "shares", "gold", "zerodha", "groww", "upstox", "angelone", "indmoney",
+    "paytm money", "index fund", "etf", "dividend", "ipo", "digital gold", "sgb", "bitcoin", "btc", "ethereum", "eth",
+    "fixed deposit", "fd", "rd", "ppf", "nps", "lic", "insurance", "policybazaar"
   ],
 };
 
 // Local dictionary prediction for instant 0ms category auto-detection
-const predictCategoryLocally = (desc: string): string | null => {
+export const predictCategoryLocally = (desc: string): string | null => {
   const clean = desc.toLowerCase().trim();
   if (clean.length < 2) return null;
   // Match single words and compound terms
@@ -105,7 +166,13 @@ const predictCategoryLocally = (desc: string): string | null => {
 
   for (const [catName, keywords] of Object.entries(PREDICTIVE_CATEGORIES)) {
     for (const kw of keywords) {
-      if (clean === kw || words.includes(kw) || (kw.length >= 4 && clean.includes(kw))) {
+      if (
+        clean === kw ||
+        words.includes(kw) ||
+        (kw.length >= 3 && clean.startsWith(kw + " ")) ||
+        (kw.length >= 3 && clean.endsWith(" " + kw)) ||
+        (kw.length >= 4 && clean.includes(kw))
+      ) {
         return catName;
       }
     }
@@ -424,9 +491,10 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
     prevIsOpenRef.current = isOpen;
   }, [isOpen, expense, categories, paymentMethods, categoryId, paymentMethodId, localCategories.length]);
 
-  // Real-time category recommendation based on description (Instant Local + Debounced AI)
+  // Real-time category recommendation based on description or Quick-Add input (Instant Local + Debounced AI)
   useEffect(() => {
-    if (!description || description.trim().length < 2 || isEditMode) {
+    const textToAnalyze = description.trim() || aiInputText.trim();
+    if (!textToAnalyze || textToAnalyze.length < 2 || isEditMode) {
       setSuggestedCategory(null);
       setSuggestedNewCategory(null);
       setSuggestedReason(null);
@@ -436,13 +504,13 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
     const activeCats = localCategories.length > 0 ? localCategories : categories;
 
     // Step 1: Instant 0ms local dictionary prediction
-    const localPred = predictCategoryLocally(description);
+    const localPred = predictCategoryLocally(textToAnalyze);
     if (localPred) {
       const matched = matchCategory(localPred, activeCats);
       if (matched) {
         if (matched.id !== categoryId) {
           setSuggestedCategory(matched);
-          setSuggestedReason(`Matches "${description.trim()}"`);
+          setSuggestedReason(`Matches "${textToAnalyze}"`);
           setSuggestedNewCategory(null);
         } else {
           setSuggestedCategory(null);
@@ -453,7 +521,7 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
         // Suggested category does not exist in user's category list yet
         setSuggestedCategory(null);
         setSuggestedNewCategory(localPred);
-        setSuggestedReason(`Matches "${description.trim()}"`);
+        setSuggestedReason(`Matches "${textToAnalyze}"`);
       }
     }
 
@@ -462,7 +530,7 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
       try {
         setIsCategorizingAi(true);
         const res = await aiApi.categorize({
-          description,
+          description: textToAnalyze,
           available_categories: activeCats.map((c) => c.name),
         });
         if (res.data?.category_name) {
@@ -491,7 +559,7 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [description, localCategories, categories, categoryId, isEditMode]);
+  }, [description, aiInputText, localCategories, categories, categoryId, isEditMode]);
 
   // Debounced duplicate detection guard
   useEffect(() => {
@@ -1127,6 +1195,23 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
           onCreateCategory={handleCreateCategory}
           isLoading={loadingCats}
           error={errors.category_id}
+          suggestedNewCategory={suggestedNewCategory}
+          suggestedExistingCategory={suggestedCategory}
+          onApplySuggestedNewCategory={async (catName) => {
+            try {
+              setIsAddingNewCategory(true);
+              const created = await handleCreateCategory(catName);
+              setCategoryId(created.id);
+              setSuggestedNewCategory(null);
+              setSuggestedCategory(null);
+              success(`Category "${created.name}" created and selected!`);
+            } catch {
+              toastError(`Failed to create category "${catName}"`);
+            } finally {
+              setIsAddingNewCategory(false);
+            }
+          }}
+          isAddingNewCategory={isAddingNewCategory}
         />
 
         {/* Payment Method Custom Animated Dropdown Menu */}

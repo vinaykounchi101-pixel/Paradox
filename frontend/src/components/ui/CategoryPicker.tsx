@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, Loader2, Tag } from "lucide-react";
+import { Plus, Check, Loader2, Tag, Sparkles } from "lucide-react";
 import { CategoryRead } from "@/lib/api/expenses";
+import { predictCategoryLocally } from "@/features/expenses/components/ExpenseFormDialog";
 
 export interface CategoryPickerProps {
   categories: CategoryRead[];
@@ -14,6 +15,10 @@ export interface CategoryPickerProps {
   isLoading?: boolean;
   error?: string;
   label?: string;
+  suggestedNewCategory?: string | null;
+  suggestedExistingCategory?: CategoryRead | null;
+  onApplySuggestedNewCategory?: (name: string) => Promise<void>;
+  isAddingNewCategory?: boolean;
 }
 
 export const CategoryPicker: React.FC<CategoryPickerProps> = ({
@@ -24,6 +29,10 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
   isLoading = false,
   error,
   label = "Category",
+  suggestedNewCategory,
+  suggestedExistingCategory,
+  onApplySuggestedNewCategory,
+  isAddingNewCategory = false,
 }) => {
   const [showInput, setShowInput] = useState(false);
   const [newName, setNewName] = useState("");
@@ -158,6 +167,41 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
             );
           })}
 
+          {/* Suggested New Category Pill (Direct 1-click database creation and selection) */}
+          {suggestedNewCategory && (
+            <motion.button
+              type="button"
+              onClick={() => onApplySuggestedNewCategory?.(suggestedNewCategory)}
+              disabled={isAddingNewCategory}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.94 }}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-amber-500/60 bg-gradient-to-r from-amber-500/25 via-orange-500/20 to-amber-500/15 text-amber-200 shadow-[0_0_14px_rgba(245,158,11,0.35)] hover:border-amber-400 cursor-pointer select-none transition-all duration-150 animate-pulse outline-none"
+              title={`Click to add "${suggestedNewCategory}" and select it`}
+            >
+              {isAddingNewCategory ? (
+                <Loader2 className="h-3 w-3 animate-spin text-amber-400 shrink-0" />
+              ) : (
+                <Sparkles className="h-3 w-3 text-amber-400 shrink-0" />
+              )}
+              <span>+ Add &quot;{suggestedNewCategory}&quot; (Suggested)</span>
+            </motion.button>
+          )}
+
+          {/* Suggested Existing Category Pill */}
+          {suggestedExistingCategory && suggestedExistingCategory.id !== value && (
+            <motion.button
+              type="button"
+              onClick={() => onChange(suggestedExistingCategory.id)}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.94 }}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-indigo-500/60 bg-gradient-to-r from-indigo-500/25 via-purple-500/20 to-indigo-500/15 text-indigo-200 shadow-[0_0_14px_rgba(99,102,241,0.35)] hover:border-indigo-400 cursor-pointer select-none transition-all duration-150 animate-pulse outline-none"
+              title={`Click to select suggested category "${suggestedExistingCategory.name}"`}
+            >
+              <Sparkles className="h-3 w-3 text-indigo-400 shrink-0" />
+              <span>Select {suggestedExistingCategory.name} (Suggested)</span>
+            </motion.button>
+          )}
+
           {/* + New Category pill — hidden while input is open */}
           {!showInput && (
             <motion.button
@@ -226,6 +270,32 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Intelligent Brand/Product Helper inside New Category Input */}
+            {(() => {
+              const brandPred = newName.trim().length >= 2 ? predictCategoryLocally(newName) : null;
+              if (brandPred && brandPred.toLowerCase() !== newName.trim().toLowerCase()) {
+                return (
+                  <div className="flex items-center gap-2 mt-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 animate-in fade-in duration-150">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="truncate">
+                      Recognized product/brand! Suggest category: <strong className="text-white font-semibold">{brandPred}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewName(brandPred);
+                        setInputError("");
+                      }}
+                      className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-semibold transition cursor-pointer shrink-0 shadow-sm"
+                    >
+                      Use &quot;{brandPred}&quot;
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {inputError && (
               <p className="text-xs text-destructive font-medium mt-1.5 pl-1">

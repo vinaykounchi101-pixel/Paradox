@@ -82,86 +82,144 @@ DEFAULT_PAYMENT_METHODS = [
 ]
 
 HEURISTIC_KEYWORD_MAP = {
+    "Alcohol": [
+        "brandy", "whiskey", "whisky", "scotch", "bourbon", "single malt", "rye", "vodka", "rum", "gin", "tequila",
+        "beer", "craft beer", "lager", "ale", "stout", "cider", "draught", "wine", "red wine", "white wine", "rose wine",
+        "champagne", "prosecco", "sangria", "port wine", "liquor", "alcohol", "booze", "theka", "daaru", "daru",
+        "bar", "pub", "brewery", "cocktail", "old monk", "royal stag", "blenders pride", "imperial blue", "mcdowell",
+        "officers choice", "antiquity", "signature", "magic moments", "smirnoff", "absolut", "grey goose", "bacardi",
+        "captain morgan", "kingfisher", "bira", "budweiser", "corona", "carlsberg", "tuborg", "heineken", "stella artois",
+        "guinness", "jack daniels", "johnnie walker", "red label", "black label", "double black", "gold label", "chivas",
+        "chivas regal", "glenlivet", "glenfiddich", "macallan", "jameson", "ballantines", "monkey shoulder", "black dog",
+        "teachers", "100 pipers", "sula", "jacobs creek", "baileys", "jagermeister", "bombay sapphire", "tanqueray",
+        "hendricks", "don julio", "patron", "breezer", "liquor store", "wines"
+    ],
+    "Gaming": [
+        "ps5", "ps4", "ps3", "playstation", "playstation 5", "playstation 4", "dualsense", "dualshock", "psp", "psvita",
+        "xbox", "xbox series", "xbox series x", "xbox series s", "xbox one", "xbox 360", "nintendo", "nintendo switch",
+        "switch oled", "switch lite", "steam", "steam deck", "rog ally", "legion go", "vr headset", "oculus", "meta quest",
+        "gpu", "graphics card", "rtx", "gtx", "geforce", "radeon", "gaming pc", "gaming laptop", "gaming monitor",
+        "mechanical keyboard", "gaming mouse", "controller", "gamepad", "joystick", "arcade stick", "capture card", "elgato",
+        "epic games", "riot games", "battlenet", "game pass", "gta", "gta 5", "gta 6", "fifa", "fc 24", "fc 25",
+        "call of duty", "cod", "warzone", "valorant", "csgo", "cs2", "pubg", "bgmi", "apex legends", "fortnite",
+        "roblox", "minecraft", "cyberpunk", "elden ring", "god of war", "spiderman", "assassin's creed", "rdr2",
+        "witcher", "hogwarts legacy", "zelda", "pokemon", "mario", "dark souls", "sekiro", "overwatch", "dota", "gaming"
+    ],
     "Food & Dining": [
-        "food", "dining", "restaurant", "cafe", "coffee", "tea", "chai", "lunch", "dinner",
-        "breakfast", "snack", "swiggy", "zomato", "mcdonald", "burger", "pizza", "starbucks",
-        "biryani", "bakery", "bread", "meal", "eats"
+        "food", "dining", "restaurant", "cafe", "coffee", "tea", "chai", "lunch", "dinner", "breakfast", "snack",
+        "brunch", "meal", "swiggy", "zomato", "eatclub", "magicpin", "mcdonald", "mcdonalds", "kfc", "burger king",
+        "subway", "dominos", "pizza hut", "mojo pizza", "ovenstory", "behrouz", "faasos", "taco bell", "popeyes",
+        "starbucks", "ccd", "cafe coffee day", "chaayos", "chai point", "third wave", "blue tokai", "baskin robbins",
+        "theobroma", "haldirams", "barbeque nation", "bbq", "pizza", "burger", "biryani", "fried chicken", "momos",
+        "noodles", "fried rice", "shawarma", "roll", "sandwich", "wrap", "pasta", "tacos", "dosa", "idli", "vada",
+        "pav bhaji", "samosa", "chaat", "pani puri", "thali", "paneer tikka", "butter chicken", "bakery", "dessert",
+        "pastry", "cake", "ice cream", "eats"
     ],
     "Groceries": [
-        "grocery", "groceries", "supermarket", "blinkit", "zepto", "instamart",
-        "fruits", "vegetables", "milk", "bread", "eggs", "veggies", "provisions", "mart"
+        "grocery", "groceries", "supermarket", "blinkit", "zepto", "instamart", "bigbasket", "bb daily", "dmart",
+        "kirana", "ration", "fruits", "vegetables", "milk", "bread", "eggs", "veggies", "provisions", "mart",
+        "amul", "mother dairy", "nandini", "gokul", "dahi", "curd", "paneer", "butter", "cheese", "ghee", "atta",
+        "flour", "aashirvaad", "rice", "basmati", "daal", "dal", "pulses", "oil", "cooking oil", "fortune", "saffola",
+        "salt", "tata salt", "sugar", "spices", "masala", "mdh", "everest", "maggi", "noodles", "yippee", "oats",
+        "kelloggs", "cornflakes", "biscuits", "cookies", "parle", "britannia", "good day", "bourbon", "oreo", "hide & seek",
+        "dark fantasy", "chips", "lays", "kurkure", "doritos", "pringles", "bingo", "namkeen", "bikaji", "chocolate",
+        "cadbury", "dairy milk", "silk", "kitkat", "5 star", "perk", "snickers", "ketchup", "sauce", "mayonnaise", "jam",
+        "honey", "dabur", "pickle"
     ],
     "Transportation": [
-        "transport", "taxi", "cab", "uber", "ola", "auto", "rickshaw", "metro", "bus",
-        "train", "flight", "fuel", "petrol", "diesel", "cng", "parking", "toll", "fastag"
+        "transport", "taxi", "cab", "uber", "ola", "auto", "rickshaw", "metro", "bus", "train", "flight", "fuel",
+        "petrol", "diesel", "cng", "parking", "toll", "fastag", "rapido", "blu smart", "indrive", "air india", "indigo",
+        "vistara", "spicejet", "akasa", "makemytrip", "mmt", "easemytrip", "redbus", "irctc", "railway", "iocl",
+        "indian oil", "bpcl", "bharat petroleum", "hpcl", "shell", "speed", "car wash", "service center", "mechanic",
+        "puncture", "tyre"
     ],
     "Bills & Utilities": [
         "utility", "utilities", "bill", "electricity", "water", "gas", "wifi", "internet", "broadband", "mobile",
-        "recharge", "phone bill", "cylinder", "dth", "power", "pipeline"
+        "recharge", "phone bill", "cylinder", "dth", "power", "pipeline", "piped gas", "lpg", "indane", "bharat gas",
+        "hp gas", "airtel", "jio", "vi", "bsnl", "prepaid", "postpaid", "jiofiber", "airtel xtream", "act fibernet",
+        "tata play", "dish tv"
     ],
     "Utilities": [
-        "utility", "electricity", "water", "gas", "wifi", "internet", "broadband", "mobile",
-        "recharge", "phone bill", "cylinder", "dth"
-    ],
-    "Health": [
-        "health", "doctor", "hospital", "clinic", "medicine", "pharmacy", "medical", "test", "dentist",
-        "apollo", "pharmeasy", "tablets", "syrup", "healthcare"
+        "utility", "electricity", "water", "gas", "wifi", "internet", "broadband", "mobile", "recharge", "phone bill",
+        "cylinder", "dth", "power", "airtel", "jio", "vi"
     ],
     "Healthcare": [
-        "doctor", "hospital", "clinic", "medicine", "pharmacy", "medical", "test", "dentist",
-        "apollo", "pharmeasy", "health"
+        "doctor", "hospital", "clinic", "medicine", "medicines", "pharmacy", "medical", "test", "dentist", "apollo",
+        "pharmeasy", "1mg", "netmeds", "medplus", "health", "healthcare", "crocin", "paracetamol", "dolo", "dolo 650",
+        "combiflam", "saridon", "disprin", "vicks", "strepsils", "cough syrup", "allegra", "cetirizine", "pantocid",
+        "pan d", "omez", "digene", "gelusil", "eno", "orsl", "vitamin", "multivitamin", "becosules", "supradyn", "calcium",
+        "shelcal", "eye drops", "nasal spray", "otrivin", "volini", "moov", "iodex", "bandaid", "bandage", "dettol",
+        "savlon", "betadine", "thermometer", "spectacles", "glasses", "lens", "blood test", "pathology", "physiotherapy"
     ],
-    "Housing": [
-        "rent", "maintenance", "mortgage", "repair", "plumber", "electrician", "furniture",
-        "maid", "cook"
-    ],
-    "Entertainment": [
-        "movie", "cinema", "netflix", "prime", "hotstar", "spotify", "concert", "game", "games",
-        "gaming", "steam", "youtube", "theatre", "party", "club", "playstation", "xbox", "console"
-    ],
-    "Shopping": [
-        "clothes", "shoes", "amazon", "flipkart", "myntra", "shopping", "mall", "electronics",
-        "gadget", "appliances", "book", "gift", "dress", "mouse", "keyboard", "gaming mouse",
-        "monitor", "laptop", "pc", "computer", "hardware", "accessories", "headphones", "headset",
-        "gaming", "game", "controller", "tech", "device", "ipad", "watch"
+    "Health": [
+        "health", "doctor", "hospital", "clinic", "medicine", "pharmacy", "medical", "test", "dentist", "apollo",
+        "pharmeasy", "tablets", "syrup", "healthcare", "dolo", "paracetamol"
     ],
     "Personal Care": [
-        "salon", "spa", "haircut", "gym", "fitness", "cosmetics", "skincare", "massage"
+        "salon", "spa", "haircut", "gym", "fitness", "cosmetics", "skincare", "massage", "parlour", "barber", "shaving",
+        "beard", "facial", "cleanup", "manicure", "pedicure", "urban company", "nykaa", "purplle", "tira", "sephora",
+        "lakme", "maybelline", "loreal", "sugar cosmetics", "mamaearth", "wow skin", "plum", "minimalist", "derma co",
+        "biotique", "himalaya", "nivea", "ponds", "garnier", "dove", "olay", "cetaphil", "cerave", "vaseline", "shampoo",
+        "conditioner", "hair oil", "parachute", "tresemme", "pantene", "sunsilk", "head & shoulders", "body wash",
+        "shower gel", "soap", "lux", "lifebuoy", "cinthol", "pears", "dettol soap", "facewash", "moisturizer", "sunscreen",
+        "deodorant", "deo", "perfume", "fragrance", "axe", "fogg", "gillette", "razor", "trimmer", "sanitary pads",
+        "whisper", "stayfree"
     ],
-    "Education": [
-        "tuition", "course", "udemy", "coursera", "school", "college", "fees", "books", "training"
-    ],
-    "Travel": [
-        "hotel", "airbnb", "resort", "vacation", "trip", "tour", "visa", "luggage"
-    ],
-    "Investments": [
-        "stocks", "mutual fund", "sip", "crypto", "shares", "gold", "fixed deposit"
-    ],
-    "Pets": [
-        "dog", "cat", "pet", "puppy", "kitten", "pedigree", "veterinary", "vet", "aquarium", "pet food", "whiskas", "royal canin"
-    ],
-    "Fitness": [
-        "gym", "fitness", "yoga", "crossfit", "protein", "workout", "dumbbells", "creatine", "cult", "gold's gym"
+    "Shopping": [
+        "clothes", "shoes", "amazon", "flipkart", "myntra", "shopping", "mall", "electronics", "gadget", "appliances",
+        "book", "gift", "dress", "accessories", "headphones", "headset", "earphones", "earbuds", "laptop", "pc",
+        "computer", "hardware", "tech", "device", "ipad", "watch", "smartwatch", "iphone", "macbook", "imac",
+        "airpods", "apple watch", "samsung", "galaxy", "oneplus", "xiaomi", "redmi", "realme", "vivo", "oppo",
+        "motorola", "pixel", "boat", "noise", "fireboltt", "fastrack", "boult", "mivi", "zebronics", "portronics",
+        "sony headphones", "sennheiser", "jbl", "bose", "marshall", "skullcandy", "bluetooth speaker", "charger",
+        "powerbank", "dell", "hp", "lenovo", "thinkpad", "asus", "acer", "msi", "monitor", "printer", "nike",
+        "adidas", "puma", "reebok", "under armour", "new balance", "skechers", "asics", "converse", "vans", "woodland",
+        "red tape", "bata", "crocs", "zara", "h&m", "uniqlo", "levis", "levi's", "marks & spencer", "allen solly",
+        "van heusen", "louis philippe", "peter england", "blackberrys", "raymond", "fabindia", "manyavar", "biba",
+        "vero moda", "only", "mango", "us polo", "tommy hilfiger", "calvin klein", "armani", "gucci", "prada", "fossil",
+        "titan", "timex", "casio", "g-shock", "rayban", "lenskart", "sunglasses", "sneakers", "sandals", "boots",
+        "shirt", "tshirt", "t-shirt", "jeans", "jacket", "hoodie", "suit", "saree", "kurta", "bag", "backpack",
+        "wallet", "luggage", "american tourister", "safari", "skybags", "samsonite", "ajio", "meesho", "nykaa fashion"
     ],
     "Subscriptions": [
-        "subscription", "membership", "recurring", "saas", "software", "patreon", "sub"
+        "subscription", "membership", "recurring", "saas", "software", "patreon", "sub", "netflix", "prime video",
+        "amazon prime", "hotstar", "disney", "sonyliv", "zee5", "jio cinema", "youtube premium", "spotify", "apple music",
+        "amazon music", "gaana", "jiosaavn", "audible", "kindle", "chatgpt", "openai", "claude", "google one",
+        "icloud", "apple one", "dropbox", "microsoft 365", "canva", "adobe", "figma", "midjourney", "github", "linkedin premium"
     ],
-    "Alcohol": [
-        "brandy", "whiskey", "whisky", "beer", "wine", "vodka", "rum", "gin", "tequila",
-        "liquor", "alcohol", "bar", "pub", "cocktail", "scotch", "champagne", "bourbon",
-        "brewery", "theka", "daaru", "drinks", "corona", "budweiser", "bira", "kingfisher",
-        "jack daniels", "johnnie walker", "old monk", "smirnoff", "absolut", "bacardi",
-        "liquor store", "wines"
+    "Fitness": [
+        "gym", "fitness", "yoga", "crossfit", "protein", "workout", "dumbbells", "creatine", "cult", "cult.fit",
+        "cult pass", "gold's gym", "anytime fitness", "zumba", "swimming", "badminton", "turf", "whey", "whey protein",
+        "isolate", "bcaa", "pre-workout", "muscleblaze", "optimum nutrition", "on whey", "myprotein", "avvatar", "asitis",
+        "gnc", "protein bar", "yoga mat", "decathlon"
     ],
-    "Gaming": [
-        "ps5", "playstation", "playstation 5", "ps4", "ps3", "xbox", "xbox series",
-        "nintendo", "nintendo switch", "switch", "gaming", "steam", "game", "games",
-        "epic games", "gta", "fifa", "valorant", "console", "controller", "pc gaming",
-        "roblox", "minecraft", "steam deck", "bgmi", "pubg", "game pass", "dualshock",
-        "dualsense", "gpu", "graphics card", "rtx", "geforce"
+    "Pets": [
+        "dog", "cat", "pet", "pets", "puppy", "kitten", "pedigree", "veterinary", "vet", "aquarium", "pet food",
+        "whiskas", "royal canin", "drools", "purina", "chappi", "dog food", "cat food", "dog chew", "cat litter",
+        "pet clinic", "dog vaccination", "pet grooming", "heads up for tails", "huft", "supertails"
+    ],
+    "Housing": [
+        "rent", "maintenance", "mortgage", "repair", "plumber", "electrician", "furniture", "maid", "cook", "house rent",
+        "society maintenance", "carpenter", "painting", "pest control", "ikea", "urban ladder", "pepperfry"
+    ],
+    "Education": [
+        "tuition", "course", "udemy", "coursera", "school", "college", "fees", "books", "training", "edx", "skillshare",
+        "unacademy", "byjus", "physicswallah", "pw", "allen", "aakash", "school fees", "college fees", "coaching",
+        "exam fees", "textbook", "notebook", "stationery"
+    ],
+    "Investments": [
+        "stocks", "mutual fund", "sip", "crypto", "shares", "gold", "fixed deposit", "zerodha", "kite", "groww",
+        "upstox", "angelone", "indmoney", "paytm money", "index fund", "etf", "dividend", "ipo", "digital gold",
+        "sgb", "bitcoin", "btc", "ethereum", "eth", "fd", "rd", "ppf", "nps", "lic", "insurance", "policybazaar"
+    ],
+    "Entertainment": [
+        "movie", "cinema", "theatre", "concert", "party", "club", "bookmyshow", "pvr", "inox", "cinepolis", "amusement park"
+    ],
+    "Travel": [
+        "hotel", "airbnb", "resort", "vacation", "trip", "tour", "visa", "luggage", "oyo", "taj", "marriott"
     ],
     "Gifts": [
-        "gift", "donation", "charity", "present", "birthday gift", "flowers", "bouquet"
+        "gift", "donation", "charity", "present", "birthday gift", "flowers", "bouquet", "fnp", "ferns n petals"
     ],
     "Uncategorized": [
         "other", "misc", "miscellaneous", "general", "extra"
@@ -692,10 +750,13 @@ class AIService:
 
         # 1. Extract Amount
         amount: Optional[Decimal] = None
-        amount_matches = re.findall(r"(?:(?:rs\.?|inr|₹|\$)\s*(\d+(?:\.\d{1,2})?)|(\d+(?:\.\d{1,2})?)\s*(?:rs\.?|inr|₹|\$|bucks|rupees?|\b))", text_lower)
-        # Also plain numbers
+        amount_matches = re.findall(
+            r"(?:(?:rs\.?|inr|₹|\$)\s*(\d+(?:\.\d{1,2})?)|(\d+(?:\.\d{1,2})?)\s*(?:rs\.?|inr|₹|\$|bucks|rupees?))",
+            text_lower
+        )
         if not amount_matches:
-            plain_nums = re.findall(r"\b\d+(?:\.\d{1,2})?\b", text)
+            # Standalone plain numbers: MUST be bounded by whitespace or string boundaries, NOT attached to letters like ps5
+            plain_nums = re.findall(r"(?:^|\s)(\d+(?:\.\d{1,2})?)(?=\s|$)", text_lower)
             if plain_nums:
                 amount = Decimal(plain_nums[0])
         else:
