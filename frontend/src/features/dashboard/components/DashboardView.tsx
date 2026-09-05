@@ -108,7 +108,7 @@ export default function DashboardView() {
   return (
     <div className="page-container space-y-6">
       {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="relative z-40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-glow">Dashboard</h1>

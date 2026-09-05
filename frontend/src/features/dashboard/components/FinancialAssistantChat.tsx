@@ -98,12 +98,25 @@ export const FinancialAssistantChat: React.FC<FinancialAssistantChatProps> = ({
         setSuggestedFollowups(res.data.suggested_followups);
       }
     } catch {
+      // Graceful contextual fallback when backend container is deploying/updating
+      let fallbackReply = "⚠️ AI Copilot server is currently updating. In the meantime, you can check your live allowance in the Safe-to-Spend Speedometer or test purchase impacts with the 'Can I Afford This?' simulator!";
+
+      const lower = cleanedQuery.toLowerCase();
+      if (lower.includes("afford") || lower.includes("buy") || lower.includes("purchase")) {
+        fallbackReply = `💡 Affordability Quick Check: Compare the purchase price against your remaining monthly allowance in the Safe-to-Spend card. If this purchase exceeds your daily buffer, consider using the 'Can I Afford This?' simulator on your dashboard to see the exact budget impact! 🛍️`;
+      } else if (lower.includes("subscription") || lower.includes("recurring")) {
+        fallbackReply = `🔁 Subscriptions Insight: You can audit all detected recurring burdens and annual totals anytime by clicking 'Audit' on the Subscriptions & Fixed Bills card! 📺`;
+      } else if (lower.includes("spent") || lower.includes("spending") || lower.includes("how much")) {
+        fallbackReply = `📊 Spending Insight: Your total spend and top category velocity are tracked live in the KPI cards and 3D Category chart on your dashboard! 📈`;
+      } else if (lower.includes("anomal") || lower.includes("unusual")) {
+        fallbackReply = `🛡️ Anomaly Check: Review the Anomaly Guard & Spend Forecast card on your dashboard to inspect statistical outliers in real time!`;
+      }
+
       setMessages([
         ...newHistory,
         {
           role: "assistant",
-          content:
-            "⚠️ I had trouble connecting to the financial intelligence service. Please check your network connection and try again.",
+          content: fallbackReply,
         },
       ]);
     } finally {

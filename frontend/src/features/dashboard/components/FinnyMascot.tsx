@@ -135,7 +135,7 @@ export const FinnyMascot: React.FC<FinnyMascotProps> = ({
   };
 
   return (
-    <div className="relative inline-flex items-center" style={{ perspective: 1000 }}>
+    <div className="relative z-50 inline-flex items-center">
       {/* Floating Emojis on micro-interaction poke */}
       <AnimatePresence>
         {floatingEmojis.map((item) => (
@@ -262,7 +262,7 @@ export const FinnyMascot: React.FC<FinnyMascotProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
             exit={{ opacity: 0, y: 10, scale: 0.92, rotateX: -10 }}
             transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="absolute sm:left-0 sm:right-auto right-0 top-full mt-2.5 w-[calc(100vw-2.5rem)] sm:w-84 max-w-sm z-50 rounded-2xl border border-zinc-800/90 bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-xl space-y-3"
+            className="absolute sm:left-0 sm:right-auto right-0 top-full mt-2.5 w-[calc(100vw-2.5rem)] sm:w-84 max-w-sm z-[100] rounded-2xl border border-zinc-800/90 bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-xl space-y-3"
             style={{
               boxShadow: "0 20px 40px rgba(0,0,0,0.6), 0 0 25px rgba(99,102,241,0.15)",
               transformOrigin: "top center",
