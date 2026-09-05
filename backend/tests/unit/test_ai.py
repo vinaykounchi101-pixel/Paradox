@@ -259,6 +259,16 @@ async def test_categorize_suggests_new_category_when_not_in_user_categories():
     assert res_pet.category_name == "Pets"
     assert res_pet.is_new_category is True
 
+    # Expense is for Alcohol (e.g. brandy)
+    res_alcohol = await service.categorize_expense("brandy", available_categories=user_cats)
+    assert res_alcohol.category_name == "Alcohol"
+    assert res_alcohol.is_new_category is True
+
+    # Expense is for Gaming (e.g. ps5)
+    res_gaming = await service.categorize_expense("ps5", available_categories=user_cats)
+    assert res_gaming.category_name == "Gaming"
+    assert res_gaming.is_new_category is True
+
     # Expense is for existing Food & Dining
     res_food = await service.categorize_expense("Starbucks coffee and croissant", available_categories=user_cats)
     assert res_food.category_name == "Food & Dining"

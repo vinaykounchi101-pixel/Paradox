@@ -37,6 +37,82 @@ interface ExpenseFormDialogProps {
   expense?: ExpenseRead | null;
 }
 
+const PREDICTIVE_CATEGORIES: Record<string, string[]> = {
+  "Alcohol": [
+    "brandy", "whiskey", "whisky", "beer", "wine", "vodka", "rum", "gin", "tequila",
+    "liquor", "alcohol", "bar", "pub", "cocktail", "scotch", "champagne", "bourbon",
+    "brewery", "theka", "daaru", "drinks", "corona", "budweiser", "bira", "kingfisher",
+    "bacardi", "old monk", "smirnoff", "absolut", "jack daniels", "johnnie walker"
+  ],
+  "Gaming": [
+    "ps5", "playstation", "playstation 5", "ps4", "ps3", "xbox", "xbox series",
+    "nintendo", "switch", "gaming", "steam", "game", "games", "epic games", "gta",
+    "fifa", "valorant", "console", "controller", "pc gaming", "roblox", "minecraft",
+    "steam deck", "bgmi", "pubg", "game pass", "dualsense", "dualshock"
+  ],
+  "Food & Dining": [
+    "swiggy", "zomato", "restaurant", "cafe", "coffee", "tea", "chai", "lunch", "dinner",
+    "breakfast", "snack", "burger", "pizza", "starbucks", "biryani", "bakery", "mcdonald",
+    "kfc", "dominos", "subway", "eats", "dosa", "idli", "shawarma"
+  ],
+  "Groceries": [
+    "blinkit", "zepto", "instamart", "grocery", "groceries", "supermarket", "milk",
+    "bread", "eggs", "vegetables", "fruits", "veggies", "provisions", "ration", "mart"
+  ],
+  "Transportation": [
+    "uber", "ola", "auto", "cab", "rickshaw", "metro", "bus", "train", "flight",
+    "petrol", "diesel", "fuel", "cng", "parking", "fastag", "toll", "rapido"
+  ],
+  "Bills & Utilities": [
+    "electricity", "water", "gas", "wifi", "internet", "broadband", "mobile recharge",
+    "phone bill", "cylinder", "dth", "power", "airtel", "jio", "vi", "piped gas"
+  ],
+  "Healthcare": [
+    "doctor", "hospital", "clinic", "medicine", "medicines", "pharmacy", "medical",
+    "apollo", "pharmeasy", "dentist", "tablets", "syrup", "1mg", "health checkup"
+  ],
+  "Shopping": [
+    "clothes", "shoes", "amazon", "flipkart", "myntra", "shopping", "mall", "zara",
+    "h&m", "electronics", "gadget", "headphones", "laptop", "ajio", "meesho"
+  ],
+  "Subscriptions": [
+    "netflix", "spotify", "prime", "youtube", "hotstar", "subscription", "patreon",
+    "apple music", "disney", "chatgpt"
+  ],
+  "Fitness": [
+    "gym", "fitness", "yoga", "workout", "protein", "whey", "creatine", "cult", "crossfit"
+  ],
+  "Pet Care": [
+    "dog", "cat", "pet", "pets", "puppy", "kitten", "pedigree", "veterinary", "vet", "whiskas", "royal canin"
+  ],
+  "Education": [
+    "tuition", "course", "udemy", "coursera", "school", "college", "fees", "books"
+  ],
+  "Housing": [
+    "rent", "brokerage", "maintenance", "maid", "repair", "plumber", "electrician"
+  ],
+  "Investments": [
+    "stocks", "sip", "mutual fund", "crypto", "shares", "gold", "zerodha", "groww"
+  ],
+};
+
+// Local dictionary prediction for instant 0ms category auto-detection
+const predictCategoryLocally = (desc: string): string | null => {
+  const clean = desc.toLowerCase().trim();
+  if (clean.length < 2) return null;
+  // Match single words and compound terms
+  const words = clean.split(/[\s,._\-/]+/);
+
+  for (const [catName, keywords] of Object.entries(PREDICTIVE_CATEGORIES)) {
+    for (const kw of keywords) {
+      if (clean === kw || words.includes(kw) || (kw.length >= 4 && clean.includes(kw))) {
+        return catName;
+      }
+    }
+  }
+  return null;
+};
+
 // Helper to intelligently resolve categories including common synonyms and aliases
 const matchCategory = (
   targetName?: string | null,
@@ -49,7 +125,43 @@ const matchCategory = (
   let found = availableCats.find((c) => c.name.toLowerCase() === target);
   if (found) return found;
 
-  // 2. Known Semantic / Synonym Aliases
+  // 2. Gaming specific match (preserve distinct Gaming category; do not coerce into Entertainment)
+  if (
+    target === "gaming" ||
+    target === "games" ||
+    target.includes("playstation") ||
+    target.includes("xbox") ||
+    target.includes("nintendo") ||
+    target.includes("steam")
+  ) {
+    found = availableCats.find((c) => c.name.toLowerCase().includes("gaming") || c.name.toLowerCase().includes("game"));
+    if (found) return found;
+  }
+
+  // 3. Alcohol / Liquor specific match (preserve distinct Alcohol category; do not coerce into Food)
+  if (
+    target === "alcohol" ||
+    target === "liquor" ||
+    target === "drinks" ||
+    target === "bar" ||
+    target === "pub" ||
+    target.includes("brandy") ||
+    target.includes("whiskey") ||
+    target.includes("beer") ||
+    target.includes("wine") ||
+    target.includes("vodka")
+  ) {
+    found = availableCats.find(
+      (c) =>
+        c.name.toLowerCase().includes("alcohol") ||
+        c.name.toLowerCase().includes("liquor") ||
+        c.name.toLowerCase().includes("drinks") ||
+        c.name.toLowerCase().includes("beverage")
+    );
+    if (found) return found;
+  }
+
+  // 4. Known Semantic / Synonym Aliases
   if (
     target.includes("food") ||
     target.includes("dining") ||
@@ -152,7 +264,6 @@ const matchCategory = (
     target.includes("entertain") ||
     target.includes("movie") ||
     target.includes("cinema") ||
-    target.includes("game") ||
     target.includes("netflix") ||
     target.includes("spotify")
   ) {
@@ -182,7 +293,7 @@ const matchCategory = (
     if (found) return found;
   }
 
-  // 3. Substring match fallback
+  // 5. Substring match fallback
   found = availableCats.find(
     (c) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
   );
@@ -313,19 +424,43 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
     prevIsOpenRef.current = isOpen;
   }, [isOpen, expense, categories, paymentMethods, categoryId, paymentMethodId, localCategories.length]);
 
-  // Debounced real-time category recommendation based on description
+  // Real-time category recommendation based on description (Instant Local + Debounced AI)
   useEffect(() => {
-    if (!description || description.trim().length < 3 || isEditMode) {
+    if (!description || description.trim().length < 2 || isEditMode) {
       setSuggestedCategory(null);
       setSuggestedNewCategory(null);
       setSuggestedReason(null);
       return;
     }
 
+    const activeCats = localCategories.length > 0 ? localCategories : categories;
+
+    // Step 1: Instant 0ms local dictionary prediction
+    const localPred = predictCategoryLocally(description);
+    if (localPred) {
+      const matched = matchCategory(localPred, activeCats);
+      if (matched) {
+        if (matched.id !== categoryId) {
+          setSuggestedCategory(matched);
+          setSuggestedReason(`Matches "${description.trim()}"`);
+          setSuggestedNewCategory(null);
+        } else {
+          setSuggestedCategory(null);
+          setSuggestedNewCategory(null);
+          setSuggestedReason(null);
+        }
+      } else {
+        // Suggested category does not exist in user's category list yet
+        setSuggestedCategory(null);
+        setSuggestedNewCategory(localPred);
+        setSuggestedReason(`Matches "${description.trim()}"`);
+      }
+    }
+
+    // Step 2: Debounced AI fallback for natural language phrases or non-dictionary terms
     const timer = setTimeout(async () => {
       try {
         setIsCategorizingAi(true);
-        const activeCats = localCategories.length > 0 ? localCategories : categories;
         const res = await aiApi.categorize({
           description,
           available_categories: activeCats.map((c) => c.name),
@@ -335,7 +470,7 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
           if (matched) {
             if (matched.id !== categoryId) {
               setSuggestedCategory(matched);
-              setSuggestedReason(res.data.reasoning || null);
+              setSuggestedReason(res.data.reasoning || `AI matched "${res.data.category_name}"`);
             } else {
               setSuggestedCategory(null);
               setSuggestedReason(null);
@@ -345,7 +480,7 @@ export const ExpenseFormDialog: React.FC<ExpenseFormDialogProps> = ({
             // Category suggested by AI does NOT exist in user's category list!
             setSuggestedCategory(null);
             setSuggestedNewCategory(res.data.category_name);
-            setSuggestedReason(res.data.reasoning || null);
+            setSuggestedReason(res.data.reasoning || `AI suggests new category`);
           }
         }
       } catch {
@@ -1042,13 +1177,16 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
 
           {/* Suggested new category that does not exist in user's category list */}
           {suggestedNewCategory && (
-            <div className="mt-1.5 flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 px-2.5 sm:px-3 py-2 text-xs text-amber-200 animate-in fade-in duration-200 w-full min-w-0 gap-2">
-              <div className="flex items-center gap-1.5 min-w-0 truncate">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <div className="mt-2 flex items-center justify-between rounded-xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border border-amber-500/40 p-2.5 sm:px-3 text-xs text-amber-200 animate-in fade-in duration-200 w-full min-w-0 gap-2 shadow-sm">
+              <div className="flex items-center gap-2 min-w-0 truncate">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
                 <span className="truncate">
-                  Category <strong className="text-white font-semibold">&quot;{suggestedNewCategory}&quot;</strong> doesn&apos;t exist yet.
+                  Suggested Category:{" "}
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-500/25 text-amber-200 font-semibold border border-amber-500/40 ml-1">
+                    {suggestedNewCategory}
+                  </span>
                   {suggestedReason && (
-                    <span className="text-zinc-400 text-[11px] ml-1 hidden sm:inline">
+                    <span className="text-zinc-400 text-[11px] ml-1.5 hidden sm:inline">
                       ({suggestedReason})
                     </span>
                   )}
@@ -1064,6 +1202,7 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                       const created = await handleCreateCategory(suggestedNewCategory);
                       setCategoryId(created.id);
                       setSuggestedNewCategory(null);
+                      setSuggestedCategory(null);
                       success(`Category "${created.name}" created and selected!`);
                     } catch {
                       toastError(`Failed to create category "${suggestedNewCategory}"`);
@@ -1071,20 +1210,20 @@ const resizeReceiptImage = (file: File, maxDim = 1280): Promise<File> => {
                       setIsAddingNewCategory(false);
                     }
                   }}
-                  className="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-500 text-xs text-white font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-xs text-white font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-md hover:shadow-amber-500/20 disabled:opacity-50"
                   title={`Create category "${suggestedNewCategory}" and select it`}
                 >
                   {isAddingNewCategory ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <Plus className="w-3 h-3" />
+                    <Plus className="w-3.5 h-3.5" />
                   )}
                   <span>Add &amp; Select</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSuggestedNewCategory(null)}
-                  className="p-1 text-amber-400/70 hover:text-amber-200 text-xs rounded transition cursor-pointer"
+                  className="p-1 text-amber-400/60 hover:text-amber-200 text-xs rounded transition cursor-pointer"
                   title="Dismiss suggestion"
                 >
                   ✕

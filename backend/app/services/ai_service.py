@@ -146,6 +146,20 @@ HEURISTIC_KEYWORD_MAP = {
     "Subscriptions": [
         "subscription", "membership", "recurring", "saas", "software", "patreon", "sub"
     ],
+    "Alcohol": [
+        "brandy", "whiskey", "whisky", "beer", "wine", "vodka", "rum", "gin", "tequila",
+        "liquor", "alcohol", "bar", "pub", "cocktail", "scotch", "champagne", "bourbon",
+        "brewery", "theka", "daaru", "drinks", "corona", "budweiser", "bira", "kingfisher",
+        "jack daniels", "johnnie walker", "old monk", "smirnoff", "absolut", "bacardi",
+        "liquor store", "wines"
+    ],
+    "Gaming": [
+        "ps5", "playstation", "playstation 5", "ps4", "ps3", "xbox", "xbox series",
+        "nintendo", "nintendo switch", "switch", "gaming", "steam", "game", "games",
+        "epic games", "gta", "fifa", "valorant", "console", "controller", "pc gaming",
+        "roblox", "minecraft", "steam deck", "bgmi", "pubg", "game pass", "dualshock",
+        "dualsense", "gpu", "graphics card", "rtx", "geforce"
+    ],
     "Gifts": [
         "gift", "donation", "charity", "present", "birthday gift", "flowers", "bouquet"
     ],
@@ -652,7 +666,7 @@ class AIService:
                 global_kws = g_matched
 
         # If a non-existent global domain scored higher than the user's best category, suggest it as a new category!
-        if global_best_score >= 2 and global_best_score > best_score and global_best_cat:
+        if global_best_score >= 1 and global_best_score > best_score and global_best_cat:
             return CategorizeResponse(
                 category_name=global_best_cat,
                 confidence=0.88,
