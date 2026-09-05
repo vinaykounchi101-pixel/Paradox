@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
+import { useCurrency } from "@/features/auth/context/CurrencyContext";
 
 interface ChartData {
   category_id: string;
@@ -30,6 +31,7 @@ const DEPTH_X = 10;
 const DEPTH_Y = -8;
 
 export const BarChart3D: React.FC<BarChart3DProps> = ({ data }) => {
+  const { currencySymbol, formatCurrency } = useCurrency();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
@@ -113,7 +115,7 @@ export const BarChart3D: React.FC<BarChart3DProps> = ({ data }) => {
               textAnchor="end"
               className="text-[8px] font-mono fill-muted-foreground"
             >
-              ${line.val.toFixed(0)}
+              {currencySymbol}{line.val.toFixed(0)}
             </text>
           </g>
         ))}
@@ -230,7 +232,7 @@ export const BarChart3D: React.FC<BarChart3DProps> = ({ data }) => {
                   animate={{ opacity: 1, y: y + DEPTH_Y - 4 }}
                   transition={{ duration: 0.15 }}
                 >
-                  ${item.val.toFixed(0)}
+                  {currencySymbol}{item.val.toFixed(0)}
                 </motion.text>
               )}
             </g>
@@ -255,7 +257,7 @@ export const BarChart3D: React.FC<BarChart3DProps> = ({ data }) => {
             className="font-bold text-sm mt-0.5"
             style={{ color: parsedData[hoveredIndex].colors.front }}
           >
-            ${parsedData[hoveredIndex].total}
+            {formatCurrency(parsedData[hoveredIndex].total)}
           </div>
           <div className="text-[9px] text-muted-foreground mt-0.5">
             {parsedData[hoveredIndex].percentage.toFixed(1)}% of total

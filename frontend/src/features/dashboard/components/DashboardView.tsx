@@ -119,82 +119,101 @@ export default function DashboardView() {
           <FinnyMascot />
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Can I Afford This? Simulator Button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsSimulatorOpen(true)}
-            className="cursor-pointer text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30"
-            title="Simulate a planned purchase before spending"
-          >
-            <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-400" />
-            Can I Afford This?
-          </Button>
+          <motion.div whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.96 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsSimulatorOpen(true)}
+              className="cursor-pointer text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs"
+              title="Simulate a planned purchase before spending"
+            >
+              <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-400" />
+              Can I Afford This? 🔮
+            </Button>
+          </motion.div>
 
           {/* Goal-Based Savings Planner Button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsSavingsPlannerOpen(true)}
-            className="cursor-pointer text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-            title="Calculate milestone plan to save for a major purchase or goal"
-          >
-            <Target className="h-3.5 w-3.5 mr-1.5 text-emerald-400" />
-            Savings Goal
-          </Button>
+          <motion.div whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.96 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsSavingsPlannerOpen(true)}
+              className="cursor-pointer text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs"
+              title="Calculate milestone plan to save for a major purchase or goal"
+            >
+              <Target className="h-3.5 w-3.5 mr-1.5 text-emerald-400" />
+              Savings Goal 🎯
+            </Button>
+          </motion.div>
 
           {/* Paradox Monthly Wrapped Button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsWrappedOpen(true)}
-            className="cursor-pointer text-xs bg-gradient-to-r from-purple-500/15 to-pink-500/15 hover:from-purple-500/25 hover:to-pink-500/25 text-purple-200 border border-purple-500/30"
-            title="View your monthly financial story and archetype"
-          >
-            <Gift className="h-3.5 w-3.5 mr-1.5 text-pink-400" />
-            Wrapped
-          </Button>
+          <motion.div whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.96 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsWrappedOpen(true)}
+              className="cursor-pointer text-xs bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 border border-purple-500/40 shadow-xs"
+              title="View your monthly financial story and archetype"
+            >
+              <Gift className="h-3.5 w-3.5 mr-1.5 text-pink-400" />
+              Wrapped 🌟
+            </Button>
+          </motion.div>
 
           {/* Leak Hunter Button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsLeakHunterOpen(true)}
-            className="cursor-pointer text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30"
-            title="Detect micro-spending drains and leaks"
-          >
-            <Search className="h-3.5 w-3.5 mr-1.5 text-rose-400" />
-            Leak Hunter
-          </Button>
+          <motion.div whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.96 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsLeakHunterOpen(true)}
+              className="cursor-pointer text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-xs"
+              title="Detect micro-spending drains and leaks"
+            >
+              <Search className="h-3.5 w-3.5 mr-1.5 text-rose-400" />
+              Leak Hunter 🔍
+            </Button>
+          </motion.div>
 
           {/* Monthly Health Report Button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsReportModalOpen(true)}
-            className="cursor-pointer text-xs"
-            title="Generate monthly financial health report"
-          >
-            <FileText className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
-            Health Report
-          </Button>
+          <motion.div whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.96 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsReportModalOpen(true)}
+              className="cursor-pointer text-xs shadow-xs"
+              title="Generate monthly financial health report"
+            >
+              <FileText className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+              Health Report 📑
+            </Button>
+          </motion.div>
 
-          {/* Period selection tabs */}
-          <div className="flex flex-wrap sm:flex-nowrap bg-zinc-900 border border-border p-1 rounded-lg w-full sm:w-auto justify-center">
+          {/* Period selection tabs with Framer Motion LayoutId */}
+          <div className="relative flex flex-wrap sm:flex-nowrap bg-zinc-900 border border-border p-1 rounded-xl w-full sm:w-auto justify-center">
             {(["current_month", "last_30_days", "current_week"] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`flex-1 sm:flex-initial px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer text-center ${
+                className={`relative z-10 flex-1 sm:flex-initial px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer text-center ${
                   period === p
-                    ? "bg-primary text-primary-foreground shadow"
+                    ? "text-primary-foreground font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {p === "current_month" && "Current Month"}
-                {p === "last_30_days" && "Last 30 Days"}
-                {p === "current_week" && "Current Week"}
+                <span>
+                  {p === "current_month" && "Current Month"}
+                  {p === "last_30_days" && "Last 30 Days"}
+                  {p === "current_week" && "Current Week"}
+                </span>
+                {period === p && (
+                  <motion.div
+                    layoutId="dashboardPeriodPill"
+                    className="absolute inset-0 bg-primary rounded-lg shadow-sm -z-10"
+                    transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                  />
+                )}
               </button>
             ))}
           </div>
