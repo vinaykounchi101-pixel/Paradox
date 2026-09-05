@@ -533,8 +533,8 @@ async def chat_assistant(
     context = {
         "current_month_spent": str(total_spent),
         "budget_limit": str(budget_limit) if budget_limit else None,
-        "safe_daily_spend": str(safe_spend_res.safe_daily_spend),
-        "burn_rate": str(safe_spend_res.daily_burn_rate),
+        "safe_daily_spend": str(safe_spend_res.safe_daily_allowance),
+        "burn_rate": str(safe_spend_res.current_daily_burn_rate),
         "days_elapsed": days_elapsed,
         "days_remaining": safe_spend_res.days_remaining,
         "top_categories": top_cats,

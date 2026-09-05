@@ -219,3 +219,51 @@ def test_vibe_check():
     assert res_crit.burn_rate_status == "critical"
     assert res_crit.vibe_emoji == "💀"
     assert "ICU" in res_crit.roast_commentary or "breach" in res_crit.roast_commentary
+
+
+@pytest.mark.asyncio
+async def test_chat_router_context_mapping():
+    from unittest.mock import AsyncMock, MagicMock
+    from app.api.ai import chat_assistant
+    from app.schemas.ai import SafeToSpendResponse
+    from app.schemas.dashboard import DashboardRead, DashboardBudget
+
+    mock_db = MagicMock()
+    mock_user = MagicMock()
+    mock_user.id = "11111111-1111-1111-1111-111111111111"
+
+    # Mock DashboardService
+    mock_dash = MagicMock()
+    mock_dash.get_dashboard_data = AsyncMock(return_value=DashboardRead(
+        period="current_month",
+        total_spent=Decimal("5000.00"),
+        budget=DashboardBudget(amount=Decimal("20000.00"), spent=Decimal("5000.00"), remaining=Decimal("15000.00"), status="under_budget"),
+        category_breakdown=[],
+        top_categories=[],
+        trend=[],
+        recent_expenses=[],
+    ))
+
+    # Mock ai_service safe_to_spend
+    mock_safe_spend = SafeToSpendResponse(
+        safe_daily_allowance=Decimal("750.00"),
+        current_daily_burn_rate=Decimal("250.00"),
+        remaining_budget=Decimal("15000.00"),
+        days_remaining=20,
+        depletion_date=None,
+        status="optimal",
+        burn_status_message="Optimal burn",
+    )
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("app.api.ai.DashboardService", lambda db: mock_dash)
+        mp.setattr("app.api.ai.ai_service.calculate_safe_to_spend", AsyncMock(return_value=mock_safe_spend))
+
+        res = await chat_assistant(
+            payload=AIChatRequest(message="Can I afford 1000?"),
+            current_user=mock_user,
+            db=mock_db,
+        )
+        assert res["data"].reply is not None
+        assert len(res["data"].suggested_followups) > 0
+
