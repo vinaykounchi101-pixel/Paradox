@@ -275,6 +275,43 @@ Paradox/
   - Master AI Document: [`docs/AI_FEATURES.md`](docs/AI_FEATURES.md)
   - Workspace Persistent Memory: `.agents/rules/paradox-architecture.md` & `.agents/rules/paradox-memory.md`
 
+---
 
+## 15. Instant Brand & Product Auto-Categorization, 1-Click Category Creation, & Finny Chatbot Layering (Phase 11)
+- **Instant 0ms Keystroke & Alphanumeric Auto-Categorization**:
+  - Re-architected category suggestions in `ExpenseFormDialog` to run a dual-engine prediction:
+    - **Tier 1 (Instant 0ms Client-Side)**: Synchronous local dictionary match via `PREDICTIVE_CATEGORIES` across 15+ comprehensive domains (Alcohol, Gaming, Tech/Shopping, FMCG/Groceries, Pharma/Healthcare, Personal Care, Fitness, Pets, Subscriptions, Food & Dining, etc.).
+    - **Tier 2 (Debounced 400ms AI Fallback)**: Full-phrase semantic classification via `aiApi.categorize` for complex inputs.
+    - Synchronized detection across both `description` and `aiInputText` (AI Quick Add) inputs.
+- **Comprehensive Indian & Global Brand & Product Dictionary**:
+  - Embedded hundreds of brand names and product terms across backend (`HEURISTIC_KEYWORD_MAP` in `ai_service.py`) and frontend (`PREDICTIVE_CATEGORIES` in `ExpenseFormDialog.tsx`):
+    - **Alcohol**: Brandy, Whiskey, Old Monk, Royal Stag, Blenders Pride, Kingfisher, Bira, Budweiser, Corona, Carlsberg, Smirnoff, Absolut, Bacardi, Jack Daniels, Chivas, Sula, Daaru, Theka, etc. -> `Alcohol`
+    - **Gaming**: PS5, PS4, PlayStation, Xbox, Nintendo Switch, Steam Deck, DualSense, GPU, RTX, GTA, FIFA, Valorant, BGMI, God of War, etc. -> `Gaming`
+    - **Shopping**: Nike, Adidas, Puma, Zara, H&M, Uniqlo, Levi's, Apple, iPhone, MacBook, AirPods, Samsung, OnePlus, Boat, Noise, Sony, Dell, HP, etc. -> `Shopping`
+    - **Groceries**: Amul, Mother Dairy, Blinkit, Zepto, Instamart, Maggi, Cadbury, Dairy Milk, KitKat, Lays, Kurkure, Fortune Oil, Tata Salt, etc. -> `Groceries`
+    - **Healthcare**: Dettol, Crocin, Paracetamol, Dolo 650, Combiflam, Vicks, Strepsils, Apollo, 1mg, Pharmeasy, Bandage, etc. -> `Healthcare`
+    - **Personal Care, Fitness, Pets, Subscriptions, Utilities, and more**.
+- **Omnipresent 1-Click "Add & Select" Category Flow**:
+  - **Category Picker Grid Integration**: Added dynamic, glowing suggested category pills directly inside `CategoryPicker.tsx` (`[ ✨ + Add "[Category]" (Suggested) ]` and `[ ✨ Select [Category] (Suggested) ]`). Clicking the pill immediately creates the category in the database via `categoriesApi.create` and selects it with zero context switching.
+  - **Banner Integration**: Enhanced glowing amber suggestion banner below Description/Quick Add with one-click `[ ✨ Add & Select ]` button.
+  - **"+ New Category" Input Brand Helper**: Inside `CategoryPicker`, if the user types a brand name (e.g. `brandy`), it displays: `💡 Recognized product/brand! Suggest category: Alcohol [ Use "Alcohol" ]`.
+- **Parser & Amount Regex Bug Fixes**:
+  - Resolved regex amount bug in `_heuristic_parse` where alphanumeric strings like `ps5` extracted `amount = 5`.
+- **Finny Chatbot & Mascot Z-Index Layering**:
+  - Fixed visual collision where Finny Mascot hovered behind `FinancialCopilotCard` by establishing strict z-indexing (`z-40` header, `z-50` mascot container, `z-[100]` speech bubbles).
+  - Added resilient fallback response handling in `FinancialAssistantChat.tsx` for Render cold starts.
+- **Verification & Test Suite**:
+  - All 58 backend pytest tests passing (100% green).
+  - Next.js 16.3.3 Turbopack build compiling with 0 errors across all 14 routes.
 
+---
 
+## 16. Current Session Handoff & Memory State
+- All features across Phases 1 through 11 are fully operational, tested, and verified.
+- Active servers & production environments:
+  - Vercel Frontend: `https://paradox-neon.vercel.app`
+  - Render Backend API: `https://paradox-2t3x.onrender.com`
+- Testing:
+  - Backend: `pytest tests/ -v` -> 58/58 passed (100% green).
+  - Frontend: `npm.cmd run build` -> 0 errors across 14 routes.
+- Persistent Agent Memory updated in `.agents/rules/paradox-memory.md`.

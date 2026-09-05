@@ -189,3 +189,17 @@ This document details technical debt items, architectural tradeoffs, short-term 
     - Solved UI overflow in `ExpenseFormDialog` by transitioning the Quick Add container to a 2-tier responsive layout with full-width input and flexible tool badges.
 * **Future Work**:
   - Add client-side WebAssembly OCR (e.g. Tesseract.js) for 100% offline receipt scanning in PWA mode.
+
+---
+
+## 18. Brand & Product Semantic Expansion and Zero-Latency Predictive Caching
+* **Status**: **RESOLVED in Phase 11**.
+* **Architecture / Tradeoff**:
+  - Relying exclusively on remote LLMs for simple brand-to-category lookups (e.g. "brandy" -> Alcohol, "ps5" -> Gaming, "nike" -> Shopping) causes 1-2 second roundtrip latency and fails during free-tier cloud container cold starts or network timeouts.
+  - **Resolution**:
+    - Embedded a zero-latency client-side predictive cache (`PREDICTIVE_CATEGORIES`) in `ExpenseFormDialog.tsx` and `CategoryPicker.tsx`, enabling instant 0ms categorization on every keystroke.
+    - Synchronously expanded backend `HEURISTIC_KEYWORD_MAP` in `ai_service.py` with hundreds of popular consumer brands and products across all primary expense domains, guaranteeing instant categorization even if cloud LLM API keys are unconfigured.
+    - Implemented a direct 1-click database creation and auto-selection workflow in both the CategoryPicker pills grid and the form banner.
+    - Resolved amount extraction regex bugs in `_heuristic_parse` where alphanumeric names like `ps5` falsely extracted amount values.
+* **Future Work**:
+  - Expose user-defined custom merchant-to-category alias rules in account settings for personalized categorization preferences.

@@ -42,7 +42,13 @@ This document is the agent-level repository memory for Paradox, persisted across
     6. Paradox Monthly Wrapped 5-slide animated story deck with financial archetypes (`GET /ai/monthly-wrapped`, `MonthlyWrappedModal.tsx`)
     7. Finny Vibe Check & Hinglish Roast Mode (`GET /ai/vibe-check`, `FinnyMascot.tsx`)
   - Fixed deprecated Gemini model 404 in insights, removed hardcoded currency symbols in frontend & backend.
-  - Automated tests: 57/57 tests passing in pytest (100% green).
+- **Phase 11 (Brand & Product Auto-Categorization & 1-Click Category Creation)**:
+  - Dual-engine instant auto-categorization (0ms client-side `PREDICTIVE_CATEGORIES` + debounced 400ms backend AI) listening to both `description` and `aiInputText`.
+  - Embedded comprehensive Indian & global brand/product dictionary across Alcohol, Gaming, Shopping, Groceries, Healthcare, Personal Care, Fitness, Pets, Subscriptions, Food & Dining.
+  - Added omnipresent 1-click "Add & Select" category creation directly inside the `CategoryPicker` pills grid, form suggestion banner, and inline `+ New Category` brand helper.
+  - Fixed regex amount extraction bug in `_heuristic_parse` where alphanumeric names like `ps5` falsely extracted amount values.
+  - Fixed Finny Mascot z-index layering against `FinancialCopilotCard` (`z-40` header, `z-50` mascot, `z-[100]` speech bubbles).
+  - Automated tests: 58/58 unit tests passing in pytest (100% green).
   - Frontend production build: 14/14 routes compiled and prerendered cleanly with 0 TypeScript errors.
 
 ## 3. Database State
