@@ -38,8 +38,10 @@ interface ParadoxApi {
         @Body request: RefreshTokenRequest? = null
     ): Response<TokenResponse>
 
-    @POST("api/v1/auth/logout")
-    suspend fun logout(): Response<Map<String, String>>
+    @POST("api/v1/auth/forgot-password")
+    suspend fun forgotPassword(
+        @Body body: Map<String, String>
+    ): Response<Map<String, Any>>
 
     @GET("api/v1/auth/me")
     suspend fun getProfile(): Response<UserResponse>
@@ -55,15 +57,33 @@ interface ParadoxApi {
 
     @GET("api/v1/expenses")
     suspend fun getExpenses(
-        @Query("limit") limit: Int = 100,
-        @Query("offset") offset: Int = 0,
+        @Query("page_size") pageSize: Int = 100,
+        @Query("page") page: Int = 1,
         @Query("category_id") categoryId: String? = null,
-        @Query("start_date") startDate: String? = null,
-        @Query("end_date") endDate: String? = null
-    ): Response<List<Map<String, Any>>>
+        @Query("date_from") dateFrom: String? = null,
+        @Query("date_to") dateTo: String? = null
+    ): Response<Map<String, Any>>
+
+    @GET("api/v1/expenses/export")
+    suspend fun exportExpenses(
+        @Query("date_from") dateFrom: String? = null,
+        @Query("date_to") dateTo: String? = null
+    ): Response<ResponseBody>
+
+    @Multipart
+    @POST("api/v1/expenses/import")
+    suspend fun importExpensesCsv(
+        @Part file: MultipartBody.Part
+    ): Response<Map<String, Any>>
 
     @POST("api/v1/expenses")
     suspend fun createExpense(
+        @Body expense: Map<String, Any?>
+    ): Response<Map<String, Any>>
+
+    @PATCH("api/v1/expenses/{id}")
+    suspend fun updateExpense(
+        @Path("id") expenseId: String,
         @Body expense: Map<String, Any?>
     ): Response<Map<String, Any>>
 
@@ -77,7 +97,7 @@ interface ParadoxApi {
     // ==========================================
 
     @GET("api/v1/categories")
-    suspend fun getCategories(): Response<List<Map<String, Any>>>
+    suspend fun getCategories(): Response<Map<String, Any>>
 
     @POST("api/v1/categories")
     suspend fun createCategory(
@@ -85,7 +105,7 @@ interface ParadoxApi {
     ): Response<Map<String, Any>>
 
     @GET("api/v1/payment-methods")
-    suspend fun getPaymentMethods(): Response<List<Map<String, Any>>>
+    suspend fun getPaymentMethods(): Response<Map<String, Any>>
 
     // ==========================================
     // 📊 BUDGETS
@@ -148,8 +168,31 @@ interface ParadoxApi {
     @GET("api/v1/ai/achievements")
     suspend fun getAchievements(): Response<Map<String, Any>>
 
+    @GET("api/v1/dashboard")
+    suspend fun getDashboard(
+        @Query("period") period: String = "current_month"
+    ): Response<Map<String, Any>>
+
+    @GET("api/v1/expenses/recurring")
+    suspend fun getRecurringExpenses(): Response<Map<String, Any>>
+
     @GET("api/v1/ai/monthly-wrapped")
     suspend fun getMonthlyWrapped(
         @Query("month_key") monthKey: String? = null
     ): Response<Map<String, Any>>
+
+    @POST("api/v1/ai/savings-plan")
+    suspend fun calculateSavingsPlan(
+        @Body request: Map<String, Any>
+    ): Response<Map<String, Any>>
+
+    @GET("api/v1/ai/subscription-audit")
+    suspend fun getSubscriptionAudit(): Response<Map<String, Any>>
+
+    @GET("api/v1/ai/forecast")
+    suspend fun getForecast(): Response<Map<String, Any>>
+
+    @GET("api/v1/ai/anomalies")
+    suspend fun getAnomalies(): Response<Map<String, Any>>
 }
+

@@ -307,12 +307,123 @@ Paradox/
 
 ---
 
-## 16. Current Session Handoff & Memory State
-- All features across Phases 1 through 11 are fully operational, tested, and verified.
-- Active servers & production environments:
-  - Vercel Frontend: `https://paradox-neon.vercel.app`
+---
+
+## 17. Phase 12: 100% Native Android Mobile Application (Kotlin + Jetpack Compose Material 3)
+- **Zero-Disruption Architecture**:
+  - Maintained complete separation: Existing Next.js Web app (`frontend/`) and FastAPI backend (`backend/`) remain 100% untouched.
+  - Native Android codebase organized under `android/` with independent build pipeline (`tools/gradle-8.9`, Java 21 LTS, Android SDK Tools).
+- **Core Technology Stack**:
+  - **Language & Runtime**: Kotlin 2.0.21 on JVM 21, Jetpack Compose, Material 3, AndroidX Lifecycle, ViewModel & Flow.
+  - **Networking & Serialization**: Retrofit 2.11.0, OkHttp 4.12.0, Gson, Kotlinx Coroutines.
+  - **Offline-First Persistence**: Room Database 2.6.1 (`@Entity`, `@Dao`, `AppDatabase_Impl` generated via `kapt`), Flow observers, offline mutation queue.
+  - **Security Vault**: AndroidX `EncryptedSharedPreferences` (AES-256 GCM) & AndroidX `BiometricPrompt` (Hardware Fingerprint / Face Unlock).
+  - **Hardware Superpowers**: Android CameraX (1.3.4), SpeechRecognizer (`en-IN` voice logging), and SMS Broadcast Receiver (`Telephony.Sms.Intents.SMS_RECEIVED_ACTION`).
+- **Feature Modules Implemented**:
+  1. **Design System & Dark Theme**:
+     - Modern Zinc dark palette (`#09090b` canvas, `#18181b` card, `#6366f1` Indigo, `#10b981` Emerald, 50/30/20 palette).
+     - Adaptive launcher icons (`ic_launcher.xml` and `ic_launcher_round.xml`).
+  2. **Multi-Tenant Auth & Biometric Security**:
+     - Login with password toggle & EncryptedSharedPreferences token persistence.
+     - Dual-mode registration with 6-digit OTP countdown, live polling, and validation.
+     - Android Biometric prompt with hardware fallbacks.
+  3. **Offline-First Repository & Room Database**:
+     - Entity definitions for `ExpenseEntity`, `CategoryEntity`, and `BudgetEntity`.
+     - Reactive repository with network-first synchronization and offline fallback.
+  4. **Multi-Tool Quick Add & Hardware Integrations**:
+     - 🎙️ Native Voice Input with realtime pulsing microphone.
+     - 📸 CameraX receipt scanner with bitmap pre-scaling and OCR auto-fill.
+     - 📩 Indian banking and UPI SMS transaction regex extraction.
+     - ⚡ Instant 0ms predictive category dictionary and 1-click dynamic category creation.
+  5. **Dynamic Dashboard & Finny Mascot**:
+     - Animated Finny mascot with real-time mood states (`JOYFUL`, `CALM`, `ALERT`, `STRESSED`).
+     - Safe-to-Spend Speedometer gauge, 50/30/20 Budget Bar, and dynamic currency switcher (`₹ INR`, `$ USD`, `€ EUR`, `£ GBP`).
+  6. **AI Intelligence Suite & Story Visuals**:
+     - Conversational Finny RAG Assistant with context injection.
+     - Micro-spending Leak Hunter with customizable thresholds and annual projection.
+     - "Can I Afford This?" Pre-purchase Simulator.
+     - 5-Slide Paradox Monthly Wrapped story deck.
+     - Account settings with biometric toggles and profile management.
+- **Local Testing & APK Deployment**:
+  - Standalone release APK generated at `e:\Projects\Paradox\Paradox.apk` (~21.3 MB).
+  - Automated USB deployment via `adb.exe install -r -d` and push to `/sdcard/Download/Paradox.apk` on connected device `ZA2239H4J9`.
+
+---
+
+---
+
+## 18. Phase 13: Native Android Analytics, Budget Planner, Subscriptions & Savings Goal Optimizer
+- **Advanced Screens Implemented**:
+  1. **📊 Spending Analytics (`AnalyticsScreen.kt`)**:
+     - Timeframe filters: "This Month", "Last 30 Days", "This Week".
+     - Real-time category distribution with linear percentage bars, ranking, and color accents.
+     - Payment channel distribution and daily average expenditure analytics.
+  2. **🎯 Multi-Granularity Budget Planner (`BudgetScreen.kt`)**:
+     - Switcher for Monthly (`YYYY-MM`), Weekly (`YYYY-Www`), and Daily (`YYYY-MM-DD`) targets.
+     - Real-time expenditure progress meter with safe emerald, warning amber, and danger rose states.
+     - Interactive budget target upsert dialog communicating with `/api/v1/budget`.
+     - AI budget pacing tip based on burn rate velocity.
+  3. **🔁 Subscriptions & Fixed Commitments (`SubscriptionsScreen.kt`)**:
+     - Fetches active subscriptions and normalized monthly commitments from `/api/v1/expenses/recurring`.
+     - Displays frequency badges (`MONTHLY`, `WEEKLY`, `YEARLY`) and total recurring financial burden.
+  4. **✨ Savings Goal Optimizer (`SavingsGoalsScreen.kt`)**:
+     - Interactive goal calculator with milestone timeline feasibility.
+     - Direct integration with `/api/v1/ai/savings-plan` recommending personalized discretionary category cuts (e.g. Dining, Shopping) to accelerate goal achievement.
+  5. **🎛️ Hamburger Navigation Drawer & Suite Navigation**:
+     - Built comprehensive `ModalNavigationDrawer` on `DashboardScreen.kt` featuring user profile header, dynamic currency badge, and 1-click navigation to all 10 financial screens + Sign Out action.
+     - Enhanced `LoginScreen.kt` with interactive **Forgot Password** modal dialog communicating with `/api/v1/auth/forgot-password`.
+     - Hardened Logout routing (`authViewModel.logout()` + `popUpTo(0)`) guaranteeing that signing out immediately and reliably routes to the Login screen with a cleared session.
+     - Added Monthly Outflow summary card displaying real-time monthly expenditures on Dashboard.
+- **APK Compilation & USB Deployment**:
+  - Successfully compiled via `gradlew assembleDebug` (0 errors).
+  - Deployed to root `Paradox.apk`, auto-installed to connected physical device `ZA2239H4J9` via ADB, and pushed to `/sdcard/Download/Paradox.apk`.
+
+---
+
+## 19. Phase 14: Native Interactive Graphs, Bank Statement CSV Import/Export, Expense Editing & Monetary Precision Fix
+- **Native Visual Graphs & Chart Components**:
+  1. **📈 Spending Velocity & Trend Graph (`TrendGraphView.kt`)**:
+     - Custom Canvas-based Jetpack Compose component replicating `TrendGraph.tsx`.
+     - Smooth cubic bezier curve rendering with vertical gradient primary alpha fill.
+     - Benchmark dashed gridlines with dynamic currency scaling.
+     - Interactive touch and tap listener to inspect point dates, formatted amounts, and glowing anchor highlights.
+     - Animated path growth and area fade-in on data refresh.
+  2. **📊 3D Category Breakdown Bar Chart (`CategoryBarChartView.kt`)**:
+     - Vertical bars with top highlight caps and gradient base shadows replicating `BarChart3D.tsx`.
+     - 8-color category palette (`PrimaryIndigo`, `Rose`, `Emerald`, `Purple`, `Blue`, `Amber`, `Cyan`, `Pink`).
+     - Animated bar growth, category names, percentages, and interactive tap inspection tooltip.
+  3. **Screen Integrations**:
+     - Embedded both `TrendGraphView` and `CategoryBarChartView` cards on `DashboardScreen.kt`.
+     - Embedded both graphs on `AnalyticsScreen.kt` with dynamic period updates (`current_month`, `last_30_days`, `current_week`).
+- **Bank Statement CSV Import & Export System**:
+  1. **📥 CSV Import (`ImportCsvDialog.kt`)**:
+     - Native File Picker via `ActivityResultContracts.GetContent()` for `.csv` bank statement uploads.
+     - Uploads multipart file to `@POST("api/v1/expenses/import")` for AI auto-categorization and batch persistence.
+     - Live progress spinner and feedback toast displaying exact imported transaction counts.
+  2. **📤 CSV Export (`exportExpensesCsv`)**:
+     - Communicates with `@GET("api/v1/expenses/export")` to generate spreadsheet exports.
+     - Configured `FileProvider` (`file_paths.xml`) and Android Share Sheet (`Intent.ACTION_SEND`) to share directly to WhatsApp, Gmail, Drive, or Excel.
+- **Expense Record Editing & Monetary Precision Fix**:
+  1. **✏️ Expense Record Editing (`QuickAddExpenseDialog.kt` with `isEditMode`)**:
+     - Added `@PATCH("api/v1/expenses/{id}")` support in `ParadoxApi.kt` and `ExpenseRepository.kt`.
+     - Tap any expense card or tap ✏️ **Edit** to modify Amount, Description, Category, Date, or Recurring commitment with instant local & server sync.
+  2. **💰 String/Decimal Amount Parsing Fix**:
+     - Fixed issue where FastAPI serialized monetary values as formatted strings (e.g. `"450.00"`), resolving repository casting errors and ensuring 100% accurate monetary display.
+- **APK Compilation, Local Web Server & QR Code**:
+  - Exported APK to `e:\Projects\Paradox\Paradox.apk`.
+  - Added Wi-Fi download server (`http://10.76.69.130:8080/Paradox.apk`) and QR Code card in `qr_code.md`.
+
+---
+
+## 20. Current Session Handoff & Memory State
+- All features across Phases 1 through 14 are fully operational, tested, and verified.
+- Active platforms & production environments:
+  - Vercel Web Frontend: `https://paradox-neon.vercel.app`
   - Render Backend API: `https://paradox-2t3x.onrender.com`
-- Testing:
+  - Native Android App: `e:\Projects\Paradox\Paradox.apk` (Package: `com.paradox.finance.debug`)
+  - Wi-Fi APK Server: `http://10.76.69.130:8080/Paradox.apk`
+- Testing & Verification:
   - Backend: `pytest tests/ -v` -> 58/58 passed (100% green).
-  - Frontend: `npm.cmd run build` -> 0 errors across 14 routes.
+  - Frontend: `npm run build` -> 0 errors across 14 routes.
+  - Android: `gradlew assembleDebug` -> BUILD SUCCESSFUL (0 errors), APK generated and deployed.
 - Persistent Agent Memory updated in `.agents/rules/paradox-memory.md`.

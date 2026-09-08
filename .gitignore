@@ -19,7 +19,11 @@ postman/
 # Android build outputs & local tools
 android/app/build/
 android/.gradle/
+android/.kotlin/
+android/local.properties
 android/tools/platform-tools/
+android/tools/gradle-8.9/
+android/tools/*.zip
 *.apk
 
 

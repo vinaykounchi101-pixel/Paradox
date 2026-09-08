@@ -37,6 +37,10 @@ fun LoginScreen(
     val state by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
     var passwordVisible by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var forgotEmail by remember { mutableStateOf("") }
+    var forgotStatus by remember { mutableStateOf<String?>(null) }
+    var isSendingForgot by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isSuccess) {
         if (state.isSuccess) {
@@ -172,7 +176,25 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // Forgot Password Link
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = { showForgotPasswordDialog = true },
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Forgot Password?",
+                        color = PrimaryIndigo,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Login Button
             Button(
@@ -246,5 +268,85 @@ fun LoginScreen(
                 }
             }
         }
+    }
+
+    // Forgot Password Modal Dialog
+    if (showForgotPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showForgotPasswordDialog = false
+                forgotStatus = null
+            },
+            containerColor = SurfaceDark,
+            title = {
+                Text(
+                    text = "Reset Password",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Enter your registered email address and we'll send you a password reset link.",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    OutlinedTextField(
+                        value = forgotEmail,
+                        onValueChange = { forgotEmail = it },
+                        label = { Text("Email Address") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = PrimaryIndigo,
+                            unfocusedBorderColor = BorderDark
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (forgotStatus != null) {
+                        Text(
+                            text = forgotStatus!!,
+                            color = if (forgotStatus!!.contains("sent", ignoreCase = true)) AccentEmerald else AccentRose,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isSendingForgot = true
+                        viewModel.forgotPassword(forgotEmail) { success, msg ->
+                            isSendingForgot = false
+                            forgotStatus = msg
+                        }
+                    },
+                    enabled = !isSendingForgot && forgotEmail.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)
+                ) {
+                    if (isSendingForgot) {
+                        CircularProgressIndicator(color = TextPrimary, modifier = Modifier.size(16.dp))
+                    } else {
+                        Text("Send Link")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showForgotPasswordDialog = false
+                    forgotStatus = null
+                }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
     }
 }

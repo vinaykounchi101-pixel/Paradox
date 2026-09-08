@@ -192,14 +192,29 @@ This document details technical debt items, architectural tradeoffs, short-term 
 
 ---
 
-## 18. Brand & Product Semantic Expansion and Zero-Latency Predictive Caching
-* **Status**: **RESOLVED in Phase 11**.
+---
+
+## 19. Native Android Architecture, Room Persistence & Local Toolchain
+* **Status**: **RESOLVED in Phase 12**.
 * **Architecture / Tradeoff**:
-  - Relying exclusively on remote LLMs for simple brand-to-category lookups (e.g. "brandy" -> Alcohol, "ps5" -> Gaming, "nike" -> Shopping) causes 1-2 second roundtrip latency and fails during free-tier cloud container cold starts or network timeouts.
-  - **Resolution**:
-    - Embedded a zero-latency client-side predictive cache (`PREDICTIVE_CATEGORIES`) in `ExpenseFormDialog.tsx` and `CategoryPicker.tsx`, enabling instant 0ms categorization on every keystroke.
-    - Synchronously expanded backend `HEURISTIC_KEYWORD_MAP` in `ai_service.py` with hundreds of popular consumer brands and products across all primary expense domains, guaranteeing instant categorization even if cloud LLM API keys are unconfigured.
-    - Implemented a direct 1-click database creation and auto-selection workflow in both the CategoryPicker pills grid and the form banner.
-    - Resolved amount extraction regex bugs in `_heuristic_parse` where alphanumeric names like `ps5` falsely extracted amount values.
+  - **Toolchain Decoupling**: Built directly on top of JDK 21 LTS + local Gradle 8.9 distribution and Android commandline-tools without requiring an Android Studio GUI installation or external CI/CD pipelines.
+  - **Offline-First Room SQLite**: Database entities (`ExpenseEntity`, `CategoryEntity`, `BudgetEntity`) use Room 2.6.1 with annotation processing (`kapt`). Repository utilizes Flow observers for immediate zero-latency UI rendering and synchronizes with the remote FastAPI backend (`https://paradox-2t3x.onrender.com`).
+  - **Security**: Access tokens and sensitive profile preferences are isolated in `EncryptedSharedPreferences` backed by Android Keystore (AES-256 GCM).
+  - **Hardware Integrations**: CameraX (1.3.4) with client-side bitmap pre-scaler (1280px constraint) reduces payload size to ~120KB before dispatching to `/api/v1/ai/scan-receipt`. Speech recognition runs on-device using Android's native `SpeechRecognizer` in Indian English (`en-IN`).
 * **Future Work**:
-  - Expose user-defined custom merchant-to-category alias rules in account settings for personalized categorization preferences.
+  - Integrate Android WorkManager for background scheduled synchronization and offline mutation queues when network connectivity is restored.
+  - Add Google Play Store App Bundle (`.aab`) signing configurations for production release distribution.
+
+---
+
+## 20. Native Compose Canvas Charts, Bank Statement Multipart & Monetary String Serialization
+* **Status**: **RESOLVED in Phase 14**.
+* **Architecture / Tradeoff**:
+  - **Custom Compose Canvas Charts**: Implemented custom bezier curves (`TrendGraphView.kt`) and 3D rounded bar charts (`CategoryBarChartView.kt`) using pure Jetpack Compose `Canvas` drawing scopes instead of third-party charting libraries (e.g. MPAndroidChart / Vico).
+    - **Pros**: Zero added dependency overhead, lightweight APK size, 100% theme-token alignment, and smooth 60fps animations.
+    - **Tradeoff**: Advanced multi-finger pinch zoom or logarithmic scale capabilities must be manually calculated if required in future versions.
+  - **Pydantic Decimal String Serialization Resolution**: FastAPI schemas serialize monetary Decimal objects as formatted strings (`"450.00"`). Android repositories now use dual-type safe parsing (`(as? Number)?.toDouble() ?: item["amount"]?.toString()?.toDoubleOrNull() ?: 0.0`), preventing `0.0` fallbacks across all imported and synced transactions.
+  - **Bank Statement CSV Import & Android Share Sheet**: Configured Android `FileProvider` with scoped cache paths (`file_paths.xml`) and multipart upload support, allowing bank statements to be parsed and expenses to be edited/exported directly from the mobile UI.
+* **Future Work**:
+  - Add client-side CSV preview / mapping step prior to sending multipart payloads to allow users to verify detected columns.
+

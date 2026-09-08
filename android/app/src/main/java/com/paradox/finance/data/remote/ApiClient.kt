@@ -24,7 +24,8 @@ object ApiClient {
     private class AuthHeaderInterceptor : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val original = chain.request()
-            val token = authPreferences?.getAccessToken()
+            val token = authPreferences?.getAccessToken() 
+                ?: runCatching { AuthPreferences(com.paradox.finance.ParadoxApplication.instance).getAccessToken() }.getOrNull()
 
             val requestBuilder = original.newBuilder()
             if (!token.isNullOrBlank() && !original.url.encodedPath.contains("/auth/login") && !original.url.encodedPath.contains("/auth/register")) {
@@ -63,4 +64,8 @@ object ApiClient {
         }
         return retrofit!!.create(ParadoxApi::class.java)
     }
+
+    val apiService: ParadoxApi
+        get() = getApi()
 }
+

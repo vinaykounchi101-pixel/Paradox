@@ -25,3 +25,29 @@ val AccentCyan = Color(0xFF06B6D4)           // Cyan-500 (Savings)
 val NeedsColor = Color(0xFF3B82F6)           // Blue-500 (50% Needs)
 val WantsColor = Color(0xFFF59E0B)           // Amber-500 (30% Wants)
 val SavingsColor = Color(0xFF10B981)         // Emerald-500 (20% Savings)
+
+// Tailored Utility Palette Aliases
+val Zinc950 = BackgroundDark
+val Zinc900 = SurfaceDark
+val Zinc800 = SurfaceCard
+val Zinc700 = BorderDark
+val Zinc600 = Color(0xFF52525B)
+val Zinc500 = TextMuted
+val Zinc400 = TextSecondary
+val Zinc300 = Color(0xFFD4D4D8)
+val Zinc200 = Color(0xFFE4E4E7)
+val Zinc50 = TextPrimary
+
+val Indigo600 = PrimaryIndigoHover
+val Indigo500 = PrimaryIndigo
+val Indigo400 = Color(0xFF818CF8)
+
+val Emerald500 = AccentEmerald
+val Emerald400 = Color(0xFF34D399)
+
+val Rose500 = AccentRose
+val Rose400 = Color(0xFFF87171)
+
+val Amber500 = AccentAmber
+val Amber400 = Color(0xFFFBBF24)
+

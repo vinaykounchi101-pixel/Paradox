@@ -49,10 +49,31 @@ This document is the agent-level repository memory for Paradox, persisted across
   - Fixed regex amount extraction bug in `_heuristic_parse` where alphanumeric names like `ps5` falsely extracted amount values.
   - Fixed Finny Mascot z-index layering against `FinancialCopilotCard` (`z-40` header, `z-50` mascot, `z-[100]` speech bubbles).
   - Automated tests: 58/58 unit tests passing in pytest (100% green).
-  - Frontend production build: 14/14 routes compiled and prerendered cleanly with 0 TypeScript errors.
+- **Phase 12 (100% Native Android Mobile Application)**:
+  - Built pure Native Android app in Kotlin 2.0.21 + Jetpack Compose Material 3 under `android/` directory without touching web/backend code.
+  - Features: Multi-tenant Auth (Login, 6-digit OTP Register, BiometricPrompt), Room SQLite offline-first database with Flow caching, Multi-Tool Quick Add (Voice SpeechRecognizer `en-IN`, CameraX 1280px receipt OCR, Indian SMS parsing, 0ms predictive categories + 1-click creation), Dashboard with Safe-to-Spend Speedometer, 50/30/20 budget bar, Finny Mascot mood animations, AI Finny RAG chat, Leak Hunter, Purchase Simulator, and 5-Slide Monthly Wrapped story deck.
+  - Build pipeline: Local JDK 21 LTS + Gradle 8.9 + Android SDK Tools. Deployed `Paradox.apk` locally and auto-installed via USB `adb` to connected device `ZA2239H4J9`.
+- **Phase 13 (Native Android Analytics, Budget Planner, Subscriptions & Goal Optimizer)**:
+  - Spending Analytics Screen (`AnalyticsScreen.kt`) with category and payment channel breakdowns.
+  - Multi-granularity Budget Planner Screen (`BudgetScreen.kt`) supporting Monthly, Weekly, and Daily targets.
+  - Subscriptions & Bills Screen (`SubscriptionsScreen.kt`) with commitment cost analysis and frequency badges.
+  - Savings Goal Optimizer Screen (`SavingsGoalsScreen.kt`) with milestone feasibility and AI discretionary cut suggestions.
+  - Integrated full navigation drawer on `DashboardScreen.kt`, Forgot Password recovery modal on `LoginScreen.kt`, and hardened backstack logout navigation.
+  - Re-compiled and deployed debug APK directly to phone (`ZA2239H4J9`) and `/sdcard/Download/Paradox.apk`.
+- **Phase 14 (Native Compose Canvas Graphs, Bank Statement CSV Import/Export, Expense Editing & Precision Parsing)**:
+  - Built custom Canvas-based `TrendGraphView.kt` with smooth cubic bezier curves, gradient alpha fills, dashed gridlines, and interactive touch/point inspection tooltips.
+  - Built 3D rounded `CategoryBarChartView.kt` with curated 8-color palette, highlight caps, and percentage indicators.
+  - Embedded interactive graphs across both `DashboardScreen.kt` and `AnalyticsScreen.kt`.
+  - Added Bank Statement CSV upload via native file picker, multipart `@POST("api/v1/expenses/import")`, and AI batch categorization.
+  - Added CSV Export via `@GET("api/v1/expenses/export")`, Android `FileProvider`, and system Share Sheet.
+  - Added interactive expense record editing dialog (`QuickAddExpenseDialog` in `isEditMode`) communicating with `@PATCH("api/v1/expenses/{id}")`.
+  - Resolved string-to-number monetary decimal parsing in `ExpenseRepository.kt`, guaranteeing 100% accurate display of imported expenses and totals.
+  - Hosted Wi-Fi APK download server (`http://10.76.69.130:8080/Paradox.apk`) and generated QR code card (`qr_code.md`).
 
 ## 3. Database State
 - Latest Alembic Migration: `a1b2c3d4e5f6_add_otp_to_pending_registration.py`
 - Active Entities: `User`, `RefreshToken`, `PasswordResetToken`, `PendingRegistrationToken`, `Category`, `PaymentMethod`, `Expense`, `Budget`
+- Android Room Database: `AppDatabase` (entities: `ExpenseEntity`, `CategoryEntity`, `BudgetEntity`)
+
 
 

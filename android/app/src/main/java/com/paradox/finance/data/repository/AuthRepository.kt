@@ -69,6 +69,19 @@ class AuthRepository(private val authPrefs: AuthPreferences) {
         }
     }
 
+    suspend fun forgotPassword(email: String): Resource<String> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.forgotPassword(mapOf("email" to email.trim()))
+            if (response.isSuccessful) {
+                Resource.Success("Password reset instructions have been sent to your email.")
+            } else {
+                Resource.Error(response.errorBody()?.string() ?: "Failed to send reset link", response.code())
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.localizedMessage ?: "Network connection error")
+        }
+    }
+
     suspend fun fetchAndSaveProfile(): Resource<UserResponse> = withContext(Dispatchers.IO) {
         try {
             val response = api.getProfile()

@@ -164,9 +164,31 @@ class AuthViewModel(
     }
 
     fun onBiometricSuccess() {
-        if (repository.isLoggedIn()) {
-            _uiState.value = _uiState.value.copy(isSuccess = true)
+        _uiState.value = _uiState.value.copy(isSuccess = true)
+    }
+
+    fun forgotPassword(email: String, onResult: (Boolean, String) -> Unit) {
+        if (email.isBlank()) {
+            onResult(false, "Please enter your email address")
+            return
         }
+        viewModelScope.launch {
+            when (val res = repository.forgotPassword(email)) {
+                is Resource.Success -> onResult(true, res.data ?: "Reset link sent")
+                is Resource.Error -> onResult(false, res.message ?: "Failed to send reset link")
+                else -> Unit
+            }
+        }
+    }
+
+    fun logout() {
+        repository.logout()
+        _uiState.value = AuthUiState(
+            email = "",
+            password = "",
+            isSuccess = false,
+            errorMessage = null
+        )
     }
 
     override fun onCleared() {
@@ -175,3 +197,4 @@ class AuthViewModel(
         pollingJob?.cancel()
     }
 }
+
