@@ -16,4 +16,11 @@ Thumbs.db
 .postman/
 postman/
 
+# Android build outputs & local tools
+android/app/build/
+android/.gradle/
+android/tools/platform-tools/
+*.apk
+
+
 
