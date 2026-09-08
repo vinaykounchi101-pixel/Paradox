@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="paradox_bg">#FF09090B</color>
+    <color name="paradox_surface">#FF18181B</color>
+    <color name="paradox_primary">#FF6366F1</color>
+</resources>

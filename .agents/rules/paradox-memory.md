@@ -50,9 +50,16 @@ This document is the agent-level repository memory for Paradox, persisted across
   - Fixed Finny Mascot z-index layering against `FinancialCopilotCard` (`z-40` header, `z-50` mascot, `z-[100]` speech bubbles).
   - Automated tests: 58/58 unit tests passing in pytest (100% green).
   - Frontend production build: 14/14 routes compiled and prerendered cleanly with 0 TypeScript errors.
+- **Phase 12 (Paradox Native Android Client - Kotlin + Jetpack Compose)**:
+  - Built standalone Native Android app in `android/` directory using Kotlin 2.0.21, Jetpack Compose Material 3, Retrofit 2, and Jetpack DataStore without touching web/backend code.
+  - Configured Dark Design System matching Paradox web (`#09090b` zinc, `#6366f1` indigo).
+  - Built Login, Register, 6-Digit OTP, Dashboard (Safe-to-Spend Speedometer, Finny Mascot), Expense List, and AI Quick Add bottom sheet.
+  - Implemented background Indian Bank/UPI SMS BroadcastReceiver (`SmsReceiver.kt`) and Biometric Fingerprint Helper (`BiometricHelper.kt`).
+  - Configured GitHub Actions CI pipeline (`.github/workflows/android-build.yml`) for automated cloud APK builds on every push.
 
 ## 3. Database State
 - Latest Alembic Migration: `a1b2c3d4e5f6_add_otp_to_pending_registration.py`
 - Active Entities: `User`, `RefreshToken`, `PasswordResetToken`, `PendingRegistrationToken`, `Category`, `PaymentMethod`, `Expense`, `Budget`
+
 
 

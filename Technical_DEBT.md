@@ -203,3 +203,16 @@ This document details technical debt items, architectural tradeoffs, short-term 
     - Resolved amount extraction regex bugs in `_heuristic_parse` where alphanumeric names like `ps5` falsely extracted amount values.
 * **Future Work**:
   - Expose user-defined custom merchant-to-category alias rules in account settings for personalized categorization preferences.
+
+---
+
+## 19. Cross-Platform Native Mobile Architecture (Kotlin + Jetpack Compose)
+* **Status**: **INITIALIZED in Phase 12**.
+* **Architecture / Tradeoff**:
+  - Designed the Android client in a dedicated `android/` directory using modern Kotlin 2.0 and Jetpack Compose without modifying the Next.js web application or backend contracts.
+  - Utilizes OkHttp `AuthInterceptor` with Jetpack DataStore Preferences for token storage and automatic authorization header injection.
+  - Implemented background `BroadcastReceiver` for zero-latency on-device Indian bank/UPI SMS parsing.
+  - Automated cloud APK compilation via GitHub Actions CI pipeline (`.github/workflows/android-build.yml`), eliminating the requirement for local Android Studio installations.
+* **Future Work**:
+  - Add Room Database for full offline-first transaction logging and auto-sync when network reconnects.
+  - Add Glance Home Screen Widgets for instant 1-tap expense logging.

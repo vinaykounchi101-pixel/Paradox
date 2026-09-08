@@ -306,11 +306,33 @@ Paradox/
 
 ---
 
-## 16. Current Session Handoff & Memory State
-- All features across Phases 1 through 11 are fully operational, tested, and verified.
+## 16. Phase 12: Paradox Native Android Application (Kotlin + Jetpack Compose)
+- **Native Android Client Architecture (`android/`)**:
+  - Initialized full Native Android application using **Kotlin 2.0.21** and **Jetpack Compose (Material 3)**.
+  - Configured Gradle Version Catalog ([`libs.versions.toml`](android/gradle/libs.versions.toml)) and multi-module build structure without modifying existing Next.js web application or FastAPI backend.
+- **Dark Design System & Theme Alignment**:
+  - Implemented exact Paradox theme tokens ([`Color.kt`](android/app/src/main/java/com/paradox/finance/theme/Color.kt), [`Theme.kt`](android/app/src/main/java/com/paradox/finance/theme/Theme.kt)) with `#09090b` Dark Zinc background, `#18181b` surface cards, and `#6366f1` indigo accents.
+- **Networking & State Management**:
+  - Integrated Retrofit 2 + OkHttp 3 ([`ApiClient.kt`](android/app/src/main/java/com/paradox/finance/data/remote/ApiClient.kt)) pointing directly to the live Render cloud backend.
+  - Configured Jetpack DataStore ([`TokenManager.kt`](android/app/src/main/java/com/paradox/finance/data/local/TokenManager.kt)) for secure JWT session storage and automatic Bearer header attachment via `AuthInterceptor`.
+- **Jetpack Compose UI & Screens**:
+  - **Auth Flows**: [`LoginScreen.kt`](android/app/src/main/java/com/paradox/finance/ui/screens/auth/LoginScreen.kt), [`RegisterScreen.kt`](android/app/src/main/java/com/paradox/finance/ui/screens/auth/RegisterScreen.kt), and 6-Digit OTP [`OtpVerificationScreen.kt`](android/app/src/main/java/com/paradox/finance/ui/screens/auth/OtpVerificationScreen.kt).
+  - **Dashboard**: [`DashboardScreen.kt`](android/app/src/main/java/com/paradox/finance/ui/screens/dashboard/DashboardScreen.kt) with Safe-to-Spend Speedometer, Finny Mascot mood card, and real-time transaction feeds.
+  - **Expense Management**: [`ExpenseListScreen.kt`](android/app/src/main/java/com/paradox/finance/ui/screens/expenses/ExpenseListScreen.kt) and AI Quick Add modal [`AddExpenseBottomSheet.kt`](android/app/src/main/java/com/paradox/finance/ui/screens/expenses/AddExpenseBottomSheet.kt).
+- **Native Android Features**:
+  - **Indian Bank & UPI SMS Receiver**: [`SmsReceiver.kt`](android/app/src/main/java/com/paradox/finance/native_features/SmsReceiver.kt) background broadcast receiver parsing bank/UPI SMS (HDFC, SBI, ICICI, Axis, Paytm, GPay, CRED).
+  - **Biometric Authentication**: [`BiometricHelper.kt`](android/app/src/main/java/com/paradox/finance/native_features/BiometricHelper.kt) for device fingerprint unlock.
+- **Cloud Build Automation**:
+  - Configured GitHub Actions CI ([`.github/workflows/android-build.yml`](.github/workflows/android-build.yml)) to automatically compile `app-debug.apk` on git push without requiring local Android Studio installations.
+
+---
+
+## 17. Current Session Handoff & Memory State
+- All features across Phases 1 through 12 are fully operational, tested, and verified.
 - Active servers & production environments:
   - Vercel Frontend: `https://paradox-neon.vercel.app`
   - Render Backend API: `https://paradox-2t3x.onrender.com`
+  - Android Client: `android/` (Kotlin + Jetpack Compose with GitHub Actions CI APK build)
 - Testing:
   - Backend: `pytest tests/ -v` -> 58/58 passed (100% green).
   - Frontend: `npm.cmd run build` -> 0 errors across 14 routes.
