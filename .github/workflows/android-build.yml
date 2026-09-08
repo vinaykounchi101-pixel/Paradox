@@ -1,0 +1,71 @@
+name: Build Paradox Android APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x android/gradlew
+
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Locate and Rename APK
+        run: |
+          mkdir -p output_apk
+          find android/app/build/outputs/apk/ -name "*.apk" -exec cp {} output_apk/Paradox.apk \;
+          ls -la output_apk/
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Paradox-App
+          path: output_apk/Paradox.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/main')
+        with:
+          tag_name: v1.2.0
+          name: "Paradox Native Android v1.2.0"
+          body: |
+            ## 🚀 Paradox Native Android App (Kotlin 2.0 + Jetpack Compose)
+            
+            ### ✨ Included Features:
+            - **4-Tab Navigation**: Dashboard, Expenses, AI Finny Copilot, Spending Analytics.
+            - **Google OAuth & Direct / OTP Registration**: Fast 1-tap sign up + 6-digit email OTP verification.
+            - **Multi-Tool Quick Add**: On-device OCR Receipt scanning & Voice Speech-to-Text input.
+            - **Finny Mascot**: Animated mascot with dynamic mood shifts (`JOYFUL`, `CALM`, `STRESSED`).
+            - **50/30/20 Budgeting**: Needs vs Wants vs Savings tracking.
+            - **Paradox Monthly Wrapped & Leak Hunter**: Interactive spending highlights and subscription detector.
+            - **Multi-Currency Support**: Switch between `INR ₹`, `USD $`, `EUR €`, `GBP £`.
+            - **Live Render Backend**: Synchronized with `https://paradox-2t3x.onrender.com`.
+          files: output_apk/Paradox.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
