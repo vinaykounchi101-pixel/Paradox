@@ -10,6 +10,7 @@ This document provides a comprehensive summary of all architectural implementati
 - **Secrets & Environment Isolation**: `.env` and `.env.local` are strictly ignored by Git and never committed or directly accessed by tools. Keep `.env.example` continuously updated.
 - **Precision Monetary Values**: Uses fixed-precision `Numeric(12, 2)` (Python `Decimal`) with database `CHECK (amount > 0)` and `CHECK (amount >= 0)` constraints.
 - **Communication Conventions**: Follows pair-programming callout rules (`"Roger That"` before starting work, `"Over n Out"` upon completion, and `"Signing off"` upon session closure).
+- **Session Note**: Android Native mobile requirements reviewed with live backend parity (`https://paradox-2t3x.onrender.com`). Workspace cleanly maintained at Phase 11 baseline.
 
 ---
 
