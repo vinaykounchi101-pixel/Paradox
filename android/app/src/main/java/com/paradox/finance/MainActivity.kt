@@ -1,22 +1,12 @@
 package com.paradox.finance
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,24 +15,34 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paradox.finance.ui.theme.AccentEmerald
-import com.paradox.finance.ui.theme.BackgroundDark
-import com.paradox.finance.ui.theme.ParadoxTheme
-import com.paradox.finance.ui.theme.PrimaryIndigo
-import com.paradox.finance.ui.theme.TextPrimary
-import com.paradox.finance.ui.theme.TextSecondary
+import androidx.fragment.app.FragmentActivity
+import com.paradox.finance.data.preferences.AuthPreferences
+import com.paradox.finance.data.remote.ApiClient
+import com.paradox.finance.ui.navigation.AppNavHost
+import com.paradox.finance.ui.theme.*
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+
+    private lateinit var authPreferences: AuthPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Initialize secure preferences & Retrofit client
+        authPreferences = AuthPreferences(this)
+        ApiClient.initialize(this)
+
         setContent {
             ParadoxTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SplashPreview()
+                    AppNavHost(
+                        activity = this@MainActivity,
+                        authPreferences = authPreferences
+                    )
                 }
             }
         }
@@ -61,7 +61,6 @@ fun SplashPreview() {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(24.dp)
         ) {
-            // Glowing Gradient Logo Avatar
             Box(
                 modifier = Modifier
                     .size(96.dp)
