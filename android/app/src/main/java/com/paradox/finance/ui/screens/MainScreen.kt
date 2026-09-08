@@ -225,7 +225,7 @@ fun MainScreen(
             currencySymbol = currencySymbol,
             onDismiss = { showAddExpense = false },
             onExpenseAdded = {
-                // refreshed automatically via repository & screen LaunchedEffects
+                // automatic flow refresh
             }
         )
     }
@@ -246,22 +246,18 @@ fun MainScreen(
 
     if (showWrapped) {
         MonthlyWrappedDialog(
-            currencySymbol = currencySymbol,
             onDismiss = { showWrapped = false }
         )
     }
 
     if (showLeakHunter) {
         LeakHunterBottomSheet(
-            repository = repository,
-            currencySymbol = currencySymbol,
             onDismiss = { showLeakHunter = false }
         )
     }
 
     if (showPurchaseSimulator) {
         PurchaseSimulatorBottomSheet(
-            currencySymbol = currencySymbol,
             onDismiss = { showPurchaseSimulator = false }
         )
     }

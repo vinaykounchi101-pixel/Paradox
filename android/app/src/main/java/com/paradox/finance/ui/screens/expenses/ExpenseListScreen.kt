@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paradox.finance.data.model.ExpenseResponse
+import com.paradox.finance.data.model.Expense
 import com.paradox.finance.data.repository.ExpenseRepository
 import com.paradox.finance.ui.components.ParadoxCard
 import com.paradox.finance.ui.components.ParadoxTextField
@@ -36,7 +36,7 @@ fun ExpenseListScreen(
     onAddExpenseClick: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    var expenses by remember { mutableStateOf<List<ExpenseResponse>>(emptyList()) }
+    var expenses by remember { mutableStateOf<List<Expense>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf("All") }
     var isLoading by remember { mutableStateOf(false) }
@@ -45,10 +45,9 @@ fun ExpenseListScreen(
         coroutineScope.launch {
             isLoading = true
             try {
-                repository.syncExpenses()
+                repository.refreshExpenses()
                 expenses = repository.getExpenses()
             } catch (e: Exception) {
-                // local cached data
                 expenses = repository.getExpenses()
             } finally {
                 isLoading = false
@@ -63,10 +62,11 @@ fun ExpenseListScreen(
     val categories = listOf("All", "Food & Dining", "Shopping", "Transport", "Entertainment", "Utilities & Bills", "Healthcare", "Investment", "Other")
 
     val filteredExpenses = expenses.filter { item ->
+        val catName = item.category?.name ?: "General"
         val matchesSearch = searchQuery.isEmpty() || 
             item.description.contains(searchQuery, ignoreCase = true) ||
-            (item.category ?: "").contains(searchQuery, ignoreCase = true)
-        val matchesCategory = selectedCategoryFilter == "All" || item.category == selectedCategoryFilter
+            catName.contains(searchQuery, ignoreCase = true)
+        val matchesCategory = selectedCategoryFilter == "All" || catName == selectedCategoryFilter
         matchesSearch && matchesCategory
     }
 
@@ -230,7 +230,7 @@ fun ExpenseListScreen(
                                             maxLines = 1
                                         )
                                         Text(
-                                            text = "${item.category ?: "General"} • ${item.date.take(10)}",
+                                            text = "${item.category?.name ?: "General"} • ${item.date.take(10)}",
                                             color = TextSecondary,
                                             fontSize = 11.sp
                                         )

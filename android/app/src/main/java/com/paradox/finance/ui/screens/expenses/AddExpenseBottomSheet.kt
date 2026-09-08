@@ -8,7 +8,6 @@ import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -29,8 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paradox.finance.data.model.BudgetCategory
-import com.paradox.finance.data.model.CreateExpenseRequest
 import com.paradox.finance.data.repository.ExpenseRepository
 import com.paradox.finance.ui.components.ParadoxGradientButton
 import com.paradox.finance.ui.components.ParadoxTextField
@@ -48,13 +45,11 @@ fun AddExpenseBottomSheet(
     onDismiss: () -> Unit,
     onExpenseAdded: () -> Unit
 ) {
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Food & Dining") }
-    var selectedBudgetType by remember { mutableStateOf(BudgetCategory.NEEDS) }
     var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var ocrStatus by remember { mutableStateOf<String?>(null) }
@@ -73,7 +68,6 @@ fun AddExpenseBottomSheet(
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!spokenText.isNullOrEmpty()) {
                 description = spokenText
-                // Extract possible numbers for amount
                 val numberRegex = "(\\d+([.,]\\d+)?)".toRegex()
                 val match = numberRegex.find(spokenText)
                 if (match != null) {
@@ -97,10 +91,10 @@ fun AddExpenseBottomSheet(
                         description = recognized.merchant ?: "Receipt Scan"
                         ocrStatus = "Receipt scanned successfully!"
                     } else {
-                        ocrStatus = "Receipt processed. Please verify amount."
+                        ocrStatus = "Receipt processed. Please verify details."
                     }
                 } catch (e: Exception) {
-                    ocrStatus = "Could not parse automatically. Please fill manually."
+                    ocrStatus = "Could not parse automatically. Please enter details."
                 }
             }
         }
@@ -234,51 +228,6 @@ fun AddExpenseBottomSheet(
                 }
             }
 
-            // 50/30/20 Tag Selection
-            Text(
-                text = "50/30/20 Budget Rule Bucket",
-                color = TextSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                BudgetCategory.entries.forEach { bucket ->
-                    val isSelected = selectedBudgetType == bucket
-                    val bucketColor = when (bucket) {
-                        BudgetCategory.NEEDS -> Color(0xFF00E5FF)
-                        BudgetCategory.WANTS -> Color(0xFF7C3AED)
-                        BudgetCategory.SAVINGS -> Color(0xFF00C853)
-                    }
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { selectedBudgetType = bucket },
-                        color = if (isSelected) bucketColor.copy(alpha = 0.2f) else SurfaceElevated,
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (isSelected) bucketColor else SurfaceBorder
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = bucket.name,
-                                color = if (isSelected) bucketColor else TextSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
             if (errorMessage != null) {
                 Text(
                     text = errorMessage!!,
@@ -309,13 +258,10 @@ fun AddExpenseBottomSheet(
                         try {
                             val isoDate = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date())
                             repository.addExpense(
-                                CreateExpenseRequest(
-                                    amount = parsedAmount,
-                                    description = description.trim(),
-                                    category = selectedCategory,
-                                    date = isoDate,
-                                    budget_category = selectedBudgetType.name
-                                )
+                                amount = parsedAmount,
+                                description = description.trim(),
+                                date = isoDate,
+                                categoryName = selectedCategory
                             )
                             onExpenseAdded()
                             onDismiss()

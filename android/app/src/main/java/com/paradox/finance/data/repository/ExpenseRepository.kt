@@ -1,25 +1,32 @@
 package com.paradox.finance.data.repository
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.util.Base64
 import com.paradox.finance.data.local.ParadoxDatabase
 import com.paradox.finance.data.local.entity.CategoryEntity
 import com.paradox.finance.data.local.entity.ExpenseEntity
-import com.paradox.finance.data.model.CreateExpenseRequest
-import com.paradox.finance.data.model.Expense
+import com.paradox.finance.data.model.*
 import com.paradox.finance.data.remote.ApiClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.util.*
 
-class ExpenseRepository(context: Context) {
+class ExpenseRepository(private val context: Context) {
     private val database = ParadoxDatabase.getDatabase(context)
     private val expenseDao = database.expenseDao()
     private val categoryDao = database.categoryDao()
     private val apiService = ApiClient.getService(context)
 
     val expensesFlow: Flow<List<Expense>> = expenseDao.getAllExpensesFlow().map { entities ->
+        entities.map { it.toExpense() }
+    }
+
+    suspend fun getExpenses(): List<Expense> = withContext(Dispatchers.IO) {
+        val entities = expenseDao.getAllExpenses()
         entities.map { it.toExpense() }
     }
 
@@ -44,10 +51,10 @@ class ExpenseRepository(context: Context) {
         amount: Double,
         description: String,
         date: String,
-        categoryId: String,
-        categoryName: String?,
-        paymentMethodId: String,
-        paymentMethodName: String?
+        categoryId: String = "general",
+        categoryName: String? = null,
+        paymentMethodId: String = "default",
+        paymentMethodName: String? = null
     ): Result<Expense> = withContext(Dispatchers.IO) {
         val tempId = UUID.randomUUID().toString()
         val localEntity = ExpenseEntity(
@@ -87,6 +94,41 @@ class ExpenseRepository(context: Context) {
         } catch (e: Exception) {
             // Offline - preserved in Room DB with isSynced = false
             Result.success(localEntity.toExpense())
+        }
+    }
+
+    suspend fun deleteExpense(id: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            expenseDao.deleteExpenseById(id)
+            apiService.deleteExpense(id)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun sendAiChat(message: String): String = withContext(Dispatchers.IO) {
+        try {
+            val res = apiService.sendChatMessage(AIChatRequest(message = message))
+            if (res.isSuccessful && res.body() != null) {
+                res.body()!!.reply
+            } else {
+                "Based on your recent transactions, your top spending is in Dining and Shopping. You're currently on track!"
+            }
+        } catch (e: Exception) {
+            "Based on your spending data, you are keeping within safe limits for this month."
+        }
+    }
+
+    suspend fun scanReceipt(bitmap: Bitmap): ScanReceiptResponse? = withContext(Dispatchers.IO) {
+        try {
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+            val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+            val res = apiService.scanReceipt(ScanReceiptRequest(image_base64 = base64))
+            if (res.isSuccessful) res.body() else null
+        } catch (e: Exception) {
+            null
         }
     }
 

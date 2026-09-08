@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paradox.finance.data.model.ExpenseResponse
+import com.paradox.finance.data.model.Expense
 import com.paradox.finance.data.repository.ExpenseRepository
 import com.paradox.finance.ui.components.ParadoxCard
 import com.paradox.finance.ui.theme.*
@@ -32,7 +32,7 @@ fun AnalyticsScreen(
     currencySymbol: String
 ) {
     val coroutineScope = rememberCoroutineScope()
-    var expenses by remember { mutableStateOf<List<ExpenseResponse>>(emptyList()) }
+    var expenses by remember { mutableStateOf<List<Expense>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -47,7 +47,7 @@ fun AnalyticsScreen(
     }
 
     val totalSpent = expenses.sumOf { it.amount }
-    val categoryTotals = expenses.groupBy { it.category ?: "Other" }
+    val categoryTotals = expenses.groupBy { it.category?.name ?: "Other" }
         .mapValues { entry -> entry.value.sumOf { it.amount } }
         .toList()
         .sortedByDescending { it.second }

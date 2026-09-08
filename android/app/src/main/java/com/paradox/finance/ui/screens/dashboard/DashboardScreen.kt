@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paradox.finance.data.model.ExpenseResponse
+import com.paradox.finance.data.model.Expense
 import com.paradox.finance.data.model.FinnyEmotion
 import com.paradox.finance.data.repository.ExpenseRepository
 import com.paradox.finance.ui.components.AchievementsCard
@@ -49,7 +49,7 @@ fun DashboardScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     var totalSpent by remember { mutableDoubleStateOf(0.0) }
     var monthlyBudget by remember { mutableDoubleStateOf(50000.0) }
-    var recentExpenses by remember { mutableStateOf<List<ExpenseResponse>>(emptyList()) }
+    var recentExpenses by remember { mutableStateOf<List<Expense>>(emptyList()) }
     var finnyMessage by remember { mutableStateOf("Looking good! You're on track with your budget this month.") }
     var finnyEmotion by remember { mutableStateOf(FinnyEmotion.JOYFUL) }
 
@@ -57,7 +57,7 @@ fun DashboardScreen(
         coroutineScope.launch {
             isRefreshing = true
             try {
-                repository.syncExpenses()
+                repository.refreshExpenses()
                 val expenses = repository.getExpenses()
                 recentExpenses = expenses.take(5)
                 val total = expenses.sumOf { it.amount }
@@ -74,7 +74,10 @@ fun DashboardScreen(
                     finnyMessage = "Superb discipline! Your savings rate is healthy."
                 }
             } catch (e: Exception) {
-                // local fallback if offline
+                // local fallback
+                val expenses = repository.getExpenses()
+                recentExpenses = expenses.take(5)
+                totalSpent = expenses.sumOf { it.amount }
             } finally {
                 isRefreshing = false
             }
@@ -168,7 +171,6 @@ fun DashboardScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Progress Bar
                         val progress = if (monthlyBudget > 0) (totalSpent / monthlyBudget).toFloat().coerceIn(0f, 1f) else 0f
                         LinearProgressIndicator(
                             progress = { progress },
@@ -201,7 +203,7 @@ fun DashboardScreen(
                 }
             }
 
-            // Quick Actions Hub
+            // Quick Superpowers
             item {
                 Text(
                     text = "Quick Superpowers",
@@ -247,7 +249,7 @@ fun DashboardScreen(
                 }
             }
 
-            // 50/30/20 Rule Breakdown Card
+            // 50/30/20 Breakdown
             item {
                 FiftyThirtyTwentyCard(
                     needsSpent = totalSpent * 0.50,
@@ -257,7 +259,7 @@ fun DashboardScreen(
                 )
             }
 
-            // Streaks & Badges Gamification Card
+            // Gamification Card
             item {
                 AchievementsCard(
                     streakDays = 5,
@@ -266,7 +268,7 @@ fun DashboardScreen(
                 )
             }
 
-            // Recent Transactions Header
+            // Recent Transactions
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -289,7 +291,6 @@ fun DashboardScreen(
                 }
             }
 
-            // Recent Transactions List
             if (recentExpenses.isEmpty()) {
                 item {
                     ParadoxCard(modifier = Modifier.fillMaxWidth()) {
@@ -348,7 +349,7 @@ fun DashboardScreen(
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
-                                        text = expense.category ?: "General",
+                                        text = expense.category?.name ?: "General",
                                         color = TextSecondary,
                                         fontSize = 12.sp
                                     )

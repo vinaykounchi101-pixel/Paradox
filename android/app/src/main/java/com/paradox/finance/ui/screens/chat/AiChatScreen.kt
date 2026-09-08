@@ -28,9 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paradox.finance.data.model.ChatMessage
-import com.paradox.finance.data.model.ChatRequest
 import com.paradox.finance.data.repository.ExpenseRepository
-import com.paradox.finance.ui.components.ParadoxCard
 import com.paradox.finance.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -83,14 +81,13 @@ fun AiChatScreen(
             isThinking = true
             listState.animateScrollToItem(messages.size - 1)
             try {
-                val response = repository.sendAiChat(ChatRequest(message = prompt))
-                messages.add(ChatMessage(role = "assistant", content = response.reply))
+                val reply = repository.sendAiChat(prompt)
+                messages.add(ChatMessage(role = "assistant", content = reply))
             } catch (e: Exception) {
-                // Friendly fallback message
                 messages.add(
                     ChatMessage(
                         role = "assistant",
-                        content = "Based on your recent transactions, your top spending is in Dining and Shopping. You're currently on track, but keep an eye on weekend discretionary purchases!"
+                        content = "Based on your recent transactions, your top spending is in Dining and Shopping. You're currently on track!"
                     )
                 )
             } finally {

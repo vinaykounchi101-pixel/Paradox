@@ -12,9 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
-import com.paradox.finance.data.local.ParadoxDatabase
 import com.paradox.finance.data.local.TokenManager
-import com.paradox.finance.data.remote.ApiClient
 import com.paradox.finance.data.repository.ExpenseRepository
 import com.paradox.finance.ui.navigation.ParadoxNavGraph
 import com.paradox.finance.ui.navigation.Screen
@@ -26,7 +24,6 @@ import kotlinx.coroutines.flow.first
 class MainActivity : ComponentActivity() {
 
     private lateinit var tokenManager: TokenManager
-    private lateinit var database: ParadoxDatabase
     private lateinit var repository: ExpenseRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,9 +31,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         tokenManager = TokenManager(applicationContext)
-        database = ParadoxDatabase.getDatabase(applicationContext)
-        val apiService = ApiClient.getApiService(tokenManager)
-        repository = ExpenseRepository(apiService, database.expenseDao(), applicationContext)
+        repository = ExpenseRepository(applicationContext)
 
         setContent {
             ParadoxTheme {
