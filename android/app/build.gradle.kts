@@ -13,8 +13,8 @@ android {
         applicationId = "com.paradox.finance"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -44,6 +44,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -71,6 +72,11 @@ dependencies {
     // Security & Biometrics
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
+
+    // Google Credential Manager (OAuth 2.0)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     // Networking
     implementation(libs.retrofit)

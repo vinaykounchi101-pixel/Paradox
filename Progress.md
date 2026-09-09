@@ -415,8 +415,44 @@ Paradox/
 
 ---
 
-## 20. Current Session Handoff & Memory State
-- All features across Phases 1 through 14 are fully operational, tested, and verified.
+---
+
+## 20. Phase 15: Stitch MCP Design System & Obsidian Glassmorphism UI/UX Overhaul, Live Physical Device Deployment & Interactive Verification
+- **Stitch MCP Design System Integration**:
+  1. **🌌 Obsidian Dark Mode & Glassmorphism Aesthetic**:
+     - Modern color palette: Pitch Black (`#0A0B0E`), Obsidian Base Surface (`#12141C`), Elevated Surface (`#1A1D28`), Glass Border (`#1F2433`), Neon Emerald (`#00F5A0`), Neon Teal/Cyan (`#00D2FF`), Neon Violet, Alert Amber, and Alert Coral.
+     - Ultra-responsive touch feedback using Jetpack Compose Material 3 `Surface(onClick = ...)`.
+  2. **🚀 Floating Obsidian Bottom Bar (`ObsidianBottomBar.kt`)**:
+     - Floating pill bar docked at bottom with 4 primary destinations: `Dashboard`, `Quick Log`, `Simulator`, and `Finny AI`.
+  3. **📊 Supercharged Dashboard (`DashboardScreen.kt`)**:
+     - Total Net Worth Hero Card with balance visibility toggle and 50/30/20 pacing sub-bar.
+     - Monthly Spend Cap Card with safe daily burn rate calculations.
+     - 4-Column Quick Action Monoliths: `+ Log Expense`, `Afford? Simulator`, `Leaks Audit`, and `Insights Velocity`.
+     - Spending Velocity Bezier Curve Graph with live channel filters (`All`, `UPI`, `Cards`, `Cash`).
+     - Recent Transactions list with 1-click edit dialog trigger.
+  4. **⚡ Frictionless Expense Capture (`QuickAddExpenseDialog.kt`)**:
+     - Natural language AI parser with offline regex heuristic fallback.
+     - Soft-keyboard resilience with `DialogProperties(usePlatformDefaultWidth = false)`, `imePadding()`, and `LocalFocusManager.clearFocus()`.
+     - 3-column squircle category classification grid with dynamic 1-click creation.
+  5. **🛍️ Pre-Purchase Stress Simulator (`PurchaseSimulatorScreen.kt`)**:
+     - Monte Carlo projection engine with depletion date forecasting and buffer comparison.
+     - Integrated **"Proceed Anyway"** button with automatic expense prefilling and ledger entry.
+  6. **🔍 Leak Hunter & Telemetry Engine (`LeakHunterScreen.kt`)**:
+     - 14-day gamified streak banner and Grade A (88 Optimal) radial health gauge.
+     - Dynamic threshold chips (`<₹50`, `<₹100`, `<₹150`, `<₹300`, `<₹500`) with live scanning feedback.
+  7. **🤖 Finny AI Copilot Chat (`FinnyChatScreen.kt`)**:
+     - Real-time Android `SpeechRecognizer` voice input via `VoiceInputHelper`.
+     - Interactive financial prompt pills and 1-tap savings vault goal locking.
+  8. **📈 Insights Velocity (`AnalyticsScreen.kt`)**:
+     - Multi-period category velocity breakdown and direct ledger navigation.
+- **Physical Device Deployment & Verification**:
+  - Successfully built debug APK with Gradle and deployed via ADB to connected Motorola Edge 60 Fusion (`ZA2239H4J9`).
+  - Performed live interactive verification of every feature directly on the physical device screen.
+
+---
+
+## 21. Current Session Handoff & Memory State
+- All features across Phases 1 through 15 are fully operational, tested, and verified on physical hardware.
 - Active platforms & production environments:
   - Vercel Web Frontend: `https://paradox-neon.vercel.app`
   - Render Backend API: `https://paradox-2t3x.onrender.com`
@@ -425,5 +461,5 @@ Paradox/
 - Testing & Verification:
   - Backend: `pytest tests/ -v` -> 58/58 passed (100% green).
   - Frontend: `npm run build` -> 0 errors across 14 routes.
-  - Android: `gradlew assembleDebug` -> BUILD SUCCESSFUL (0 errors), APK generated and deployed.
+  - Android: `gradlew assembleDebug` -> BUILD SUCCESSFUL (0 errors), APK generated, installed, and verified on device `ZA2239H4J9`.
 - Persistent Agent Memory updated in `.agents/rules/paradox-memory.md`.

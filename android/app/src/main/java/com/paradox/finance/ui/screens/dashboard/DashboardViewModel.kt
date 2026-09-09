@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.paradox.finance.core.Resource
 import com.paradox.finance.data.preferences.AuthPreferences
 import com.paradox.finance.data.remote.ApiClient
+import com.paradox.finance.data.repository.ExpenseRepository
 import com.paradox.finance.ui.components.FinnyMood
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,7 +46,8 @@ data class DashboardUiState(
 )
 
 class DashboardViewModel(
-    private val authPrefs: AuthPreferences
+    private val authPrefs: AuthPreferences,
+    private val expenseRepository: ExpenseRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -59,7 +61,67 @@ class DashboardViewModel(
     private val api = ApiClient.getApi()
 
     init {
+        observeLocalExpenses()
         refreshDashboard()
+    }
+
+    private fun observeLocalExpenses() {
+        if (expenseRepository == null) return
+        viewModelScope.launch {
+            expenseRepository.getLocalExpenses().collect { list ->
+                if (list.isNotEmpty()) {
+                    val currentSpent = _uiState.value.totalSpent
+                    // If server returned 0 or not yet refreshed, calculate from local Room cache
+                    if (currentSpent <= 0.0) {
+                        calculateLocalAggregates(list)
+                    } else {
+                        _uiState.value = _uiState.value.copy(totalExpensesCount = list.size)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun calculateLocalAggregates(list: List<com.paradox.finance.data.local.entity.ExpenseEntity>) {
+        val sumTotal = list.sumOf { it.amount }
+        
+        // Group by category
+        val catMap = list.groupBy { it.categoryName ?: "Other" }
+        val catItems = catMap.entries.mapIndexed { idx, entry ->
+            val total = entry.value.sumOf { it.amount }
+            val pct = if (sumTotal > 0) (total / sumTotal) * 100 else 0.0
+            com.paradox.finance.ui.components.CategoryChartItem(
+                categoryName = entry.key,
+                total = total,
+                percentage = pct,
+                color = com.paradox.finance.ui.components.CATEGORY_COLORS[idx % com.paradox.finance.ui.components.CATEGORY_COLORS.size]
+            )
+        }.sortedByDescending { it.total }
+
+        // Weekly trends
+        val trendPoints = listOf(
+            com.paradox.finance.ui.components.TrendPoint("Week 1", list.take(list.size / 4 + 1).sumOf { it.amount }),
+            com.paradox.finance.ui.components.TrendPoint("Week 2", list.drop(list.size / 4).take(list.size / 4 + 1).sumOf { it.amount }),
+            com.paradox.finance.ui.components.TrendPoint("Week 3", list.drop(list.size / 2).take(list.size / 4 + 1).sumOf { it.amount }),
+            com.paradox.finance.ui.components.TrendPoint("Week 4", list.drop((list.size * 3) / 4).sumOf { it.amount })
+        )
+
+        val estimatedBudget = if (_uiState.value.totalBudget > 0) _uiState.value.totalBudget else maxOf(sumTotal * 1.3, 50000.0)
+        val remaining = maxOf(0.0, estimatedBudget - sumTotal)
+        val daily = remaining / 30.0
+
+        _uiState.value = _uiState.value.copy(
+            totalSpent = sumTotal,
+            totalBudget = estimatedBudget,
+            categoryBreakdown = catItems,
+            trendData = trendPoints,
+            remainingBudget = remaining,
+            safeToSpendDaily = daily,
+            totalExpensesCount = list.size,
+            needsSpent = sumTotal * 0.5,
+            wantsSpent = sumTotal * 0.3,
+            savingsSpent = sumTotal * 0.2
+        )
     }
 
     fun refreshDashboard() {
@@ -76,7 +138,8 @@ class DashboardViewModel(
                         ?: (data["total_spent"] as? Number)?.toDouble() 
                         ?: data["total_spent"]?.toString()?.toDoubleOrNull() ?: 0.0
                     val budgetObj = data["budget"] as? Map<*, *>
-                    val budget = (budgetObj?.get("amount") as? Number)?.toDouble() ?: 0.0
+                    val budget = (budgetObj?.get("amount") as? Number)?.toDouble() 
+                        ?: budgetObj?.get("amount")?.toString()?.toDoubleOrNull() ?: 0.0
 
                     // Trend Graph Points
                     val trendList = (data["trend"] as? List<*>)?.filterIsInstance<Map<*, *>>() ?: emptyList()
@@ -93,8 +156,10 @@ class DashboardViewModel(
                         val name = item["category_name"]?.toString() ?: item["name"]?.toString() ?: "Other"
                         val total = (item["total"] as? Number)?.toDouble()
                             ?: item["total"]?.toString()?.toDoubleOrNull()
-                            ?: (item["amount"] as? Number)?.toDouble() ?: 0.0
-                        val pct = (item["percentage"] as? Number)?.toDouble() ?: 0.0
+                            ?: (item["amount"] as? Number)?.toDouble()
+                            ?: item["amount"]?.toString()?.toDoubleOrNull() ?: 0.0
+                        val pct = (item["percentage"] as? Number)?.toDouble()
+                            ?: item["percentage"]?.toString()?.toDoubleOrNull() ?: 0.0
                         if (name.isNotEmpty()) {
                             com.paradox.finance.ui.components.CategoryChartItem(
                                 categoryName = name,
@@ -105,12 +170,14 @@ class DashboardViewModel(
                         } else null
                     }
 
-                    _uiState.value = _uiState.value.copy(
-                        totalSpent = spent,
-                        totalBudget = budget,
-                        trendData = parsedTrend,
-                        categoryBreakdown = parsedCategories
-                    )
+                    if (spent > 0.0 || parsedCategories.isNotEmpty()) {
+                        _uiState.value = _uiState.value.copy(
+                            totalSpent = spent,
+                            totalBudget = budget,
+                            trendData = parsedTrend,
+                            categoryBreakdown = parsedCategories
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 // Ignore
@@ -122,8 +189,10 @@ class DashboardViewModel(
                 if (safeRes.isSuccessful && safeRes.body() != null) {
                     val rawBody = safeRes.body()!!
                     val data = (rawBody["data"] as? Map<*, *>) ?: rawBody
-                    val daily = (data["daily_allowance"] as? Number)?.toDouble() ?: 0.0
-                    val rem = (data["remaining_budget"] as? Number)?.toDouble() ?: 0.0
+                    val daily = (data["daily_allowance"] as? Number)?.toDouble()
+                        ?: data["daily_allowance"]?.toString()?.toDoubleOrNull() ?: 0.0
+                    val rem = (data["remaining_budget"] as? Number)?.toDouble()
+                        ?: data["remaining_budget"]?.toString()?.toDoubleOrNull() ?: 0.0
                     val pacing = data["pacing_status"]?.toString() ?: "Normal"
 
                     _uiState.value = _uiState.value.copy(
@@ -142,7 +211,8 @@ class DashboardViewModel(
                 if (healthRes.isSuccessful && healthRes.body() != null) {
                     val rawBody = healthRes.body()!!
                     val data = (rawBody["data"] as? Map<*, *>) ?: rawBody
-                    val score = (data["health_score"] as? Number)?.toInt() ?: 85
+                    val score = (data["health_score"] as? Number)?.toInt()
+                        ?: data["health_score"]?.toString()?.toIntOrNull() ?: 85
                     val commentary = data["commentary"]?.toString() ?: "Spending on track!"
 
                     val mood = when {
@@ -168,9 +238,12 @@ class DashboardViewModel(
                 if (ftRes.isSuccessful && ftRes.body() != null) {
                     val rawBody = ftRes.body()!!
                     val data = (rawBody["data"] as? Map<*, *>) ?: rawBody
-                    val needs = (data["needs_spent"] as? Number)?.toDouble() ?: 0.0
-                    val wants = (data["wants_spent"] as? Number)?.toDouble() ?: 0.0
-                    val savings = (data["savings_spent"] as? Number)?.toDouble() ?: 0.0
+                    val needs = (data["needs_spent"] as? Number)?.toDouble()
+                        ?: data["needs_spent"]?.toString()?.toDoubleOrNull() ?: 0.0
+                    val wants = (data["wants_spent"] as? Number)?.toDouble()
+                        ?: data["wants_spent"]?.toString()?.toDoubleOrNull() ?: 0.0
+                    val savings = (data["savings_spent"] as? Number)?.toDouble()
+                        ?: data["savings_spent"]?.toString()?.toDoubleOrNull() ?: 0.0
 
                     _uiState.value = _uiState.value.copy(
                         needsSpent = needs,

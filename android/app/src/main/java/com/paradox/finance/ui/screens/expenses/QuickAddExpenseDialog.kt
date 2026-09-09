@@ -48,13 +48,6 @@ fun QuickAddExpenseDialog(
 
     val currencySymbol = Constants.CURRENCY_SYMBOLS[state.currency] ?: "₹"
 
-    // Image Picker for Receipt OCR
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { viewModel.handleReceiptScan(context, it) }
-    }
-
     // Voice Helper
     val voiceHelper = remember {
         VoiceInputHelper(
@@ -63,219 +56,344 @@ fun QuickAddExpenseDialog(
                 viewModel.onQuickAddInputChanged(text)
                 viewModel.parseNaturalLanguageExpense()
             },
-            onError = { /* Error handled */ },
+            onError = { err ->
+                android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_SHORT).show()
+            },
             onListeningStateChanged = { listening ->
                 isListening = listening
             }
         )
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    // Audio Permission Launcher for Voice Input
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            voiceHelper.startListening()
+        } else {
+            android.widget.Toast.makeText(context, "Microphone permission is required for voice input", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Image Picker for Receipt OCR
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.handleReceiptScan(context, it) }
+    }
+
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = {
+            focusManager.clearFocus()
+            onDismiss()
+        },
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = SurfaceDark,
             border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.94f)
+                .imePadding()
                 .padding(vertical = 16.dp)
         ) {
             Column(
                 modifier = Modifier
                     .padding(20.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Header
+                // Sub-bar Header: Velocity & Telemetry Status
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (isEditMode) "Edit Expense Record" else "Add Expense",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextMuted)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = AccentEmerald,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isEditMode) "Edit Expense" else "Log Expense",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(9999.dp),
+                        color = SurfaceCard,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(AccentEmerald))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "AUTO-TRIGGER",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentCyan
+                            )
+                        }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 if (!isEditMode) {
-                    // AI Quick-Add Input Row
-                    OutlinedTextField(
-                        value = state.quickAddInput,
-                        onValueChange = { viewModel.onQuickAddInputChanged(it) },
-                        placeholder = { Text("e.g. Spent 450 for Zomato pizza", style = MaterialTheme.typography.bodyMedium) },
-                        trailingIcon = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Voice Mic Button
-                                IconButton(onClick = {
-                                    if (isListening) voiceHelper.stopListening() else voiceHelper.startListening()
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Mic,
-                                        contentDescription = "Voice Input",
-                                        tint = if (isListening) AccentRose else PrimaryIndigo
-                                    )
-                                }
-                                // Auto-Fill Button
-                                IconButton(onClick = { viewModel.parseNaturalLanguageExpense() }) {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = "Parse", tint = AccentAmber)
-                                }
-                            }
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryIndigo,
-                            unfocusedBorderColor = BorderDark,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Voice Listening status banner
-                    AnimatedVisibility(visible = isListening) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .padding(top = 8.dp)
-                                .background(AccentRose.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            CircularProgressIndicator(color = AccentRose, strokeWidth = 2.dp, modifier = Modifier.size(12.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Listening to your voice...", color = AccentRose, style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Action Tools Grid: [ 📷 Scan Bill ] & [ 💬 Paste SMS ]
+                    // Mode Selector Pills: [ Keypad ] [ AI Voice ] [ OCR Scan ]
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceCard, RoundedCornerShape(9999.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Button(
-                            onClick = { imagePickerLauncher.launch("image/*") },
-                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                            shape = RoundedCornerShape(10.dp),
+                        // Mode 1: Keypad
+                        Surface(
+                            shape = RoundedCornerShape(9999.dp),
+                            color = AccentEmerald,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.CameraAlt, contentDescription = null, tint = AccentEmerald, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (state.isOcrScanning) "Scanning..." else "Scan Bill", fontSize = 12.sp, color = TextPrimary)
+                            Row(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Dialpad, contentDescription = null, tint = BackgroundDark, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Keypad", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = BackgroundDark)
+                            }
                         }
 
-                        Button(
-                            onClick = { showSmsDrawer = !showSmsDrawer },
-                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Sms, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Paste SMS", fontSize = 12.sp, color = TextPrimary)
-                        }
-                    }
-
-                    // SMS Paste Drawer
-                    AnimatedVisibility(visible = showSmsDrawer) {
-                        Column(modifier = Modifier.padding(top = 10.dp)) {
-                            OutlinedTextField(
-                                value = smsInputText,
-                                onValueChange = {
-                                    smsInputText = it
-                                    viewModel.handleSmsPaste(it)
-                                },
-                                placeholder = { Text("Paste bank / UPI SMS here...", fontSize = 12.sp) },
-                                maxLines = 3,
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-
-                    // Category Suggestion Banner with 1-Click Add & Select
-                    AnimatedVisibility(visible = state.suggestedCategory != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                        // Mode 2: AI Voice
+                        Surface(
+                            shape = RoundedCornerShape(9999.dp),
+                            color = if (isListening) AccentRose.copy(alpha = 0.2f) else Color.Transparent,
+                            border = if (isListening) androidx.compose.foundation.BorderStroke(1.dp, AccentRose) else null,
                             modifier = Modifier
-                                .padding(top = 12.dp)
-                                .fillMaxWidth()
-                                .background(AccentAmber.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .weight(1f)
+                                .clickable {
+                                    if (isListening) {
+                                        voiceHelper.stopListening()
+                                    } else {
+                                        val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                                            context,
+                                            android.Manifest.permission.RECORD_AUDIO
+                                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                                        if (hasPermission) {
+                                            voiceHelper.startListening()
+                                        } else {
+                                            audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    }
+                                }
                         ) {
-                            Text(
-                                text = "✨ Suggests: ${state.suggestedCategory}",
-                                color = AccentAmber,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp
-                            )
-                            TextButton(onClick = { viewModel.applySuggestedCategory() }) {
-                                Text("+ Add & Select", color = AccentAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Row(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Mic, contentDescription = null, tint = if (isListening) AccentRose else TextSecondary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("AI Voice", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (isListening) AccentRose else TextSecondary)
+                            }
+                        }
+
+                        // Mode 3: OCR Scan
+                        Surface(
+                            shape = RoundedCornerShape(9999.dp),
+                            color = Color.Transparent,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { imagePickerLauncher.launch("image/*") }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.DocumentScanner, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("OCR Scan", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // Amount Field
+                // Large Numeric Entry Display Card
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = SurfaceCard,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = currencySymbol,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (state.amountInput.isNotBlank()) state.amountInput else "0.00",
+                                fontSize = 34.sp,
+                                fontWeight = FontWeight.Black,
+                                color = TextPrimary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        val selectedCatName = state.categories.find { it.id == state.selectedCategoryId }?.name ?: "Select Classification"
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(AccentCyan))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = selectedCatName,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = AccentCyan
+                            )
+                        }
+                    }
+                }
+
+                // AI Natural Language Quick Input Field
                 OutlinedTextField(
-                    value = state.amountInput,
-                    onValueChange = { viewModel.onAmountChanged(it) },
-                    label = { Text("Amount ($currencySymbol)") },
-                    leadingIcon = { Text(currencySymbol, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo, modifier = Modifier.padding(start = 12.dp)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    value = state.quickAddInput,
+                    onValueChange = { viewModel.onQuickAddInputChanged(it) },
+                    placeholder = { Text("e.g. Swiggy dinner ₹450 via UPI", fontSize = 12.sp, color = TextMuted) },
+                    trailingIcon = {
+                        IconButton(onClick = { viewModel.parseNaturalLanguageExpense() }) {
+                            if (state.isLoading) {
+                                CircularProgressIndicator(color = AccentEmerald, modifier = Modifier.size(16.dp))
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = "Parse", tint = AccentEmerald)
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentEmerald,
+                        unfocusedBorderColor = BorderDark,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 // Description Field
                 OutlinedTextField(
                     value = state.descriptionInput,
                     onValueChange = { viewModel.onDescriptionChanged(it) },
-                    label = { Text("Description / Merchant") },
+                    label = { Text("Merchant / Description") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryIndigo,
+                        unfocusedBorderColor = BorderDark,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                // Category Squircle Grid (3 Columns)
+                Column {
+                    Text(
+                        text = "CLASSIFICATION",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextSecondary,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                // Category Picker Chips
-                Text("Category", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                Spacer(modifier = Modifier.height(6.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(state.categories) { cat ->
-                        val isSelected = state.selectedCategoryId == cat.id
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (isSelected) PrimaryIndigo else SurfaceCard)
-                                .border(1.dp, if (isSelected) PrimaryIndigo else BorderDark, RoundedCornerShape(20.dp))
-                                .clickable { viewModel.onCategorySelected(cat.id) }
-                                .padding(horizontal = 14.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = cat.name,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) TextPrimary else TextSecondary
-                            )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(state.categories) { cat ->
+                            val isSelected = state.selectedCategoryId == cat.id
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) AccentEmerald.copy(alpha = 0.15f) else SurfaceCard,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isSelected) AccentEmerald else BorderDark
+                                ),
+                                modifier = Modifier.clickable { viewModel.onCategorySelected(cat.id) }
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = when {
+                                            cat.name.contains("Food", true) || cat.name.contains("Dining", true) -> Icons.Default.Restaurant
+                                            cat.name.contains("Groceries", true) -> Icons.Default.ShoppingCart
+                                            cat.name.contains("Transport", true) || cat.name.contains("Transit", true) -> Icons.Default.LocalTaxi
+                                            cat.name.contains("Shopping", true) -> Icons.Default.ShoppingBag
+                                            cat.name.contains("Bills", true) || cat.name.contains("Utilities", true) -> Icons.Default.ReceiptLong
+                                            else -> Icons.Default.Category
+                                        },
+                                        contentDescription = null,
+                                        tint = if (isSelected) AccentEmerald else TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = cat.name,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) TextPrimary else TextSecondary
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
+                // Amount Numerical Field
+                OutlinedTextField(
+                    value = state.amountInput,
+                    onValueChange = { viewModel.onAmountChanged(it) },
+                    label = { Text("Amount ($currencySymbol)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentEmerald,
+                        unfocusedBorderColor = BorderDark,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 if (state.errorMessage != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = state.errorMessage!!,
                         color = AccentRose,
@@ -283,32 +401,47 @@ fun QuickAddExpenseDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Save / Update Expense Button
-                Button(
-                    onClick = {
-                        if (isEditMode) {
-                            viewModel.updateExpense()
-                        } else {
-                            viewModel.saveExpense()
-                        }
-                    },
-                    enabled = !state.isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
+                // Action Buttons: Discard & Confirm Log
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (state.isLoading) {
-                        CircularProgressIndicator(color = TextPrimary, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-                    } else {
-                        Text(
-                            text = if (isEditMode) "Save Changes" else "Record Expense",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                    OutlinedButton(
+                        onClick = {
+                            focusManager.clearFocus()
+                            onDismiss()
+                        },
+                        shape = RoundedCornerShape(9999.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
+                        modifier = Modifier.weight(1f).height(50.dp)
+                    ) {
+                        Text("Cancel", color = TextSecondary)
+                    }
+
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            if (isEditMode) {
+                                viewModel.updateExpense()
+                            } else {
+                                viewModel.saveExpense()
+                            }
+                            onDismiss()
+                        },
+                        enabled = !state.isLoading && state.amountInput.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentEmerald),
+                        shape = RoundedCornerShape(9999.dp),
+                        modifier = Modifier.weight(1.5f).height(50.dp)
+                    ) {
+                        if (state.isLoading) {
+                            CircularProgressIndicator(color = BackgroundDark, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                        } else {
+                            Text(
+                                text = if (isEditMode) "Save Changes" else "Confirm Log",
+                                color = BackgroundDark,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

@@ -55,7 +55,7 @@ fun SettingsScreen(
         ) {
             // Profile Card
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = SurfaceDark,
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
                 modifier = Modifier.fillMaxWidth()
@@ -92,7 +92,7 @@ fun SettingsScreen(
 
             // Preferences Card
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = SurfaceDark,
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
                 modifier = Modifier.fillMaxWidth()
@@ -125,7 +125,7 @@ fun SettingsScreen(
                         )
                     }
 
-                    Divider(color = BorderDark, modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = BorderDark, modifier = Modifier.padding(vertical = 12.dp))
 
                     // Currency Selector
                     Row(
@@ -150,7 +150,7 @@ fun SettingsScreen(
                 onClick = onLogout,
                 colors = ButtonDefaults.buttonColors(containerColor = AccentRose.copy(alpha = 0.15f)),
                 border = androidx.compose.foundation.BorderStroke(1.dp, AccentRose.copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(9999.dp),
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
                 Icon(Icons.Default.Logout, contentDescription = null, tint = AccentRose)

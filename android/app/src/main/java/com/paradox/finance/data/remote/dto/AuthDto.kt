@@ -21,6 +21,10 @@ data class VerifyOtpRequest(
     @SerializedName("full_name") val fullName: String? = null
 )
 
+data class GoogleLoginRequest(
+    @SerializedName("id_token") val idToken: String
+)
+
 data class RefreshTokenRequest(
     @SerializedName("refresh_token") val refreshToken: String
 )

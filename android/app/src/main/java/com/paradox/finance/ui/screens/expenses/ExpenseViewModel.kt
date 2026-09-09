@@ -18,6 +18,7 @@ import com.paradox.finance.hardware.sms.SmsTransactionParser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -169,15 +170,19 @@ class ExpenseViewModel(
             try {
                 val res = api.parseExpense(mapOf("text" to text))
                 if (res.isSuccessful && res.body() != null) {
-                    val data = res.body()!!
-                    val amount = (data["amount"] as? Number)?.toDouble() ?: 0.0
+                    val rawBody = res.body()!!
+                    val data = (rawBody["data"] as? Map<*, *>) ?: rawBody
+                    val amount = (data["amount"] as? Number)?.toDouble() 
+                        ?: data["amount"]?.toString()?.toDoubleOrNull() ?: 0.0
                     val merchant = data["description"]?.toString() ?: text
                     val catName = data["category"]?.toString()
                     val pmName = data["payment_method"]?.toString()
+                    val date = data["date"]?.toString()
 
                     _uiState.value = _uiState.value.copy(
-                        amountInput = if (amount > 0) amount.toString() else _uiState.value.amountInput,
+                        amountInput = if (amount > 0) String.format(Locale.US, "%.2f", amount) else _uiState.value.amountInput,
                         descriptionInput = merchant,
+                        dateInput = date ?: _uiState.value.dateInput,
                         suggestedCategory = catName
                     )
 
@@ -196,7 +201,7 @@ class ExpenseViewModel(
     fun handleSmsPaste(smsText: String) {
         val parsed = SmsTransactionParser.parse(smsText) ?: return
         _uiState.value = _uiState.value.copy(
-            amountInput = parsed.amount?.toString() ?: "",
+            amountInput = parsed.amount?.let { String.format(Locale.US, "%.2f", it) } ?: "",
             descriptionInput = parsed.merchant ?: "",
             dateInput = parsed.date
         )
@@ -208,14 +213,18 @@ class ExpenseViewModel(
             _uiState.value = _uiState.value.copy(isOcrScanning = true)
             val result = ReceiptScannerHelper.scanReceipt(context, uri)
             if (result is Resource.Success) {
-                val data = result.data
+                val rawBody = result.data
+                val data = (rawBody["data"] as? Map<*, *>) ?: rawBody
                 val amount = (data["amount"] as? Number)?.toDouble()
-                val merchant = data["merchant"]?.toString() ?: data["store"]?.toString()
+                    ?: data["amount"]?.toString()?.toDoubleOrNull()
+                val merchant = data["description"]?.toString()
+                    ?: data["merchant"]?.toString() 
+                    ?: data["store"]?.toString()
                 val date = data["date"]?.toString()
                 val cat = data["category"]?.toString()
 
                 _uiState.value = _uiState.value.copy(
-                    amountInput = amount?.toString() ?: "",
+                    amountInput = if (amount != null && amount > 0) String.format(Locale.US, "%.2f", amount) else "",
                     descriptionInput = merchant ?: "Receipt Expense",
                     dateInput = date ?: _uiState.value.dateInput,
                     suggestedCategory = cat
@@ -234,7 +243,7 @@ class ExpenseViewModel(
             return
         }
 
-        val categoryId = state.selectedCategoryId ?: state.categories.firstOrNull()?.id ?: return
+        val categoryId = state.selectedCategoryId ?: state.categories.firstOrNull()?.id ?: "1"
         val paymentMethodId = state.selectedPaymentMethodId ?: state.paymentMethods.firstOrNull()?.get("id")?.toString() ?: "1"
 
         viewModelScope.launch {
@@ -249,7 +258,14 @@ class ExpenseViewModel(
                 recurringFrequency = state.recurringFrequency
             )
             if (res is Resource.Success) {
-                _uiState.value = _uiState.value.copy(isLoading = false, showAddDialog = false)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    showAddDialog = false,
+                    amountInput = "",
+                    descriptionInput = "",
+                    quickAddInput = "",
+                    selectedCategoryId = null
+                )
             } else if (res is Resource.Error) {
                 _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = res.message)
             }
@@ -321,61 +337,82 @@ class ExpenseViewModel(
 
     fun exportExpensesCsv(context: Context) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isExporting = true, errorMessage = null)
+            _uiState.value = _uiState.value.copy(isExporting = true, errorMessage = null, exportSuccessMessage = null)
             try {
-                val res = api.exportExpenses()
-                if (res.isSuccessful && res.body() != null) {
-                    val bytes = res.body()!!.bytes()
-                    val fileName = "paradox_expenses_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.csv"
-                    
-                    // Save to cache dir for sharing
-                    val exportDir = File(context.cacheDir, "exports")
-                    if (!exportDir.exists()) exportDir.mkdirs()
-                    val file = File(exportDir, fileName)
-                    FileOutputStream(file).use { it.write(bytes) }
-
-                    // Also try saving a public copy to Downloads folder if possible
-                    try {
-                        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-                        if (downloadsDir.exists() || downloadsDir.mkdirs()) {
-                            val pubFile = File(downloadsDir, fileName)
-                            FileOutputStream(pubFile).use { it.write(bytes) }
-                        }
-                    } catch (e: Exception) {
-                        // Ignore public dir errors
+                var csvBytes: ByteArray? = null
+                
+                // 1. Try server export first
+                try {
+                    val res = api.exportExpenses()
+                    if (res.isSuccessful && res.body() != null) {
+                        csvBytes = res.body()!!.bytes()
                     }
-
-                    _uiState.value = _uiState.value.copy(
-                        isExporting = false,
-                        exportSuccessMessage = "Exported successfully as $fileName"
-                    )
-
-                    // Share intent
-                    try {
-                        val uri = FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            file
-                        )
-                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/csv"
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            putExtra(Intent.EXTRA_SUBJECT, "Paradox Expenses Export")
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(Intent.createChooser(sendIntent, "Export Paradox Expenses").apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        })
-                    } catch (e: Exception) {
-                        // Fallback without share sheet
-                    }
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isExporting = false,
-                        errorMessage = "Failed to export expenses: HTTP ${res.code()}"
-                    )
+                } catch (_: Exception) {
+                    // Fall back to local database export
                 }
+
+                // 2. If server export is null or empty, generate from local Room expenses
+                if (csvBytes == null || csvBytes.isEmpty()) {
+                    val localExpenses = _uiState.value.expenses.ifEmpty {
+                        repository.getLocalExpenses().firstOrNull() ?: emptyList()
+                    }
+                    val sb = StringBuilder()
+                    sb.append("Date,Description,Category,Payment Method,Amount,Recurring\n")
+                    localExpenses.forEach { exp ->
+                        val date = exp.date
+                        val desc = exp.description.replace("\"", "\"\"")
+                        val cat = (exp.categoryName ?: "Other").replace("\"", "\"\"")
+                        val pm = (exp.paymentMethodName ?: "Cash").replace("\"", "\"\"")
+                        val amt = exp.amount
+                        val rec = exp.isRecurring
+                        sb.append("\"$date\",\"$desc\",\"$cat\",\"$pm\",$amt,$rec\n")
+                    }
+                    csvBytes = sb.toString().toByteArray(Charsets.UTF_8)
+                }
+
+                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                val fileName = "paradox_expenses_$timestamp.csv"
+                
+                // Save to cache dir for sharing via FileProvider
+                val exportDir = File(context.cacheDir, "exports")
+                if (!exportDir.exists()) exportDir.mkdirs()
+                val file = File(exportDir, fileName)
+                FileOutputStream(file).use { it.write(csvBytes) }
+
+                // Also save to app documents directory
+                try {
+                    val docDir = context.getExternalFilesDir(null)
+                    if (docDir != null && (docDir.exists() || docDir.mkdirs())) {
+                        val docFile = File(docDir, fileName)
+                        FileOutputStream(docFile).use { it.write(csvBytes) }
+                    }
+                } catch (_: Exception) {
+                    // Ignored
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    isExporting = false,
+                    exportSuccessMessage = "Exported to $fileName"
+                )
+
+                // Trigger Android system Share / Save Sheet
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, "Paradox Expenses Export")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                val chooser = Intent.createChooser(sendIntent, "Export Paradox Expenses CSV").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(chooser)
+
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isExporting = false,

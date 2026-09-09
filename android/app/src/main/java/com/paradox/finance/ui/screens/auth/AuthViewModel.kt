@@ -87,6 +87,21 @@ class AuthViewModel(
         }
     }
 
+    fun loginWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            when (val result = repository.loginWithGoogle(idToken)) {
+                is Resource.Success -> {
+                    _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
+                }
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = result.message)
+                }
+                else -> Unit
+            }
+        }
+    }
+
     fun sendRegisterOtp() {
         val state = _uiState.value
         if (state.email.isBlank() || state.password.isBlank()) {

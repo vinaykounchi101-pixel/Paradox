@@ -16,6 +16,9 @@ object Constants {
     const val KEY_CURRENCY = "selected_currency"
     const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
 
+    // Google OAuth 2.0 Web Client ID
+    const val GOOGLE_WEB_CLIENT_ID = "911004062951-cjfaob0o04n9falb7jgs8k8gfmb3r511.apps.googleusercontent.com"
+
     // Supported Currencies
     val SUPPORTED_CURRENCIES = listOf("INR", "USD", "EUR", "GBP")
     val CURRENCY_SYMBOLS = mapOf(

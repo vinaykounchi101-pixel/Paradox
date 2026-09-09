@@ -18,6 +18,11 @@ interface ParadoxApi {
         @Body request: LoginRequest
     ): Response<TokenResponse>
 
+    @POST("api/v1/auth/google")
+    suspend fun googleLogin(
+        @Body request: GoogleLoginRequest
+    ): Response<TokenResponse>
+
     @POST("api/v1/auth/register")
     suspend fun register(
         @Body request: RegisterRequest
@@ -150,6 +155,11 @@ interface ParadoxApi {
     @GET("api/v1/ai/safe-to-spend")
     suspend fun getSafeToSpend(
         @Query("period_key") periodKey: String? = null
+    ): Response<Map<String, Any>>
+
+    @GET("api/v1/ai/suggest-budget")
+    suspend fun suggestBudget(
+        @Query("period_type") periodType: String = "month"
     ): Response<Map<String, Any>>
 
     @GET("api/v1/ai/health-score")

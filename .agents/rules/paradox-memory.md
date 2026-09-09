@@ -70,6 +70,17 @@ This document is the agent-level repository memory for Paradox, persisted across
   - Resolved string-to-number monetary decimal parsing in `ExpenseRepository.kt`, guaranteeing 100% accurate display of imported expenses and totals.
   - Hosted Wi-Fi APK download server (`http://10.76.69.130:8080/Paradox.apk`) and generated QR code card (`qr_code.md`).
 
+- **Phase 15 (Stitch MCP Design System & Obsidian Glassmorphism UI/UX Overhaul, Live Physical Device Deployment & Interactive Verification)**:
+  - Fetched and inspected real Stitch MCP screens from the "Paradox" Stitch project.
+  - Implemented Obsidian dark mode theme (`#0A0B0E`), glassmorphism cards, neon accents (`#00F5A0`, `#00D2FF`), and floating pill `ObsidianBottomBar`.
+  - Rebuilt Dashboard with Net Worth Hero card, balance reveal toggle, 50/30/20 pacing tracker, Monthly Spend Cap with daily safe burn velocity, 4 quick action monoliths, interactive bezier Spending Velocity graph, and transaction ledger.
+  - Upgraded Quick Add Dialog with AI parsing, squircle category grid, keypad/voice/OCR tabs, and soft-keyboard `imePadding` resilience.
+  - Wired Pre-Purchase Simulator with Monte Carlo projection, depletion date forecasting, and "Proceed Anyway" automatic ledger logging.
+  - Wired Leak Hunter with 14-day streak banner, financial health score telemetry (88 Grade A Optimal), interactive threshold filter chips (`<₹50`, `<₹100`, `<₹150`, `<₹300`, `<₹500`), and annualized chai drain impact cards.
+  - Wired Finny AI chat with real-time `VoiceInputHelper` speech recognition, suggestion chips, and 1-tap goal lock confirmations.
+  - Connected Analytics Category Velocity breakdown with direct ledger routing.
+  - Compiled and deployed debug APK directly to physical Android phone (`ZA2239H4J9` - Motorola Edge 60 Fusion) and verified all features live on hardware.
+
 ## 3. Database State
 - Latest Alembic Migration: `a1b2c3d4e5f6_add_otp_to_pending_registration.py`
 - Active Entities: `User`, `RefreshToken`, `PasswordResetToken`, `PendingRegistrationToken`, `Category`, `PaymentMethod`, `Expense`, `Budget`

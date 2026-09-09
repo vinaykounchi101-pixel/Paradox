@@ -27,6 +27,22 @@ class AuthRepository(private val authPrefs: AuthPreferences) {
         }
     }
 
+    suspend fun loginWithGoogle(idToken: String): Resource<TokenResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.googleLogin(GoogleLoginRequest(idToken = idToken))
+            if (response.isSuccessful && response.body() != null) {
+                val token = response.body()!!
+                authPrefs.saveTokens(token.accessToken, token.refreshToken)
+                fetchAndSaveProfile()
+                Resource.Success(token)
+            } else {
+                Resource.Error(response.errorBody()?.string() ?: "Google login failed", response.code())
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.localizedMessage ?: "Network connection error")
+        }
+    }
+
     suspend fun register(email: String, password: String, fullName: String? = null): Resource<String> = withContext(Dispatchers.IO) {
         try {
             val response = api.register(RegisterRequest(email = email.trim(), password = password, fullName = fullName?.trim()))

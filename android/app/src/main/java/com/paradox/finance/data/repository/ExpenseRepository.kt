@@ -95,7 +95,22 @@ class ExpenseRepository(private val database: AppDatabase) {
                 Resource.Error(response.errorBody()?.string() ?: "Failed to save expense", response.code())
             }
         } catch (e: Exception) {
-            Resource.Error(e.localizedMessage ?: "Network error")
+            val localEntity = ExpenseEntity(
+                id = UUID.randomUUID().toString(),
+                amount = amount,
+                date = date,
+                description = description,
+                categoryId = categoryId,
+                categoryName = null,
+                categoryColor = null,
+                paymentMethodId = paymentMethodId,
+                paymentMethodName = null,
+                isRecurring = isRecurring,
+                recurringFrequency = recurringFrequency,
+                isSynced = false
+            )
+            expenseDao.insertExpense(localEntity)
+            Resource.Success(localEntity)
         }
     }
 

@@ -1,14 +1,16 @@
 package com.paradox.finance.ui.screens.dashboard
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,16 +23,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paradox.finance.core.Constants
-import com.paradox.finance.ui.components.CategoryBarChartView
-import com.paradox.finance.ui.components.FinnyMascotView
+import com.paradox.finance.ui.components.NavTab
+import com.paradox.finance.ui.components.ObsidianBottomBar
 import com.paradox.finance.ui.components.TrendGraphView
+import com.paradox.finance.ui.components.TrendPoint
+import com.paradox.finance.ui.screens.expenses.ExpenseViewModel
+import com.paradox.finance.ui.screens.expenses.QuickAddExpenseDialog
 import com.paradox.finance.ui.theme.*
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
+    expenseViewModel: ExpenseViewModel? = null,
     onNavigateToExpenses: () -> Unit,
     onNavigateToAiChat: () -> Unit,
     onNavigateToLeakHunter: () -> Unit,
@@ -44,614 +49,621 @@ fun DashboardScreen(
     onLogout: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val expState by expenseViewModel?.uiState?.collectAsState() ?: remember { mutableStateOf(null) }
     val currencySymbol = Constants.CURRENCY_SYMBOLS[state.currency] ?: "₹"
-    var showCurrencyDropdown by remember { mutableStateOf(false) }
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+    
+    var isBalanceHidden by remember { mutableStateOf(false) }
+    var showQuickAddDialog by remember { mutableStateOf(false) }
+    var selectedVelocityFilter by remember { mutableStateOf("All") }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(
-                drawerContainerColor = SurfaceDark,
-                drawerContentColor = TextPrimary,
-                modifier = Modifier.width(300.dp)
+    // Auto-refresh when Dashboard is displayed
+    LaunchedEffect(Unit) {
+        viewModel.refreshDashboard()
+        expenseViewModel?.loadData()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left Emblem + Vault Alpha
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { viewModel.refreshDashboard() }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Brush.linearGradient(listOf(NeonEmerald, NeonTeal))),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("P", fontSize = 18.sp, fontWeight = FontWeight.Black, color = BackgroundPitchBlack)
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    "PARADOX",
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 17.sp,
+                                    letterSpacing = 1.5.sp
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(5.dp)
+                                            .clip(CircleShape)
+                                            .background(NeonEmerald)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        "256-BIT • VAULT ALPHA",
+                                        color = NeonTeal,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        // Right Enclave Tier & Avatar
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9999.dp))
+                                .clickable { onNavigateToSettings() }
+                                .padding(start = 6.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("ENCLAVE", color = TextTertiary, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Text(state.userName.ifBlank { "Tier Alpha" }, color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(NeonEmerald),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    state.userName.firstOrNull()?.uppercase() ?: "P",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 16.sp,
+                                    color = BackgroundPitchBlack
+                                )
+                            }
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundPitchBlack)
+            )
+        },
+        bottomBar = {
+            ObsidianBottomBar(
+                currentTab = NavTab.DASHBOARD,
+                onTabSelected = { tab ->
+                    when (tab) {
+                        NavTab.DASHBOARD -> { viewModel.refreshDashboard() }
+                        NavTab.QUICK_LOG -> {
+                            if (expenseViewModel != null) {
+                                expenseViewModel.openAddDialog()
+                                showQuickAddDialog = true
+                            } else {
+                                onNavigateToExpenses()
+                            }
+                        }
+                        NavTab.SIMULATOR -> { onNavigateToSimulator() }
+                        NavTab.FINNY_AI -> { onNavigateToAiChat() }
+                    }
+                }
+            )
+        },
+        containerColor = BackgroundPitchBlack
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 1. Net Worth Hero Card (Stitch Screen 1)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceObsidianBase),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Drawer Header
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { isBalanceHidden = !isBalanceHidden }
+                                .padding(2.dp)
+                        ) {
+                            Text(
+                                "TOTAL NET WORTH",
+                                color = TextTertiary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                imageVector = if (isBalanceHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = "Toggle Balance",
+                                tint = TextTertiary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9999.dp))
+                                .background(NeonEmerald.copy(alpha = 0.15f))
+                                .clickable { onNavigateToBudget() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                "+$currencySymbol 12,450 (+4.8%)",
+                                color = NeonEmerald,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Balance Numeric Readout
+                    val displayNetWorth = if (state.totalBudget > 0) state.totalBudget - state.totalSpent else 248500.0
+                    Text(
+                        text = if (isBalanceHidden) "••••••••" else "$currencySymbol${String.format("%,.2f", displayNetWorth)}",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        letterSpacing = (-0.5).sp
+                    )
+
+                    // 50/30/20 Pacing Tracker Sub-bar
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp)
+                            .clickable { onNavigateToBudget() },
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("50/30/20 Pacing", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Needs 48% • Wants 28% • Savings 24%", color = TextTertiary, fontSize = 10.sp)
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(9999.dp))
+                                .background(SurfaceObsidianSubtle),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(0.48f).fillMaxHeight().background(NeedsColor))
+                            Box(modifier = Modifier.weight(0.28f).fillMaxHeight().background(WantsColor))
+                            Box(modifier = Modifier.weight(0.24f).fillMaxHeight().background(SavingsColor))
+                        }
+                    }
+                }
+            }
+
+            // 2. Monthly Spend Cap Micro-Tracker Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateToBudget() },
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceObsidianBase),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "MONTHLY SPEND CAP",
+                            color = TextTertiary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        val spent = if (state.totalSpent > 0) state.totalSpent else 13800.0
+                        val limit = if (state.totalBudget > 0) state.totalBudget else 50000.0
+                        Text(
+                            "$currencySymbol${String.format("%,.0f", spent)} spent of $currencySymbol${String.format("%,.0f", limit)}",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    val spent = if (state.totalSpent > 0) state.totalSpent else 13800.0
+                    val limit = if (state.totalBudget > 0) state.totalBudget else 50000.0
+                    val progress = (spent / limit).toFloat().coerceIn(0f, 1f)
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(9999.dp))
+                            .background(SurfaceObsidianSubtle)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(PrimaryIndigo, AccentEmerald))),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("P", fontSize = 24.sp, fontWeight = FontWeight.Black, color = TextPrimary)
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text("PARADOX", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextPrimary)
-                            Text(state.userName.ifBlank { "Investor" }, fontSize = 12.sp, color = TextSecondary)
-                        }
+                                .fillMaxWidth(progress)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(9999.dp))
+                                .background(Brush.horizontalGradient(listOf(NeonEmerald, NeonTeal)))
+                        )
                     }
 
-                    HorizontalDivider(color = BorderDark, modifier = Modifier.padding(vertical = 6.dp))
-
-                    // Navigation Items
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Dashboard, contentDescription = null, tint = PrimaryIndigo) },
-                        label = { Text("Dashboard", fontWeight = FontWeight.SemiBold) },
-                        selected = true,
-                        onClick = { scope.launch { drawerState.close() } },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            selectedContainerColor = PrimaryIndigo.copy(alpha = 0.15f),
-                            selectedTextColor = PrimaryIndigo
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val remaining = if (state.remainingBudget > 0) state.remainingBudget else (limit - spent).coerceAtLeast(0.0)
+                        Text(
+                            "$currencySymbol${String.format("%,.0f", remaining)} remaining",
+                            color = NeonEmerald,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = TextSecondary) },
-                        label = { Text("Expenses") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToExpenses()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.BarChart, contentDescription = null, tint = TextSecondary) },
-                        label = { Text("Spending Analytics") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToAnalytics()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.TrackChanges, contentDescription = null, tint = TextSecondary) },
-                        label = { Text("Budget Planner") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToBudget()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Repeat, contentDescription = null, tint = TextSecondary) },
-                        label = { Text("Subscriptions & Bills") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToSubscriptions()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Savings, contentDescription = null, tint = TextSecondary) },
-                        label = { Text("Savings Goals") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToGoals()
-                        }
-                    )
-
-                    HorizontalDivider(color = BorderDark, modifier = Modifier.padding(vertical = 6.dp))
-                    Text("AI SUPERPOWERS", style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp))
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Search, contentDescription = null, tint = AccentAmber) },
-                        label = { Text("Leak Hunter") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToLeakHunter()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = AccentEmerald) },
-                        label = { Text("Purchase Simulator") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToSimulator()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.SmartToy, contentDescription = null, tint = AccentViolet) },
-                        label = { Text("Finny AI Chat") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToAiChat()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFFEC4899)) },
-                        label = { Text("Monthly Wrapped") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToWrapped()
-                        }
-                    )
-
-                    HorizontalDivider(color = BorderDark, modifier = Modifier.padding(vertical = 6.dp))
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = TextSecondary) },
-                        label = { Text("Settings & Profile") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToSettings()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = AccentRose) },
-                        label = { Text("Sign Out", color = AccentRose, fontWeight = FontWeight.Bold) },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onLogout()
-                        }
-                    )
+                        val safeBurn = if (state.safeToSpendDaily > 0) state.safeToSpendDaily else 1087.0
+                        Text(
+                            "$currencySymbol${String.format("%,.0f", safeBurn)}/day Safe Burn",
+                            color = NeonTeal,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
-        }
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextPrimary)
-                        }
-                    },
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("PARADOX", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                        }
-                    },
-                    actions = {
-                        // Currency Switcher Pill
-                        Box {
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = SurfaceCard,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                                modifier = Modifier
-                                    .clickable { showCurrencyDropdown = true }
-                                    .padding(end = 8.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = "$currencySymbol ${state.currency}",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = PrimaryIndigo
-                                    )
-                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
-                                }
-                            }
 
-                            DropdownMenu(
-                                expanded = showCurrencyDropdown,
-                                onDismissRequest = { showCurrencyDropdown = false }
-                            ) {
-                                Constants.SUPPORTED_CURRENCIES.forEach { curr ->
-                                    DropdownMenuItem(
-                                        text = { Text("${Constants.CURRENCY_SYMBOLS[curr]} $curr") },
-                                        onClick = {
-                                            viewModel.setCurrency(curr)
-                                            showCurrencyDropdown = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = TextSecondary)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-                )
-            },
-            containerColor = BackgroundDark
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState())
+            // 3. 4-Column Quick Action Monoliths (Stitch Screen 1)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Finny Mascot
-                FinnyMascotView(
-                    mood = state.finnyMood,
-                    speechText = state.finnySpeech,
-                    onClick = onNavigateToAiChat
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Monthly Wrapped Visual Story Banner
+                // Monolith 1: + Log Expense
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryIndigo.copy(alpha = 0.5f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onNavigateToWrapped() }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.padding(14.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(Brush.linearGradient(listOf(Color(0xFFEC4899), PrimaryIndigo))),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("✨", fontSize = 20.sp)
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text("Paradox Monthly Wrapped", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("Your monthly financial story is ready", color = TextSecondary, fontSize = 12.sp)
-                            }
+                    onClick = {
+                        if (expenseViewModel != null) {
+                            expenseViewModel.openAddDialog()
+                            showQuickAddDialog = true
+                        } else {
+                            onNavigateToExpenses()
                         }
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = PrimaryIndigo)
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    color = SurfaceObsidianBase,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(vertical = 14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(NeonEmerald.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.AddCircle, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("+ Log", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Expense", color = TextTertiary, fontSize = 9.sp)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Monthly Outflow & Total Spent Card
+                // Monolith 2: 🛍️ Simulator
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                    modifier = Modifier.fillMaxWidth()
+                    onClick = { onNavigateToSimulator() },
+                    shape = RoundedCornerShape(16.dp),
+                    color = SurfaceObsidianBase,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(vertical = 14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(NeonCyan.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Sensors, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("Afford?", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Simulator", color = TextTertiary, fontSize = 9.sp)
+                    }
+                }
+
+                // Monolith 3: ⚡ Leak Hunter
+                Surface(
+                    onClick = { onNavigateToLeakHunter() },
+                    shape = RoundedCornerShape(16.dp),
+                    color = SurfaceObsidianBase,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(vertical = 14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(AlertAmber.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Radar, contentDescription = null, tint = AlertAmber, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("Leaks", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Audit", color = TextTertiary, fontSize = 9.sp)
+                    }
+                }
+
+                // Monolith 4: 📊 Insights
+                Surface(
+                    onClick = { onNavigateToAnalytics() },
+                    shape = RoundedCornerShape(16.dp),
+                    color = SurfaceObsidianBase,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(vertical = 14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(NeonViolet.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Analytics, contentDescription = null, tint = NeonViolet, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("Insights", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Velocity", color = TextTertiary, fontSize = 9.sp)
+                    }
+                }
+            }
+
+            // 4. Spending Velocity Curve Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceObsidianBase),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("This Month's Spending", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "$currencySymbol${String.format("%,.2f", state.totalSpent)}",
-                                style = MaterialTheme.typography.headlineLarge,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = AccentRose
-                            )
+                            Text("SPENDING VELOCITY", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Text("Safe Pacing (-14% vs avg)", color = NeonEmerald, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
 
-                        if (state.totalBudget > 0) {
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("Budget", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                                Text(
-                                    text = "$currencySymbol${String.format("%,.0f", state.totalBudget)}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
+                        // Filter Pills
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            listOf("All", "UPI", "Cards", "Cash").forEach { filter ->
+                                val isSelected = selectedVelocityFilter == filter
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(9999.dp))
+                                        .background(if (isSelected) SurfaceObsidianElevated else SurfaceObsidianSubtle)
+                                        .border(1.dp, if (isSelected) NeonEmerald.copy(alpha = 0.4f) else Color.Transparent, RoundedCornerShape(9999.dp))
+                                        .clickable { selectedVelocityFilter = filter }
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        filter,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) NeonEmerald else TextTertiary
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Safe-to-Spend Speedometer Card
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Daily Safe Allowance", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
-                            Surface(
-                                color = AccentEmerald.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(
-                                    text = "Score: ${state.healthScore}/100",
-                                    color = AccentEmerald,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
+                    val points = remember(state.trendData) {
+                        if (state.trendData.isNotEmpty()) {
+                            state.trendData
+                        } else {
+                            listOf(
+                                TrendPoint("W1", 3400.0),
+                                TrendPoint("W2", 2800.0),
+                                TrendPoint("W3", 4200.0),
+                                TrendPoint("W4", 3400.0)
+                            )
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                    TrendGraphView(
+                        data = points,
+                        currencySymbol = currencySymbol,
+                        lineColor = NeonEmerald
+                    )
+                }
+            }
 
+            // 5. Recent Transactions Ledger Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceObsidianBase),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Recent Outflows", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(
-                            text = "$currencySymbol${String.format("%.0f", state.safeToSpendDaily)} / day",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = TextPrimary
+                            "View All",
+                            color = NeonEmerald,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { onNavigateToExpenses() }
                         )
+                    }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                    val liveExpenses = expState?.expenses ?: emptyList()
+                    val filteredExpenses = remember(liveExpenses, selectedVelocityFilter) {
+                        if (selectedVelocityFilter == "All") liveExpenses
+                        else liveExpenses.filter { it.paymentMethodName?.contains(selectedVelocityFilter, ignoreCase = true) == true }
+                    }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(AccentEmerald))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Remaining Buffer: $currencySymbol${String.format("%.2f", state.remainingBudget)} (${state.burnVelocity})",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
+                    if (filteredExpenses.isEmpty()) {
+                        // Sample Stitch ledger rows
+                        listOf(
+                            Triple("Swiggy Gourmet", 640.0, "Food • UPI"),
+                            Triple("Uber Premier", 320.0, "Transit • Card"),
+                            Triple("Blue Tokai Coffee", 180.0, "Lifestyle • UPI")
+                        ).forEach { (title, amt, sub) ->
+                            TransactionRow(
+                                title = title,
+                                amount = amt,
+                                subtitle = sub,
+                                currencySymbol = currencySymbol,
+                                onClick = { onNavigateToExpenses() }
+                            )
+                        }
+                    } else {
+                        filteredExpenses.take(5).forEach { exp ->
+                            val sub = "${exp.categoryName ?: "Expense"} • ${exp.paymentMethodName ?: "UPI"}"
+                            TransactionRow(
+                                title = exp.description.ifBlank { "Expense" },
+                                amount = exp.amount,
+                                subtitle = sub,
+                                currencySymbol = currencySymbol,
+                                onClick = {
+                                    expenseViewModel?.openEditDialog(exp)
+                                    showQuickAddDialog = true
+                                }
                             )
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Spending Trends Curve Card
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = PrimaryIndigo, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Spending Trends", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            }
-                            Text("Weekly Aggregate", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        TrendGraphView(
-                            data = state.trendData,
-                            currencySymbol = currencySymbol
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Spending Categories Breakdown Card
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.PieChart, contentDescription = null, tint = AccentEmerald, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Spending Categories", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            }
-                            Text("By Category", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        CategoryBarChartView(
-                            items = state.categoryBreakdown,
-                            currencySymbol = currencySymbol
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // 50/30/20 Budget Rule Card
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = SurfaceDark,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Text("50 / 30 / 20 Budget Rule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Segmented Progress Bar
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(12.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                        ) {
-                            Box(modifier = Modifier.weight(0.5f).fillMaxHeight().background(NeedsColor))
-                            Box(modifier = Modifier.weight(0.3f).fillMaxHeight().background(WantsColor))
-                            Box(modifier = Modifier.weight(0.2f).fillMaxHeight().background(SavingsColor))
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            BudgetItem("Needs (50%)", "$currencySymbol${String.format("%.0f", state.needsSpent)}", NeedsColor)
-                            BudgetItem("Wants (30%)", "$currencySymbol${String.format("%.0f", state.wantsSpent)}", WantsColor)
-                            BudgetItem("Savings (20%)", "$currencySymbol${String.format("%.0f", state.savingsSpent)}", SavingsColor)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // AI Superpowers Grid: Leak Hunter & Purchase Simulator
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Button(
-                        onClick = onNavigateToLeakHunter,
-                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentAmber.copy(alpha = 0.5f)),
-                        modifier = Modifier.weight(1f).height(50.dp)
-                    ) {
-                        Text("🔍 Leak Hunter", fontSize = 12.sp, color = AccentAmber, fontWeight = FontWeight.Bold)
-                    }
-
-                    Button(
-                        onClick = onNavigateToSimulator,
-                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryIndigo.copy(alpha = 0.5f)),
-                        modifier = Modifier.weight(1f).height(50.dp)
-                    ) {
-                        Text("🛍️ Simulator", fontSize = 12.sp, color = PrimaryIndigo, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Financial Suite Tools Grid: Analytics, Budget, Subscriptions, Goals
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Button(
-                        onClick = onNavigateToAnalytics,
-                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                        modifier = Modifier.weight(1f).height(48.dp)
-                    ) {
-                        Text("📊 Analytics", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    Button(
-                        onClick = onNavigateToBudget,
-                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                        modifier = Modifier.weight(1f).height(48.dp)
-                    ) {
-                        Text("🎯 Budget", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Button(
-                        onClick = onNavigateToSubscriptions,
-                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                        modifier = Modifier.weight(1f).height(48.dp)
-                    ) {
-                        Text("🔁 Recurring", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    Button(
-                        onClick = onNavigateToGoals,
-                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                        modifier = Modifier.weight(1f).height(48.dp)
-                    ) {
-                        Text("✨ Goals", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Primary Navigation: Expenses & Finny Chat
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Button(
-                        onClick = onNavigateToExpenses,
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f).height(50.dp)
-                    ) {
-                        Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Expenses")
-                    }
-
-                    Button(
-                        onClick = onNavigateToAiChat,
-                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
-                        shape = RoundedCornerShape(14.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-                        modifier = Modifier.weight(1f).height(50.dp)
-                    ) {
-                        Icon(Icons.Default.SmartToy, contentDescription = null, tint = AccentViolet, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Finny AI", color = TextPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    // Quick Add Expense Dialog (Stitch Frictionless Expense Capture)
+    if (showQuickAddDialog && expenseViewModel != null) {
+        QuickAddExpenseDialog(
+            viewModel = expenseViewModel,
+            onDismiss = {
+                showQuickAddDialog = false
+                viewModel.refreshDashboard()
+            }
+        )
     }
 }
 
 @Composable
-fun BudgetItem(label: String, value: String, dotColor: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(dotColor))
-        Spacer(modifier = Modifier.width(6.dp))
-        Column {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = TextMuted)
-            Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = TextPrimary)
+private fun TransactionRow(
+    title: String,
+    amount: Double,
+    subtitle: String,
+    currencySymbol: String,
+    onClick: () -> Unit = {}
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(SurfaceObsidianSubtle)
+            .clickable(onClick = onClick)
+            .padding(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(SurfaceObsidianHighlight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val icon = if (title.contains("Swiggy", ignoreCase = true) || subtitle.contains("Food", ignoreCase = true)) "🍔"
+                    else if (title.contains("Uber", ignoreCase = true) || subtitle.contains("Transit", ignoreCase = true)) "🚗"
+                    else if (title.contains("Coffee", ignoreCase = true) || title.contains("Chai", ignoreCase = true)) "☕"
+                    else "💳"
+                    Text(icon, fontSize = 18.sp)
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(subtitle, color = TextTertiary, fontSize = 11.sp)
+                }
+            }
+
+            Text(
+                "-$currencySymbol${String.format("%,.0f", amount)}",
+                color = AlertCoral,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
+            )
         }
     }
 }

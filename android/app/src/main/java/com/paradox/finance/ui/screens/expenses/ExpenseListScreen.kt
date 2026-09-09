@@ -354,7 +354,7 @@ fun ExpenseCardItem(
     onDelete: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = SurfaceDark,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
         modifier = Modifier
@@ -370,19 +370,19 @@ fun ExpenseCardItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // Category Icon Avatar
+                // Category Icon Squircle Container
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .clip(CircleShape)
+                        .clip(RoundedCornerShape(12.dp))
                         .background(SurfaceCard),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = (expense.categoryName?.firstOrNull() ?: 'E').uppercase(),
                         fontWeight = FontWeight.Bold,
-                        color = PrimaryIndigo,
-                        fontSize = 18.sp
+                        color = AccentEmerald,
+                        fontSize = 16.sp
                     )
                 }
 
@@ -407,7 +407,7 @@ fun ExpenseCardItem(
                             Text(
                                 text = expense.categoryName,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = AccentAmber
+                                color = AccentCyan
                             )
                         }
                     }
@@ -416,7 +416,7 @@ fun ExpenseCardItem(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "-$currencySymbol${String.format("%.2f", expense.amount)}",
+                    text = "-$currencySymbol${String.format("%,.2f", expense.amount)}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = AccentRose

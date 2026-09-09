@@ -1,13 +1,17 @@
 package com.paradox.finance.ui.screens.ai
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,10 +21,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paradox.finance.data.remote.ApiClient
+import com.paradox.finance.hardware.voice.VoiceInputHelper
+import com.paradox.finance.ui.components.NavTab
+import com.paradox.finance.ui.components.ObsidianBottomBar
+import com.paradox.finance.ui.screens.expenses.ExpenseViewModel
+import com.paradox.finance.ui.screens.expenses.QuickAddExpenseDialog
 import com.paradox.finance.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -33,24 +44,56 @@ data class ChatMessage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FinnyChatScreen(
-    onNavigateBack: () -> Unit
+    expenseViewModel: ExpenseViewModel? = null,
+    onNavigateBack: () -> Unit,
+    onNavigateToDashboard: () -> Unit = onNavigateBack,
+    onNavigateToSimulator: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val api = remember { ApiClient.getApi() }
 
     var inputText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var isListening by remember { mutableStateOf(false) }
+    var showQuickAddDialog by remember { mutableStateOf(false) }
+    
     val messages = remember {
         mutableStateListOf(
-            ChatMessage("Hey there! 🐬 I'm Finny, your AI Financial Intelligence copilot. Ask me about your expenses, budgets, or if you can afford a purchase!", false)
+            ChatMessage("You spent 18% less on food deliveries this week compared to last week! Would you like me to lock ₹2,000 into your MacBook Pro Goal?", false)
         )
     }
 
+    val voiceHelper = remember {
+        VoiceInputHelper(
+            context = context,
+            onResult = { text ->
+                inputText = text
+            },
+            onError = { err ->
+                Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+            },
+            onListeningStateChanged = { listening ->
+                isListening = listening
+            }
+        )
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            voiceHelper.startListening()
+        } else {
+            Toast.makeText(context, "Microphone permission needed for voice commands", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val suggestionChips = listOf(
-        "Can I afford ₹1,500 dinner?",
-        "Where am I overspending?",
-        "Show my 50/30/20 balance",
+        "Where did my money go?",
+        "Can I afford dinner tonight?",
+        "Suggest budget cuts",
         "Find micro-spending leaks"
     )
 
@@ -68,10 +111,10 @@ fun FinnyChatScreen(
                     val reply = res.body()!!["response"]?.toString() ?: "I've analyzed your financials! Everything looks within safe thresholds."
                     messages.add(ChatMessage(reply, false))
                 } else {
-                    messages.add(ChatMessage("Based on your recent transactions, you are spending within your safe daily allowance! Keep it up!", false))
+                    messages.add(ChatMessage("Based on your recent transactions, you are spending within your safe daily allowance of ₹1,087/day! Keep it up!", false))
                 }
             } catch (e: Exception) {
-                messages.add(ChatMessage("Your financial pacing is healthy! Let me know if you want to log an expense or check your budget.", false))
+                messages.add(ChatMessage("Your financial pacing is healthy! Let me know if you want to log an expense or simulate a purchase.", false))
             } finally {
                 isLoading = false
                 listState.animateScrollToItem(messages.size - 1)
@@ -84,7 +127,29 @@ fun FinnyChatScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🐬 Finny AI Copilot", fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(NeonCyan.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.SmartToy, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Finny Copilot", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(NeonEmerald)
+                                )
+                            }
+                            Text("Autonomous Portfolio Advisor", color = NeonTeal, fontSize = 10.sp)
+                        }
                     }
                 },
                 navigationIcon = {
@@ -92,10 +157,39 @@ fun FinnyChatScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                actions = {
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .clip(RoundedCornerShape(9999.dp))
+                            .background(SurfaceObsidianElevated)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("NEURAL CORE v4", color = TextTertiary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundPitchBlack)
             )
         },
-        containerColor = BackgroundDark
+        bottomBar = {
+            ObsidianBottomBar(
+                currentTab = NavTab.FINNY_AI,
+                onTabSelected = { tab ->
+                    when (tab) {
+                        NavTab.DASHBOARD -> { onNavigateToDashboard() }
+                        NavTab.QUICK_LOG -> {
+                            if (expenseViewModel != null) {
+                                expenseViewModel.openAddDialog()
+                                showQuickAddDialog = true
+                            }
+                        }
+                        NavTab.SIMULATOR -> { onNavigateToSimulator() }
+                        NavTab.FINNY_AI -> { /* Already on Finny AI */ }
+                    }
+                }
+            )
+        },
+        containerColor = BackgroundPitchBlack
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -106,14 +200,25 @@ fun FinnyChatScreen(
             // Chat Messages List
             LazyColumn(
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 12.dp)
             ) {
                 items(messages) { msg ->
-                    ChatBubble(msg)
+                    ChatBubble(
+                        msg = msg,
+                        onLockGoal = {
+                            messages.add(ChatMessage("Yes, Lock ₹2,000", true))
+                            Toast.makeText(context, "₹2,000 locked into MacBook Pro Goal! 🎯", Toast.LENGTH_SHORT).show()
+                            messages.add(ChatMessage("Done! ₹2,000 has been transferred to your MacBook Pro savings vault. Target completion accelerated by 18 days! 🚀", false))
+                        },
+                        onDismissAction = {
+                            messages.add(ChatMessage("Not right now, thanks.", true))
+                            messages.add(ChatMessage("Understood! Keeping funds liquid in your primary balance.", false))
+                        }
+                    )
                 }
 
                 if (isLoading) {
@@ -122,73 +227,141 @@ fun FinnyChatScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(start = 12.dp, top = 4.dp)
                         ) {
-                            CircularProgressIndicator(color = AccentViolet, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                            CircularProgressIndicator(color = NeonCyan, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Finny is thinking...", color = TextMuted, style = MaterialTheme.typography.labelSmall)
+                            Text("Finny is analyzing ledger...", color = TextTertiary, fontSize = 12.sp)
                         }
                     }
                 }
             }
 
-            // Suggestion Chips
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-            ) {
-                items(suggestionChips) { chip ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(SurfaceCard)
-                            .border(1.dp, BorderDark, RoundedCornerShape(16.dp))
-                            .clickable { sendMessage(chip) }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(chip, fontSize = 11.sp, color = TextSecondary)
+            // Suggested Command Pills
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Text(
+                    "SUGGESTED COMMANDS",
+                    color = TextTertiary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    suggestionChips.forEach { chip ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9999.dp))
+                                .background(SurfaceObsidianElevated)
+                                .border(1.dp, BorderGlass, RoundedCornerShape(9999.dp))
+                                .clickable { sendMessage(chip) }
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Text(chip, fontSize = 12.sp, color = TextSecondary)
+                        }
                     }
                 }
             }
 
-            // Input Bar
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // Interactive AI Input Bar
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                    .padding(bottom = 8.dp)
+                    .clip(RoundedCornerShape(9999.dp))
+                    .background(SurfaceObsidianSubtle)
+                    .border(1.dp, BorderGlass, RoundedCornerShape(9999.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    placeholder = { Text("Ask Finny anything...") },
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryIndigo,
-                        unfocusedBorderColor = BorderDark,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(
-                    onClick = { sendMessage(inputText) },
-                    enabled = inputText.isNotBlank() && !isLoading,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(if (inputText.isNotBlank()) PrimaryIndigo else SurfaceCard)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = "Send", tint = TextPrimary)
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = { inputText = it },
+                        placeholder = { Text("Ask Finny anything...", color = TextTertiary, fontSize = 14.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            cursorColor = NeonEmerald
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    IconButton(
+                        onClick = {
+                            if (isListening) {
+                                voiceHelper.stopListening()
+                            } else {
+                                val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context,
+                                    android.Manifest.permission.RECORD_AUDIO
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                                if (hasPermission) {
+                                    voiceHelper.startListening()
+                                } else {
+                                    audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(if (isListening) AlertCoral.copy(alpha = 0.3f) else SurfaceObsidianElevated)
+                    ) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = "Voice Input",
+                            tint = if (isListening) AlertCoral else TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    IconButton(
+                        onClick = { sendMessage(inputText) },
+                        enabled = inputText.isNotBlank() && !isLoading,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(if (inputText.isNotBlank()) NeonEmerald else SurfaceObsidianElevated)
+                    ) {
+                        Icon(
+                            Icons.Default.ArrowUpward,
+                            contentDescription = "Send",
+                            tint = if (inputText.isNotBlank()) BackgroundPitchBlack else TextTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
     }
+
+    if (showQuickAddDialog && expenseViewModel != null) {
+        QuickAddExpenseDialog(
+            viewModel = expenseViewModel,
+            onDismiss = { showQuickAddDialog = false }
+        )
+    }
 }
 
 @Composable
-fun ChatBubble(msg: ChatMessage) {
+fun ChatBubble(
+    msg: ChatMessage,
+    onLockGoal: () -> Unit = {},
+    onDismissAction: () -> Unit = {}
+) {
     Row(
         horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start,
         modifier = Modifier.fillMaxWidth()
@@ -198,27 +371,55 @@ fun ChatBubble(msg: ChatMessage) {
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(SurfaceCard)
-                    .border(1.dp, AccentViolet, CircleShape),
+                    .background(NeonEmerald.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("🐬", fontSize = 16.sp)
+                Icon(Icons.Default.Bolt, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
         }
 
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = if (msg.isUser) PrimaryIndigo else SurfaceDark,
-            border = if (!msg.isUser) androidx.compose.foundation.BorderStroke(1.dp, BorderDark) else null,
-            modifier = Modifier.widthIn(max = 280.dp)
+            shape = RoundedCornerShape(18.dp),
+            color = if (msg.isUser) SurfaceObsidianHighlight else SurfaceObsidianElevated,
+            border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
+            modifier = Modifier.widthIn(max = 290.dp)
         ) {
-            Text(
-                text = msg.text,
-                color = TextPrimary,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(12.dp)
-            )
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = msg.text,
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp
+                    )
+                )
+
+                if (!msg.isUser && msg.text.contains("MacBook")) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onLockGoal,
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
+                            shape = RoundedCornerShape(9999.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Yes, Lock ₹2,000", color = BackgroundPitchBlack, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = onDismissAction,
+                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceObsidianHighlight),
+                            shape = RoundedCornerShape(9999.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Later", color = TextSecondary, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
         }
     }
 }

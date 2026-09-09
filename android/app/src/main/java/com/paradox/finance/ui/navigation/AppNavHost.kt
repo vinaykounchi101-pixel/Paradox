@@ -43,7 +43,7 @@ fun AppNavHost(
     val expenseRepository = remember { ExpenseRepository(database) }
 
     val authViewModel = remember { AuthViewModel(authRepository, authPreferences) }
-    val dashboardViewModel = remember { DashboardViewModel(authPreferences) }
+    val dashboardViewModel = remember { DashboardViewModel(authPreferences, expenseRepository) }
     val expenseViewModel = remember { ExpenseViewModel(expenseRepository, authPreferences) }
 
     val startDestination = if (authRepository.isLoggedIn()) {
@@ -113,6 +113,7 @@ fun AppNavHost(
             }
             DashboardScreen(
                 viewModel = dashboardViewModel,
+                expenseViewModel = expenseViewModel,
                 onNavigateToExpenses = {
                     navController.navigate(Screen.Expenses.route)
                 },
@@ -155,8 +156,12 @@ fun AppNavHost(
         composable(Screen.Analytics.route) {
             AnalyticsScreen(
                 currencySymbol = currencySymbol,
+                expenseRepository = expenseRepository,
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToExpenses = {
+                    navController.navigate(Screen.Expenses.route)
                 }
             )
         }
@@ -164,7 +169,9 @@ fun AppNavHost(
         composable(Screen.Budget.route) {
             BudgetScreen(
                 currencySymbol = currencySymbol,
+                expenseRepository = expenseRepository,
                 onNavigateBack = {
+                    dashboardViewModel.refreshDashboard()
                     navController.popBackStack()
                 }
             )
@@ -192,6 +199,7 @@ fun AppNavHost(
             ExpenseListScreen(
                 viewModel = expenseViewModel,
                 onNavigateBack = {
+                    dashboardViewModel.refreshDashboard()
                     navController.popBackStack()
                 }
             )
@@ -199,8 +207,17 @@ fun AppNavHost(
 
         composable(Screen.AiCopilot.route) {
             FinnyChatScreen(
+                expenseViewModel = expenseViewModel,
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToDashboard = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                    }
+                },
+                onNavigateToSimulator = {
+                    navController.navigate(Screen.PurchaseSimulator.route)
                 }
             )
         }
@@ -220,8 +237,17 @@ fun AppNavHost(
                 currencySymbol = currencySymbol,
                 currentBuffer = dashState.remainingBudget,
                 dailyAllowance = dashState.safeToSpendDaily,
+                expenseViewModel = expenseViewModel,
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToDashboard = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                    }
+                },
+                onNavigateToAiChat = {
+                    navController.navigate(Screen.AiCopilot.route)
                 },
                 onAddExpense = { amount, desc ->
                     expenseViewModel.openAddDialog()

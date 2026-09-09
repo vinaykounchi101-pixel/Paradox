@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -101,7 +102,7 @@ fun RegisterOtpScreen(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -121,7 +122,7 @@ fun RegisterOtpScreen(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -142,11 +143,11 @@ fun RegisterOtpScreen(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Button(
                         onClick = {
@@ -155,7 +156,7 @@ fun RegisterOtpScreen(
                         },
                         enabled = !state.isLoading,
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(9999.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
@@ -166,6 +167,58 @@ fun RegisterOtpScreen(
                             Text("Send Verification Code", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // OR Divider
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = BorderDark
+                        )
+                        Text(
+                            text = "OR",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextMuted,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = BorderDark
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Google Sign Up Button
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val coroutineScope = rememberCoroutineScope()
+                    var isGoogleLoading by remember { mutableStateOf(false) }
+
+                    com.paradox.finance.ui.components.GoogleSignInButton(
+                        onClick = {
+                            isGoogleLoading = true
+                            coroutineScope.launch {
+                                com.paradox.finance.core.GoogleAuthHelper.signIn(
+                                    context = context,
+                                    onSuccess = { idToken ->
+                                        isGoogleLoading = false
+                                        viewModel.loginWithGoogle(idToken)
+                                    },
+                                    onError = { err ->
+                                        isGoogleLoading = false
+                                        android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                                isGoogleLoading = false
+                            }
+                        },
+                        isLoading = isGoogleLoading,
+                        text = "Sign Up with Google"
+                    )
                 }
             }
 
@@ -191,7 +244,7 @@ fun RegisterOtpScreen(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -245,7 +298,7 @@ fun RegisterOtpScreen(
                         },
                         enabled = !state.isLoading && state.otpCode.length == 6,
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(9999.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
