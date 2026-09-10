@@ -4,12 +4,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.paradox.finance.data.local.dao.BudgetDao
-import com.paradox.finance.data.local.dao.CategoryDao
-import com.paradox.finance.data.local.dao.ExpenseDao
-import com.paradox.finance.data.local.entity.BudgetEntity
-import com.paradox.finance.data.local.entity.CategoryEntity
-import com.paradox.finance.data.local.entity.ExpenseEntity
 
 @Database(
     entities = [ExpenseEntity::class, CategoryEntity::class, BudgetEntity::class],
@@ -17,7 +11,6 @@ import com.paradox.finance.data.local.entity.ExpenseEntity
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
-
     abstract fun expenseDao(): ExpenseDao
     abstract fun categoryDao(): CategoryDao
     abstract fun budgetDao(): BudgetDao
@@ -31,7 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "paradox_local_db"
+                    "paradox_database"
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance

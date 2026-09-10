@@ -4,118 +4,136 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.paradox.finance.ui.theme.*
 
-enum class NavTab {
-    DASHBOARD, QUICK_LOG, SIMULATOR, FINNY_AI
+enum class BottomBarDestination {
+    DASHBOARD,
+    LOG_EXPENSE,
+    SIMULATOR,
+    FINNY_AI
 }
 
 @Composable
 fun ObsidianBottomBar(
-    currentTab: NavTab,
-    onTabSelected: (NavTab) -> Unit,
+    currentDestination: BottomBarDestination,
+    onNavigate: (BottomBarDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(BackgroundPitchBlack)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .shadow(elevation = 24.dp, shape = RoundedCornerShape(9999.dp), ambientColor = Color.Black, spotColor = Color.Black)
                 .clip(RoundedCornerShape(9999.dp))
-                .background(SurfaceObsidianSubtle.copy(alpha = 0.95f))
-                .border(1.dp, BorderGlass, RoundedCornerShape(9999.dp))
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+                .background(GlassSurfaceFloating)
+                .border(1.dp, GlassBorderStroke, RoundedCornerShape(9999.dp))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            NavBarItem(
-                icon = Icons.Default.Dashboard,
-                label = "Dashboard",
-                isSelected = currentTab == NavTab.DASHBOARD,
-                onClick = { onTabSelected(NavTab.DASHBOARD) }
+            // Dashboard
+            BottomNavItem(
+                icon = Icons.Default.GridView,
+                label = "Home",
+                isSelected = currentDestination == BottomBarDestination.DASHBOARD,
+                onClick = { onNavigate(BottomBarDestination.DASHBOARD) }
             )
 
-            NavBarItem(
-                icon = Icons.Default.AddCircle,
-                label = "Quick Log",
-                isSelected = currentTab == NavTab.QUICK_LOG,
-                isHighlight = true,
-                onClick = { onTabSelected(NavTab.QUICK_LOG) }
+            // Center + Log Action
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(listOf(ElectricEmerald, CyanContainer))
+                    )
+                    .clickable { onNavigate(BottomBarDestination.LOG_EXPENSE) },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Quick Log",
+                    tint = PitchBlack,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // Pre-Purchase Simulator
+            BottomNavItem(
+                icon = Icons.Default.Calculate,
+                label = "Simulate",
+                isSelected = currentDestination == BottomBarDestination.SIMULATOR,
+                onClick = { onNavigate(BottomBarDestination.SIMULATOR) }
             )
 
-            NavBarItem(
-                icon = Icons.Default.Sensors,
-                label = "Simulator",
-                isSelected = currentTab == NavTab.SIMULATOR,
-                onClick = { onTabSelected(NavTab.SIMULATOR) }
-            )
-
-            NavBarItem(
+            // Finny AI Copilot
+            BottomNavItem(
                 icon = Icons.Default.AutoAwesome,
-                label = "Finny AI",
-                isSelected = currentTab == NavTab.FINNY_AI,
-                onClick = { onTabSelected(NavTab.FINNY_AI) }
+                label = "Finny",
+                isSelected = currentDestination == BottomBarDestination.FINNY_AI,
+                onClick = { onNavigate(BottomBarDestination.FINNY_AI) }
             )
         }
     }
 }
 
 @Composable
-private fun NavBarItem(
+private fun BottomNavItem(
     icon: ImageVector,
     label: String,
     isSelected: Boolean,
-    isHighlight: Boolean = false,
     onClick: () -> Unit
 ) {
-    val activeColor = if (isHighlight) NeonEmerald else NeonEmerald
-    val inactiveColor = TextTertiary
-
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(9999.dp),
-        color = if (isSelected && !isHighlight) SurfaceObsidianElevated else Color.Transparent,
-        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isSelected || isHighlight) activeColor else inactiveColor,
-                modifier = Modifier.size(22.dp)
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (isSelected) NeonEmerald else MutedOutline,
+            modifier = Modifier.size(22.dp)
+        )
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .size(4.dp)
+                    .clip(CircleShape)
+                    .background(NeonEmerald)
             )
-            Spacer(modifier = Modifier.height(2.dp))
+        } else {
             Text(
                 text = label,
+                color = MutedOutline,
                 fontSize = 10.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected || isHighlight) activeColor else inactiveColor
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
     }

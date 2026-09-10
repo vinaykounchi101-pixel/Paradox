@@ -1,121 +1,162 @@
 package com.paradox.finance.data.repository
 
-import com.paradox.finance.core.Resource
-import com.paradox.finance.data.preferences.AuthPreferences
-import com.paradox.finance.data.remote.ApiClient
-import com.paradox.finance.data.remote.dto.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.paradox.finance.data.api.ApiClient
+import com.paradox.finance.data.api.TokenManager
+import com.paradox.finance.data.models.*
 
-class AuthRepository(private val authPrefs: AuthPreferences) {
+class AuthRepository(private val tokenManager: TokenManager) {
 
-    private val api = ApiClient.getApi()
+    private val api get() = ApiClient.api
 
-    suspend fun login(email: String, password: String): Resource<TokenResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.login(LoginRequest(email = email.trim(), password = password))
+    private fun extractErrorMessage(errorBody: String?, fallback: String): String {
+        if (errorBody.isNullOrBlank()) return fallback
+        return try {
+            val json = org.json.JSONObject(errorBody)
+            if (json.has("error")) {
+                val errObj = json.optJSONObject("error")
+                val msg = errObj?.optString("message")
+                if (!msg.isNullOrBlank()) return msg
+            }
+            if (json.has("detail")) {
+                val detail = json.opt("detail")
+                if (detail is org.json.JSONArray && detail.length() > 0) {
+                    val firstItem = detail.optJSONObject(0)
+                    val msg = firstItem?.optString("msg") ?: firstItem?.optString("message")
+                    if (!msg.isNullOrBlank()) return msg
+                }
+                return detail.toString()
+            }
+            if (json.has("message")) {
+                val msg = json.optString("message")
+                if (!msg.isNullOrBlank()) return msg
+            }
+            fallback
+        } catch (e: Exception) {
+            fallback
+        }
+    }
+
+    suspend fun login(email: String, pass: String): Result<AuthResponse> {
+        return try {
+            val response = api.login(LoginRequest(email.trim(), pass))
             if (response.isSuccessful && response.body() != null) {
-                val token = response.body()!!
-                authPrefs.saveTokens(token.accessToken, token.refreshToken)
-                fetchAndSaveProfile()
-                Resource.Success(token)
+                val body = response.body()!!
+                tokenManager.saveToken(body.accessToken)
+                tokenManager.saveUserId(body.user.id)
+                tokenManager.saveCurrency(body.user.currency)
+                Result.success(body)
             } else {
-                Resource.Error(response.errorBody()?.string() ?: "Invalid credentials", response.code())
+                val errorMsg = extractErrorMessage(response.errorBody()?.string(), "Invalid email or password")
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            Resource.Error(e.localizedMessage ?: "Network connection error")
+            Result.failure(e)
         }
     }
 
-    suspend fun loginWithGoogle(idToken: String): Resource<TokenResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.googleLogin(GoogleLoginRequest(idToken = idToken))
+    suspend fun register(email: String, pass: String, name: String?): Result<AuthResponse> {
+        return try {
+            val response = api.register(RegisterRequest(email.trim(), pass, name?.ifBlank { "User" } ?: "User"))
             if (response.isSuccessful && response.body() != null) {
-                val token = response.body()!!
-                authPrefs.saveTokens(token.accessToken, token.refreshToken)
-                fetchAndSaveProfile()
-                Resource.Success(token)
+                val body = response.body()!!
+                tokenManager.saveToken(body.accessToken)
+                tokenManager.saveUserId(body.user.id)
+                tokenManager.saveCurrency(body.user.currency)
+                Result.success(body)
             } else {
-                Resource.Error(response.errorBody()?.string() ?: "Google login failed", response.code())
+                val errorMsg = extractErrorMessage(response.errorBody()?.string(), "Registration failed")
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            Resource.Error(e.localizedMessage ?: "Network connection error")
+            Result.failure(e)
         }
     }
 
-    suspend fun register(email: String, password: String, fullName: String? = null): Resource<String> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.register(RegisterRequest(email = email.trim(), password = password, fullName = fullName?.trim()))
-            if (response.isSuccessful) {
-                Resource.Success("OTP verification code sent to your email!")
-            } else {
-                Resource.Error(response.errorBody()?.string() ?: "Registration failed", response.code())
-            }
-        } catch (e: Exception) {
-            Resource.Error(e.localizedMessage ?: "Network connection error")
-        }
-    }
-
-    suspend fun verifyOtp(email: String, otpCode: String, password: String, fullName: String? = null): Resource<TokenResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.verifyOtp(VerifyOtpRequest(email = email.trim(), otpCode = otpCode.trim(), password = password, fullName = fullName?.trim()))
+    suspend fun initiateRegistration(email: String): Result<GenericMessageResponse> {
+        return try {
+            val response = api.initiateRegistration(InitiateRegisterRequest(email.trim()))
             if (response.isSuccessful && response.body() != null) {
-                val token = response.body()!!
-                authPrefs.saveTokens(token.accessToken, token.refreshToken)
-                fetchAndSaveProfile()
-                Resource.Success(token)
+                Result.success(response.body()!!)
             } else {
-                Resource.Error(response.errorBody()?.string() ?: "Invalid OTP code", response.code())
+                val errorMsg = extractErrorMessage(response.errorBody()?.string(), "Initiate registration failed")
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            Resource.Error(e.localizedMessage ?: "Network connection error")
+            Result.failure(e)
         }
     }
 
-    suspend fun checkRegisterStatus(email: String): Resource<Boolean> = withContext(Dispatchers.IO) {
-        try {
+    suspend fun verifyOtp(email: String, otp: String, pass: String, name: String?): Result<AuthResponse> {
+        return try {
+            val response = api.verifyOtp(VerifyOtpRequest(email.trim(), otp.trim(), pass, name?.ifBlank { "User" } ?: "User"))
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                tokenManager.saveToken(body.accessToken)
+                tokenManager.saveUserId(body.user.id)
+                tokenManager.saveCurrency(body.user.currency)
+                Result.success(body)
+            } else {
+                val errorMsg = extractErrorMessage(response.errorBody()?.string(), "OTP verification failed")
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun checkRegisterStatus(email: String): Result<RegisterStatusResponse> {
+        return try {
             val response = api.checkRegisterStatus(email.trim())
             if (response.isSuccessful && response.body() != null) {
-                Resource.Success(response.body()!!.isVerified)
+                val body = response.body()!!
+                if (body.isVerified && body.accessToken != null && body.user != null) {
+                    tokenManager.saveToken(body.accessToken)
+                    tokenManager.saveUserId(body.user.id)
+                    tokenManager.saveCurrency(body.user.currency)
+                }
+                Result.success(body)
             } else {
-                Resource.Error("Registration pending")
+                Result.failure(Exception("Status check failed: ${response.message()}"))
             }
         } catch (e: Exception) {
-            Resource.Error(e.localizedMessage ?: "Network error")
+            Result.failure(e)
         }
     }
 
-    suspend fun forgotPassword(email: String): Resource<String> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.forgotPassword(mapOf("email" to email.trim()))
-            if (response.isSuccessful) {
-                Resource.Success("Password reset instructions have been sent to your email.")
-            } else {
-                Resource.Error(response.errorBody()?.string() ?: "Failed to send reset link", response.code())
-            }
-        } catch (e: Exception) {
-            Resource.Error(e.localizedMessage ?: "Network connection error")
-        }
-    }
-
-    suspend fun fetchAndSaveProfile(): Resource<UserResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.getProfile()
+    suspend fun forgotPassword(email: String): Result<GenericMessageResponse> {
+        return try {
+            val response = api.forgotPassword(ForgotPasswordRequest(email.trim()))
             if (response.isSuccessful && response.body() != null) {
-                val user = response.body()!!
-                authPrefs.saveUser(user.email, user.fullName, user.currency)
-                Resource.Success(user)
+                Result.success(response.body()!!)
             } else {
-                Resource.Error("Failed to load profile")
+                Result.failure(Exception("Password reset request failed: ${response.message()}"))
             }
         } catch (e: Exception) {
-            Resource.Error(e.localizedMessage ?: "Network error")
+            Result.failure(e)
         }
     }
 
-    fun isLoggedIn(): Boolean = !authPrefs.getAccessToken().isNullOrBlank()
+    suspend fun updateCurrency(currency: String): Result<UserDto> {
+        return try {
+            val response = api.updateProfile(UpdateProfileRequest(currency = currency))
+            if (response.isSuccessful && response.body() != null) {
+                tokenManager.saveCurrency(currency)
+                Result.success(response.body()!!)
+            } else {
+                tokenManager.saveCurrency(currency)
+                Result.failure(Exception("Currency sync failed"))
+            }
+        } catch (e: Exception) {
+            tokenManager.saveCurrency(currency)
+            Result.failure(e)
+        }
+    }
+
+    fun isLoggedIn(): Boolean {
+        return !tokenManager.getToken().isNullOrBlank()
+    }
 
     fun logout() {
-        authPrefs.clear()
+        tokenManager.clear()
     }
 }

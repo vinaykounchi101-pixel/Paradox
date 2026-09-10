@@ -116,8 +116,8 @@ HEURISTIC_KEYWORD_MAP = {
         "pastry", "cake", "ice cream", "eats"
     ],
     "Groceries": [
-        "grocery", "groceries", "supermarket", "blinkit", "zepto", "instamart", "bigbasket", "bb daily", "dmart",
-        "kirana", "ration", "fruits", "vegetables", "milk", "bread", "eggs", "veggies", "provisions", "mart",
+        "grocery", "groceries", "supermarket", "hypermarket", "blinkit", "zepto", "instamart", "bigbasket", "bb daily", "dmart",
+        "kirana", "ration", "fruits", "vegetables", "milk", "bread", "eggs", "veggies", "provisions",
         "amul", "mother dairy", "nandini", "gokul", "dahi", "curd", "paneer", "butter", "cheese", "ghee", "atta",
         "flour", "aashirvaad", "rice", "basmati", "daal", "dal", "pulses", "oil", "cooking oil", "fortune", "saffola",
         "salt", "tata salt", "sugar", "spices", "masala", "mdh", "everest", "maggi", "noodles", "yippee", "oats",
@@ -205,7 +205,15 @@ HEURISTIC_KEYWORD_MAP = {
     "Education": [
         "tuition", "course", "udemy", "coursera", "school", "college", "fees", "books", "training", "edx", "skillshare",
         "unacademy", "byjus", "physicswallah", "pw", "allen", "aakash", "school fees", "college fees", "coaching",
-        "exam fees", "textbook", "notebook", "stationery"
+        "exam fees", "textbook", "textbooks", "notebook", "notebooks", "stationery", "stationary", "pen", "pens",
+        "pencil", "pencils", "eraser", "sharpener", "stapler", "staples", "fevicol", "glue", "ruler", "scale",
+        "highlighter", "highlighters", "marker", "markers", "sketch pens", "crayons", "geometry box", "compass",
+        "binder", "binders", "spiral binding", "xerox", "photostat", "printout", "lamination", "chart paper",
+        "a4 paper", "printer paper", "sticky notes", "post-it", "files", "folder", "folders", "calculator",
+        "diary", "planner", "exam pad", "writing pad", "drawing book", "art supplies", "acrylic paint", "canvas",
+        "watercolors", "brushes", "bookstore", "book store", "book depot", "book stall", "crossword",
+        "books & stationery", "books and stationery", "stationery shop", "stationary shop", "stationery mart",
+        "stationary mart", "office supplies", "school supplies"
     ],
     "Investments": [
         "stocks", "mutual fund", "sip", "crypto", "shares", "gold", "fixed deposit", "zerodha", "kite", "groww",
@@ -1345,22 +1353,22 @@ Extract the transaction details from this receipt/bill image:
 - "amount": total final amount paid as numeric decimal/float (e.g. 540.00). Only numbers and dot.
 - "date": transaction date in YYYY-MM-DD format (if missing or cannot read, use {today_iso}).
 - "description": concise merchant/store/service name or main purchase item (max 40 chars, e.g. "Dmart", "Starbucks", "Shell Fuel", "Zomato", "Apollo Pharmacy").
-- "category_name": best matching category from this list: {json.dumps(categories)}, or suggest a clean standard category name (e.g. "Food & Dining", "Groceries", "Shopping", "Bills & Utilities", "Healthcare", "Pets", "Transportation").
+- "category_name": best matching category from this list: {json.dumps(categories)}, or suggest a clean standard category name (e.g. "Food & Dining", "Groceries", "Shopping", "Education", "Bills & Utilities", "Healthcare", "Pets", "Transportation").
 - "payment_method_name": best matching payment method from this list: {json.dumps(payment_methods)}.
 
 Return ONLY a valid raw JSON object with keys: "amount", "date", "description", "category_name", "payment_method_name". No markdown, no commentary."""
 
-                models = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
+                models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-flash-latest", "gemini-2.5-flash"]
                 for model in models:
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
-                    # REST API schema requires inlineData (camelCase) and mimeType
+                    # Support both standard REST schema formats (inline_data and inlineData)
                     payload = {
                         "contents": [{
                             "parts": [
                                 {"text": prompt},
                                 {
-                                    "inlineData": {
-                                        "mimeType": mime_type or "image/jpeg",
+                                    "inline_data": {
+                                        "mime_type": mime_type or "image/jpeg",
                                         "data": base64_img
                                     }
                                 }
@@ -2356,30 +2364,34 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
         self, message: str, history: List[ChatMessage], context: Dict[str, Any]
     ) -> Optional[AIChatResponse]:
         models_to_try = [self.custom_model] if self.custom_model else [
-            "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"
+            "gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"
         ]
 
-        system_instruction = (
-            "You are the Paradox AI Financial Assistant. You are strictly an intelligent, empathetic, "
-            "and concise personal finance copilot for the Paradox expense tracker.\n"
-            "Rules:\n"
-            "1. Ground your answers strictly in the user's live financial data provided below.\n"
-            "2. Never hallucinate transactions not in the data. Do NOT provide legal, tax, or investment advice.\n"
-            "3. Keep answers concise, clear, and encouraging (2 to 4 sentences or clean markdown bullet points).\n"
-            f"User Financial Context: {json.dumps(context)}\n"
-            f"Today's Date: {date.today().isoformat()}\n"
-            "Respond strictly in JSON format with keys: \"reply\" (markdown string) and \"suggested_followups\" (list of 2-3 short questions)."
+        history_text = ""
+        for h in (history or [])[-6:]:
+            role_label = "User" if getattr(h, "role", "user") == "user" else "Assistant (Finny)"
+            history_text += f"{role_label}: {h.content}\n"
+
+        prompt = (
+            "You are Finny, the smart, friendly, empathetic, and witty AI Financial Copilot for the Paradox personal expense tracker.\n\n"
+            "Core Guidelines:\n"
+            "1. Ground all numbers and calculations strictly in the user's live financial data provided below.\n"
+            "2. Never hallucinate fake transactions. Do not give formal investment/tax/legal advice.\n"
+            "3. Language & Tone: Understand and reply naturally in whatever language or dialect the user uses (e.g., English, Minglish/Marathi-English mix, Hinglish, Marathi, Hindi). If the user asks in Minglish/Marathi (e.g. 'kiti kharch zhala', 'aaj kiti kharch karu shakto', 'kasa ahes Finny', 'kahi pan bola tari ekch reply'), reply warmly in friendly Minglish/Marathi!\n"
+            "4. Keep answers engaging, concise (2 to 4 sentences or neat bullet points), and actionable.\n\n"
+            f"User Live Financial Context:\n{json.dumps(context, indent=2)}\n\n"
+            f"Today's Date: {date.today().isoformat()}\n\n"
+            f"Recent Conversation History:\n{history_text if history_text else 'No previous messages.'}\n\n"
+            f"User Current Message: \"{message}\"\n\n"
+            "Respond strictly in valid JSON format with keys:\n"
+            "- \"reply\": (your formatted markdown string response)\n"
+            "- \"suggested_followups\": (array of 2-3 short, highly relevant follow-up questions in the user's language)"
         )
 
-        formatted_contents = [{"parts": [{"text": system_instruction}]}]
-        for h in history[-4:]:
-            formatted_contents.append({"parts": [{"text": f"{h.role.title()}: {h.content}"}]})
-        formatted_contents.append({"parts": [{"text": f"User: {message}"}]})
-
         payload = {
-            "contents": formatted_contents,
+            "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "temperature": 0.3,
+                "temperature": 0.4,
                 "responseMimeType": "application/json",
             },
         }
@@ -2387,18 +2399,18 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
         for model in models_to_try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
             try:
-                async with httpx.AsyncClient(timeout=12.0) as client:
+                async with httpx.AsyncClient(timeout=15.0) as client:
                     resp = await client.post(url, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
-                        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                        raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                         parsed = json.loads(raw_text)
                         return AIChatResponse(
                             reply=parsed.get("reply", "I analyzed your financial records."),
                             suggested_followups=parsed.get("suggested_followups", [
-                                "How much did I spend this week?",
+                                "How much can I safely spend today?",
                                 "What is my biggest expense category?",
-                                "Can I afford dinner tonight?",
+                                "Give me a savings tip",
                             ]),
                             provider_used="gemini",
                         )
@@ -2503,10 +2515,19 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
         spent = context.get("current_month_spent", "0.00")
         budget = context.get("budget_limit")
         safe_daily = context.get("safe_daily_spend", "0.00")
+        burn_rate = context.get("burn_rate", "0.00")
         top_cats = context.get("top_categories", [])
+        recent_txs = context.get("recent_transactions", [])
+        days_rem = context.get("days_remaining", 15)
 
-        # 1. "Can I afford" queries
-        if any(w in msg for w in ["afford", "can i spend", "buy"]):
+        # Detect Minglish / Marathi intent
+        is_marathi_intent = any(w in msg for w in [
+            "kiti", "kharch", "kuthe", "ghevu", "gheu", "parvadel", "chalel", "aaj", "sang", "kasa",
+            "kashi", "bol", "shakto", "paisa", "paise", "zhala", "jast", "shillak", "bachat", "kahi pan", "ekch"
+        ])
+
+        # 1. "Can I afford" / purchase simulation queries
+        if any(w in msg for w in ["afford", "can i spend", "buy", "ghevu", "gheu", "kharedi", "parvadel", "chalel ka", "ghevu ka", "kharch karu ka"]):
             nums = re.findall(r"\d+(?:\.\d{1,2})?", msg)
             if nums:
                 amt = Decimal(nums[0])
@@ -2514,82 +2535,126 @@ Return ONLY a valid raw JSON object with keys: "amount", "date", "description", 
                 if budget:
                     rem = Decimal(str(budget)) - Decimal(str(spent))
                     if amt > rem:
-                        reply = (
-                            f"⚠️ **Not Recommended**: Spending **{amt}** will exceed your remaining period budget "
-                            f"of **{rem}**. Consider holding off or trimming other discretionary categories first."
-                        )
+                        if is_marathi_intent:
+                            reply = f"⚠️ **Thamb! Parvadnar Nahi**: **{amt}** kharch kela tar tumcha remaining budget (**{rem}**) cross hoil. Ha kharch pudhe dhaka kiwa dusre kharch kami kara!"
+                        else:
+                            reply = f"⚠️ **Not Recommended**: Spending **{amt}** will exceed your remaining period budget of **{rem}**. Consider holding off or trimming other discretionary categories first."
                     elif amt > (safe_d * Decimal("2.0")):
-                        reply = (
-                            f"⚡ **Proceed with Caution**: **{amt}** is within your remaining budget ({rem}), but "
-                            f"is more than double your safe daily pace (**{safe_daily}**/day). You'll need to pace lighter over the next few days."
-                        )
+                        if is_marathi_intent:
+                            reply = f"⚡ **Savadh Raha (Caution)**: **{amt}** tumchya budget madhe baste, pan daily safe pace (**{safe_daily}**/day) peksha double aahe. Pudhche kahi divas sambhalun kharch kara!"
+                        else:
+                            reply = f"⚡ **Proceed with Caution**: **{amt}** is within your remaining budget ({rem}), but is more than double your safe daily pace (**{safe_daily}**/day). You'll need to pace lighter over the next few days."
                     else:
-                        reply = (
-                            f"✅ **Safe to Spend**: **{amt}** fits comfortably within your current daily allowance of "
-                            f"**{safe_daily}**/day and remaining budget ({rem})."
-                        )
+                        if is_marathi_intent:
+                            reply = f"✅ **Bindass Ghevu Shakta!**: **{amt}** tumchya daily allowance (**{safe_daily}**/day) ani budget madhe mast fit baste!"
+                        else:
+                            reply = f"✅ **Safe to Spend**: **{amt}** fits comfortably within your current daily allowance of **{safe_daily}**/day and remaining budget ({rem})."
                 else:
-                    reply = (
-                        f"You have spent **{spent}** so far this month with a daily pace of **{safe_daily}**/day. "
-                        f"Since no budget limit is set, spending **{amt}** is feasible, but setting a monthly target helps track surplus!"
-                    )
+                    if is_marathi_intent:
+                        reply = f"Aata paryant **{spent}** kharch zhala aahe, daily speed **{safe_daily}**/day aahe. **{amt}** cha kharch karu shakta, pan ek monthly budget target set kara jyamule bachat hoil!"
+                    else:
+                        reply = f"You have spent **{spent}** so far this month with a daily pace of **{safe_daily}**/day. Since no budget limit is set, spending **{amt}** is feasible, but setting a monthly target helps track surplus!"
             else:
-                reply = (
-                    f"To simulate a purchase, tell me the amount (e.g. *'Can I afford 1500 for shoes?'*). "
-                    f"Your current daily safe-to-spend allowance is **{safe_daily}**."
-                )
+                if is_marathi_intent:
+                    reply = f"Kharch check karaycha asel tar amount sanga (udaharanaarth: *'1500 che shoes ghevu ka?'*). Tumcha daily safe limit **{safe_daily}** aahe."
+                else:
+                    reply = f"To simulate a purchase, tell me the amount (e.g. *'Can I afford 1500 for shoes?'*). Your current daily safe-to-spend allowance is **{safe_daily}**."
             return AIChatResponse(
                 reply=reply,
-                suggested_followups=["What is my safe daily limit?", "Show my top spending categories", "How much have I spent this month?"],
+                suggested_followups=["Aata paryant kiti kharch zhala?", "Top spending categories dakhva", "Safe daily limit kiti aahe?"],
                 provider_used="heuristic",
             )
 
-        # 2. Spending inquiry
-        if any(w in msg for w in ["how much", "total spent", "my spending", "spent so far"]):
-            reply = f"📊 You have spent **{spent}** so far this period."
-            if budget:
-                rem = Decimal(str(budget)) - Decimal(str(spent))
-                pct = int((Decimal(str(spent)) / Decimal(str(budget))) * 100) if Decimal(str(budget)) > 0 else 0
-                reply += f" That's **{pct}%** of your **{budget}** budget, leaving **{rem}** remaining."
+        # 2. Spending inquiry / "Kiti kharch zhala"
+        if any(w in msg for w in ["how much", "total spent", "my spending", "spent so far", "kiti kharch", "kiti spent", "kiti paisa", "kitna kharch"]):
+            if is_marathi_intent:
+                reply = f"📊 Aata paryant ya mahinyat tumcha total **{spent}** kharch zhala aahe."
+                if budget:
+                    rem = Decimal(str(budget)) - Decimal(str(spent))
+                    pct = int((Decimal(str(spent)) / Decimal(str(budget))) * 100) if Decimal(str(budget)) > 0 else 0
+                    reply += f" He tumchya **{budget}** budget chya **{pct}%** aahe, ani **{rem}** shillak aahe."
+            else:
+                reply = f"📊 You have spent **{spent}** so far this period."
+                if budget:
+                    rem = Decimal(str(budget)) - Decimal(str(spent))
+                    pct = int((Decimal(str(spent)) / Decimal(str(budget))) * 100) if Decimal(str(budget)) > 0 else 0
+                    reply += f" That's **{pct}%** of your **{budget}** budget, leaving **{rem}** remaining."
             return AIChatResponse(
                 reply=reply,
-                suggested_followups=["What is my daily burn rate?", "Where did most of my money go?", "Can I afford dinner tonight?"],
+                suggested_followups=["Saglyat jast kharch kuthe zhala?", "Daily limit kiti aahe?", "Can I afford dinner tonight?"],
                 provider_used="heuristic",
             )
 
-        # 3. Top categories inquiry
-        if any(w in msg for w in ["category", "categories", "where", "biggest", "highest", "most"]):
+        # 3. Top categories inquiry / "Kuthe kharch zhala"
+        if any(w in msg for w in ["category", "categories", "where", "biggest", "highest", "most", "kuthe", "kashavar", "saglyat jast", "jast kharch"]):
             if top_cats:
                 cat_lines = [f"- **{c.get('name', 'Category')}**: {c.get('amount', '0.00')} ({c.get('percentage', 0)}%)" for c in top_cats[:3]]
-                reply = "🏆 **Your top spending categories this month:**\n" + "\n".join(cat_lines)
+                if is_marathi_intent:
+                    reply = "🏆 **Tumche top spending categories ya mahinyat:**\n" + "\n".join(cat_lines)
+                else:
+                    reply = "🏆 **Your top spending categories this month:**\n" + "\n".join(cat_lines)
             else:
-                reply = "You don't have enough recorded transactions yet to establish top category rankings."
+                reply = "Ajunch transactions record kelele nahit. Thode kharch log kara mhanje exact breakdown disel!"
             return AIChatResponse(
                 reply=reply,
-                suggested_followups=["How can I optimize these categories?", "Suggest a budget plan", "Check for spending leaks"],
+                suggested_followups=["Bachat kashi karu?", "Daily allowance kiti aahe?", "Suggest budget cuts"],
                 provider_used="heuristic",
             )
 
-        # 4. Daily safe spend inquiry
-        if any(w in msg for w in ["safe", "burn rate", "daily", "allowance", "pace"]):
-            reply = f"🔥 Your calculated safe daily spending allowance is **{safe_daily}**/day to finish comfortably within budget."
+        # 4. Daily safe spend inquiry / "Aaj kiti kharch karu shakto"
+        if any(w in msg for w in ["safe", "burn rate", "daily", "allowance", "pace", "aaj", "darroj", "limit", "aaj kiti"]):
+            if is_marathi_intent:
+                reply = f"🔥 Tumcha calculated safe daily spending allowance **{safe_daily}**/day aahe. Pacing speed: **{burn_rate}**/day."
+            else:
+                reply = f"🔥 Your calculated safe daily spending allowance is **{safe_daily}**/day to finish comfortably within budget (Current pace: **{burn_rate}**/day)."
             return AIChatResponse(
                 reply=reply,
-                suggested_followups=["Can I afford 1000 today?", "What is my total spent?", "How are my streaks?"],
+                suggested_followups=["Aata paryant kiti kharch zhala?", "Can I afford 500 today?", "Top spending categories"],
                 provider_used="heuristic",
             )
 
-        # 5. Greeting / Help
+        # 5. Recent transactions
+        if any(w in msg for w in ["recent", "shevatche", "last", "latest", "transactions"]):
+            if recent_txs:
+                tx_lines = [f"- **{t.get('desc', 'Expense')}**: {t.get('amount', '0.00')} ({t.get('date', '')})" for t in recent_txs[:4]]
+                reply = "📝 **Recent recorded expenses:**\n" + "\n".join(tx_lines)
+            else:
+                reply = "Ajunch kahi transactions nahit."
+            return AIChatResponse(
+                reply=reply,
+                suggested_followups=["Kiti kharch zhala?", "Daily limit kiti aahe?"],
+                provider_used="heuristic",
+            )
+
+        # 6. Conversational / Minglish / Greetings / Generic talk
+        if is_marathi_intent or any(w in msg for w in ["hi", "hello", "hey", "kasa", "kashi", "bol", "sang", "kahi pan", "whats up"]):
+            reply = (
+                f"👋 Namaskar! Me Finny, tumcha AI Financial Copilot. Aata paryant tumcha **{spent}** kharch zhala aahe "
+                f"ani tumchi safe daily allowance **{safe_daily}**/day aahe (pudhche {days_rem} divas shillak aahet). "
+                f"Konta kharch check karaycha aahe ka?"
+            )
+            return AIChatResponse(
+                reply=reply,
+                suggested_followups=[
+                    "Aata paryant kiti kharch zhala?",
+                    "Saglyat jast kharch kashavar zhala?",
+                    "Aaj 1000 kharch karu shakto ka?",
+                ],
+                provider_used="heuristic",
+            )
+
+        # 7. Default Dynamic Financial Assistant Overview
         reply = (
-            f"👋 Hello! I'm your Paradox Financial Assistant. You have spent **{spent}** this period "
-            f"with a safe allowance of **{safe_daily}**/day. What would you like to check or simulate?"
+            f"👋 Hello! I'm Finny, your Paradox Financial Copilot. You have spent **{spent}** this period "
+            f"with a safe allowance of **{safe_daily}**/day ({days_rem} days remaining in cycle). "
+            f"Ask me anything about your spending, affordability simulations, or category leaks!"
         )
         return AIChatResponse(
             reply=reply,
             suggested_followups=[
+                "Where did most of my money go?",
                 "Can I afford a 2500 purchase?",
-                "What are my biggest expenses?",
-                "Give me a savings plan",
+                "How much have I spent so far?",
             ],
             provider_used="heuristic",
         )

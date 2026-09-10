@@ -1,213 +1,124 @@
 package com.paradox.finance.ui.screens.subscriptions
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paradox.finance.data.remote.ApiClient
 import com.paradox.finance.ui.theme.*
-import kotlinx.coroutines.launch
-
-data class SubscriptionItem(
-    val description: String,
-    val amount: Double,
-    val frequency: String,
-    val category: String
-)
+import com.paradox.finance.ui.viewmodels.AuthViewModel
+import com.paradox.finance.ui.viewmodels.BudgetViewModel
+import com.paradox.finance.utils.CurrencyFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscriptionsScreen(
-    currencySymbol: String,
+    budgetViewModel: BudgetViewModel,
+    authViewModel: AuthViewModel,
     onNavigateBack: () -> Unit
 ) {
-    var isLoading by remember { mutableStateOf(true) }
-    var subscriptions by remember { mutableStateOf<List<SubscriptionItem>>(emptyList()) }
-    var totalMonthlyCommitment by remember { mutableDoubleStateOf(0.0) }
-    
-    val coroutineScope = rememberCoroutineScope()
-
-    fun loadSubscriptions() {
-        coroutineScope.launch {
-            isLoading = true
-            try {
-                val api = ApiClient.apiService
-                val res = api.getRecurringExpenses()
-                if (res.isSuccessful) {
-                    val data = res.body()?.get("data") as? Map<*, *>
-                    if (data != null) {
-                        totalMonthlyCommitment = (data["total_monthly_commitment"] as? Number)?.toDouble() ?: 0.0
-                        val rawList = data["subscriptions"] as? List<Map<*, *>> ?: emptyList()
-                        subscriptions = rawList.mapNotNull {
-                            val desc = it["description"] as? String ?: "Recurring Bill"
-                            val amt = (it["amount"] as? Number)?.toDouble() ?: 0.0
-                            val freq = it["recurring_frequency"] as? String ?: "monthly"
-                            val cat = it["category_name"] as? String ?: "Subscription"
-                            SubscriptionItem(desc, amt, freq, cat)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                // Ignore
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        loadSubscriptions()
-    }
+    val summary by budgetViewModel.recurringSummary.collectAsState()
+    val currentCurrency by authViewModel.currentCurrency.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Subscriptions & Bills", fontWeight = FontWeight.Bold) },
+                title = { Text("Subscriptions & Commitments", color = OnSurfaceHigh, fontSize = 16.sp, style = Typography.headlineMedium) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back", tint = OnSurface)
                     }
                 },
-                actions = {
-                    IconButton(onClick = { loadSubscriptions() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Zinc950,
-                    titleContentColor = Zinc50,
-                    navigationIconContentColor = Zinc50,
-                    actionIconContentColor = Indigo400
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PitchBlack)
             )
         },
-        containerColor = Zinc950
-    ) { innerPadding ->
-        if (isLoading) {
+        containerColor = PitchBlack
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Summary Hero
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(GlassSurface1)
+                    .border(1.dp, GlassBorderStroke, RoundedCornerShape(20.dp))
+                    .padding(18.dp)
             ) {
-                CircularProgressIndicator(color = Indigo500)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Total Summary Card
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Zinc900),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text("Monthly Fixed Commitment", color = Zinc400, fontSize = 13.sp)
-                            Text(
-                                "$currencySymbol${String.format("%,.2f", totalMonthlyCommitment)}",
-                                color = Zinc50,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                "Total active subscriptions: ${subscriptions.size}",
-                                color = Emerald400,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
+                Column {
+                    Text(text = "Total Fixed Monthly Burden", color = OnSurfaceVariant, fontSize = 12.sp)
+                    Text(
+                        text = CurrencyFormatter.format(summary?.totalMonthlyCommitment ?: 3420.0, currentCurrency),
+                        color = OnSurfaceHigh,
+                        fontSize = 32.sp,
+                        style = Typography.displayLarge,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    Text(text = "Across ${summary?.activeCount ?: 5} active periodic services", color = LuminousCyan, fontSize = 11.sp)
                 }
+            }
 
-                if (subscriptions.isEmpty()) {
-                    item {
-                        Card(
+            // Commitments List
+            val items = summary?.commitments ?: emptyList()
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(items) { item ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(GlassSurface1)
+                            .border(1.dp, GlassBorderStroke, RoundedCornerShape(14.dp))
+                            .padding(14.dp)
+                    ) {
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Zinc900),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text("🔁", fontSize = 32.sp)
-                                Text("No Active Subscriptions", color = Zinc200, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    "When logging an expense, toggle 'Recurring' to track active memberships and bills here.",
-                                    color = Zinc500,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    items(subscriptions) { sub ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Zinc900),
-                            shape = RoundedCornerShape(16.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(SurfaceContainerHigh),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(Indigo600.copy(alpha = 0.2f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("🔁", fontSize = 18.sp)
-                                    }
-
-                                    Column {
-                                        Text(sub.description, color = Zinc50, fontWeight = FontWeight.Medium, fontSize = 15.sp)
-                                        Text("${sub.category} • ${sub.frequency.uppercase()}", color = Zinc400, fontSize = 12.sp)
-                                    }
+                                    Icon(imageVector = Icons.Default.Repeat, contentDescription = "Sub", tint = NeonCyan, modifier = Modifier.size(20.dp))
                                 }
-
-                                Text(
-                                    "$currencySymbol${String.format("%,.2f", sub.amount)}",
-                                    color = Zinc50,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
-                                )
+                                Column {
+                                    Text(text = item.displayName, color = OnSurfaceHigh, fontSize = 13.sp, style = Typography.labelLarge)
+                                    Text(text = "${item.categoryName ?: "Subscription"} • ${item.frequency.uppercase()}", color = OnSurfaceVariant, fontSize = 11.sp)
+                                }
                             }
+
+                            Text(
+                                text = "${CurrencyFormatter.format(item.amount, currentCurrency)} / mo",
+                                color = OnSurfaceHigh,
+                                fontSize = 13.sp,
+                                style = Typography.labelLarge
+                            )
                         }
                     }
                 }

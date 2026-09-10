@@ -1,10 +1,8 @@
 package com.paradox.finance.ui.screens.dashboard
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -19,651 +17,494 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paradox.finance.core.Constants
-import com.paradox.finance.ui.components.NavTab
-import com.paradox.finance.ui.components.ObsidianBottomBar
-import com.paradox.finance.ui.components.TrendGraphView
-import com.paradox.finance.ui.components.TrendPoint
-import com.paradox.finance.ui.screens.expenses.ExpenseViewModel
-import com.paradox.finance.ui.screens.expenses.QuickAddExpenseDialog
+import com.paradox.finance.data.models.ExpenseDto
+import com.paradox.finance.ui.components.*
+import com.paradox.finance.ui.dialogs.*
 import com.paradox.finance.ui.theme.*
+import com.paradox.finance.ui.viewmodels.AiViewModel
+import com.paradox.finance.ui.viewmodels.AuthViewModel
+import com.paradox.finance.ui.viewmodels.DashboardViewModel
+import com.paradox.finance.ui.viewmodels.ExpenseViewModel
+import com.paradox.finance.utils.CurrencyFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    viewModel: DashboardViewModel,
-    expenseViewModel: ExpenseViewModel? = null,
+    dashboardViewModel: DashboardViewModel,
+    expenseViewModel: ExpenseViewModel,
+    aiViewModel: AiViewModel,
+    authViewModel: AuthViewModel,
     onNavigateToExpenses: () -> Unit,
-    onNavigateToAiChat: () -> Unit,
-    onNavigateToLeakHunter: () -> Unit,
-    onNavigateToSimulator: () -> Unit,
-    onNavigateToWrapped: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToBudget: () -> Unit,
-    onNavigateToSubscriptions: () -> Unit,
-    onNavigateToGoals: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onLogout: () -> Unit
+    onNavigateToFinnyChat: () -> Unit,
+    onSignOut: () -> Unit
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val expState by expenseViewModel?.uiState?.collectAsState() ?: remember { mutableStateOf(null) }
-    val currencySymbol = Constants.CURRENCY_SYMBOLS[state.currency] ?: "₹"
-    
-    var isBalanceHidden by remember { mutableStateOf(false) }
-    var showQuickAddDialog by remember { mutableStateOf(false) }
-    var selectedVelocityFilter by remember { mutableStateOf("All") }
+    val uiState by dashboardViewModel.uiState.collectAsState()
+    val expenses by expenseViewModel.expenses.collectAsState()
+    val currentCurrency by authViewModel.currentCurrency.collectAsState()
 
-    // Auto-refresh when Dashboard is displayed
-    LaunchedEffect(Unit) {
-        viewModel.refreshDashboard()
-        expenseViewModel?.loadData()
-    }
+    var showQuickAddDialog by remember { mutableStateOf(false) }
+    var showSimulatorDialog by remember { mutableStateOf(false) }
+    var showLeakHunterDialog by remember { mutableStateOf(false) }
+    var showWrappedModal by remember { mutableStateOf(false) }
+    var showCurrencyMenu by remember { mutableStateOf(false) }
+    var showProfileDialog by remember { mutableStateOf(false) }
+    var selectedExpenseToEdit by remember { mutableStateOf<ExpenseDto?>(null) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Left Emblem + Vault Alpha
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { viewModel.refreshDashboard() }
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Brush.linearGradient(listOf(NeonEmerald, NeonTeal))),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("P", fontSize = 18.sp, fontWeight = FontWeight.Black, color = BackgroundPitchBlack)
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    "PARADOX",
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 17.sp,
-                                    letterSpacing = 1.5.sp
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(5.dp)
-                                            .clip(CircleShape)
-                                            .background(NeonEmerald)
-                                    )
-                                    Spacer(modifier = Modifier.width(5.dp))
-                                    Text(
-                                        "256-BIT • VAULT ALPHA",
-                                        color = NeonTeal,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.sp
-                                    )
-                                }
-                            }
-                        }
-
-                        // Right Enclave Tier & Avatar
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(9999.dp))
-                                .clickable { onNavigateToSettings() }
-                                .padding(start = 6.dp)
-                        ) {
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("ENCLAVE", color = TextTertiary, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                Text(state.userName.ifBlank { "Tier Alpha" }, color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(NeonEmerald),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    state.userName.firstOrNull()?.uppercase() ?: "P",
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 16.sp,
-                                    color = BackgroundPitchBlack
-                                )
-                            }
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundPitchBlack)
-            )
-        },
         bottomBar = {
             ObsidianBottomBar(
-                currentTab = NavTab.DASHBOARD,
-                onTabSelected = { tab ->
-                    when (tab) {
-                        NavTab.DASHBOARD -> { viewModel.refreshDashboard() }
-                        NavTab.QUICK_LOG -> {
-                            if (expenseViewModel != null) {
-                                expenseViewModel.openAddDialog()
-                                showQuickAddDialog = true
-                            } else {
-                                onNavigateToExpenses()
-                            }
-                        }
-                        NavTab.SIMULATOR -> { onNavigateToSimulator() }
-                        NavTab.FINNY_AI -> { onNavigateToAiChat() }
+                currentDestination = BottomBarDestination.DASHBOARD,
+                onNavigate = { dest ->
+                    when (dest) {
+                        BottomBarDestination.DASHBOARD -> {}
+                        BottomBarDestination.LOG_EXPENSE -> showQuickAddDialog = true
+                        BottomBarDestination.SIMULATOR -> showSimulatorDialog = true
+                        BottomBarDestination.FINNY_AI -> onNavigateToFinnyChat()
                     }
                 }
             )
         },
-        containerColor = BackgroundPitchBlack
+        containerColor = PitchBlack
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Net Worth Hero Card (Stitch Screen 1)
-            Card(
+            // Top Bar
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceObsidianBase),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                // Logo & Wordmark
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Brush.linearGradient(listOf(ElectricEmerald, CyanContainer))),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { isBalanceHidden = !isBalanceHidden }
-                                .padding(2.dp)
-                        ) {
-                            Text(
-                                "TOTAL NET WORTH",
-                                color = TextTertiary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(
-                                imageVector = if (isBalanceHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = "Toggle Balance",
-                                tint = TextTertiary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        Text(text = "P", color = PitchBlack, fontSize = 18.sp, style = Typography.labelLarge)
+                    }
+                    Text(text = "PARADOX", color = OnSurfaceHigh, fontSize = 16.sp, style = Typography.headlineMedium)
+                }
 
+                // Controls: Currency Pill & Profile
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Currency Pill
+                    Box {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(9999.dp))
-                                .background(NeonEmerald.copy(alpha = 0.15f))
-                                .clickable { onNavigateToBudget() }
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .background(GlassSurface2)
+                                .border(1.dp, GlassBorderStroke, RoundedCornerShape(9999.dp))
+                                .clickable { showCurrencyMenu = true }
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                "+$currencySymbol 12,450 (+4.8%)",
-                                color = NeonEmerald,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "${CurrencyFormatter.getSymbol(currentCurrency)} $currentCurrency",
+                                color = ElectricEmerald,
+                                fontSize = 11.sp,
+                                style = Typography.labelSmall
                             )
+                        }
+
+                        DropdownMenu(
+                            expanded = showCurrencyMenu,
+                            onDismissRequest = { showCurrencyMenu = false },
+                            modifier = Modifier.background(SurfaceContainerHigh)
+                        ) {
+                            listOf("INR", "USD", "EUR", "GBP").forEach { curr ->
+                                DropdownMenuItem(
+                                    text = { Text("${CurrencyFormatter.getSymbol(curr)} $curr", color = OnSurface) },
+                                    onClick = {
+                                        authViewModel.setCurrency(curr)
+                                        showCurrencyMenu = false
+                                    }
+                                )
+                            }
                         }
                     }
 
-                    // Balance Numeric Readout
-                    val displayNetWorth = if (state.totalBudget > 0) state.totalBudget - state.totalSpent else 248500.0
-                    Text(
-                        text = if (isBalanceHidden) "••••••••" else "$currencySymbol${String.format("%,.2f", displayNetWorth)}",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        letterSpacing = (-0.5).sp
-                    )
+                    // Notification Bell (Wrapped trigger)
+                    IconButton(onClick = { showWrappedModal = true }) {
+                        Icon(imageVector = Icons.Default.Notifications, contentDescription = "Alerts", tint = OnSurfaceVariant)
+                    }
 
-                    // 50/30/20 Pacing Tracker Sub-bar
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToBudget() },
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("50/30/20 Pacing", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Needs 48% • Wants 28% • Savings 24%", color = TextTertiary, fontSize = 10.sp)
-                        }
-                        Row(
+                    // Profile / Sign Out
+                    IconButton(onClick = { showProfileDialog = true }) {
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(9999.dp))
-                                .background(SurfaceObsidianSubtle),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(GlassSurface2)
+                                .border(1.dp, ElectricEmerald.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(modifier = Modifier.weight(0.48f).fillMaxHeight().background(NeedsColor))
-                            Box(modifier = Modifier.weight(0.28f).fillMaxHeight().background(WantsColor))
-                            Box(modifier = Modifier.weight(0.24f).fillMaxHeight().background(SavingsColor))
+                            Icon(imageVector = Icons.Default.Person, contentDescription = "Profile", tint = ElectricEmerald, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
             }
 
-            // 2. Monthly Spend Cap Micro-Tracker Card
-            Card(
+            // Total Net Worth Hero Card
+            val totalBal = uiState.summary?.totalBalance ?: 842650.0
+            val monthSpend = uiState.summary?.monthSpend ?: 54210.0
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onNavigateToBudget() },
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceObsidianBase),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(GlassSurface2, GlassSurface1)
+                        )
+                    )
+                    .border(1.dp, GlassBorderActive, RoundedCornerShape(20.dp))
+                    .padding(18.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "MONTHLY SPEND CAP",
-                            color = TextTertiary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                        val spent = if (state.totalSpent > 0) state.totalSpent else 13800.0
-                        val limit = if (state.totalBudget > 0) state.totalBudget else 50000.0
-                        Text(
-                            "$currencySymbol${String.format("%,.0f", spent)} spent of $currencySymbol${String.format("%,.0f", limit)}",
-                            color = TextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Text(text = "Total Net Worth", color = OnSurfaceVariant, fontSize = 12.sp)
+                        IconButton(onClick = { dashboardViewModel.toggleBalanceVisibility() }) {
+                            Icon(
+                                imageVector = if (uiState.isBalanceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle",
+                                tint = MutedOutline,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
 
-                    val spent = if (state.totalSpent > 0) state.totalSpent else 13800.0
-                    val limit = if (state.totalBudget > 0) state.totalBudget else 50000.0
-                    val progress = (spent / limit).toFloat().coerceIn(0f, 1f)
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(9999.dp))
-                            .background(SurfaceObsidianSubtle)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(progress)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(9999.dp))
-                                .background(Brush.horizontalGradient(listOf(NeonEmerald, NeonTeal)))
-                        )
-                    }
+                    Text(
+                        text = if (uiState.isBalanceVisible) CurrencyFormatter.format(totalBal, currentCurrency) else "••••••••",
+                        color = OnSurfaceHigh,
+                        fontSize = 32.sp,
+                        style = Typography.displayLarge
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        val remaining = if (state.remainingBudget > 0) state.remainingBudget else (limit - spent).coerceAtLeast(0.0)
                         Text(
-                            "$currencySymbol${String.format("%,.0f", remaining)} remaining",
-                            color = NeonEmerald,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "This Month Outflow: ${CurrencyFormatter.format(monthSpend, currentCurrency)}",
+                            color = AlertCoral,
+                            fontSize = 11.sp
                         )
-                        val safeBurn = if (state.safeToSpendDaily > 0) state.safeToSpendDaily else 1087.0
-                        Text(
-                            "$currencySymbol${String.format("%,.0f", safeBurn)}/day Safe Burn",
-                            color = NeonTeal,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text(text = "Velocity: -8.4% vs last cycle", color = ElectricEmerald, fontSize = 11.sp)
+                    }
+
+                    // 50/30/20 Segmented Progress Bar
+                    FiftyThirtyTwentyBar(
+                        needsPct = uiState.fiftyThirtyTwenty?.needsPercentage ?: 50.0,
+                        wantsPct = uiState.fiftyThirtyTwenty?.wantsPercentage ?: 30.0,
+                        savingsPct = uiState.fiftyThirtyTwenty?.savingsPercentage ?: 20.0,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+
+            // Safe-to-Spend Speedometer & Gauge
+            SafeToSpendGauge(
+                dailyAllowance = uiState.safeToSpend?.safeDailySpend ?: 2450.0,
+                pacingStatus = uiState.safeToSpend?.pacingStatus ?: "Optimal",
+                daysLeft = uiState.safeToSpend?.daysLeft ?: 12,
+                currency = currentCurrency
+            )
+
+            // Finny Mascot Companion Card
+            FinnyMascotView(
+                mood = uiState.finnyVibe?.mood ?: "JOYFUL",
+                speechText = uiState.finnyVibe?.roastOrPraise ?: "Great pacing, Vikram! Your recurring subscriptions are down 14% this week. Tap to simulate weekend plans.",
+                onClick = onNavigateToFinnyChat
+            )
+
+            // 4 Quick Action Monoliths (2x2 Grid)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // + Log Expense Monolith
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.linearGradient(listOf(ElectricEmerald.copy(alpha = 0.25f), GlassSurface1))
+                            )
+                            .border(1.dp, ElectricEmerald.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .clickable { showQuickAddDialog = true }
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            Icon(imageVector = Icons.Default.AddCircle, contentDescription = "Log", tint = ElectricEmerald, modifier = Modifier.size(24.dp))
+                            Text(text = "+ Log Expense", color = OnSurfaceHigh, fontSize = 13.sp, style = Typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                            Text(text = "Instant 0ms Capture", color = OnSurfaceVariant, fontSize = 10.sp)
+                        }
+                    }
+
+                    // Afford? Simulator Monolith
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.linearGradient(listOf(NeonCyan.copy(alpha = 0.20f), GlassSurface1))
+                            )
+                            .border(1.dp, NeonCyan.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                            .clickable { showSimulatorDialog = true }
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            Icon(imageVector = Icons.Default.Calculate, contentDescription = "Simulate", tint = NeonCyan, modifier = Modifier.size(24.dp))
+                            Text(text = "Afford? Check", color = OnSurfaceHigh, fontSize = 13.sp, style = Typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                            Text(text = "Stress Test Purchases", color = OnSurfaceVariant, fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Leaks Audit Monolith
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.linearGradient(listOf(WarningAmber.copy(alpha = 0.20f), GlassSurface1))
+                            )
+                            .border(1.dp, WarningAmber.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                            .clickable { showLeakHunterDialog = true }
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            Icon(imageVector = Icons.Default.Warning, contentDescription = "Leaks", tint = WarningAmber, modifier = Modifier.size(24.dp))
+                            Text(text = "Leaks Audit", color = OnSurfaceHigh, fontSize = 13.sp, style = Typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                            Text(text = "Projected Drain Radar", color = OnSurfaceVariant, fontSize = 10.sp)
+                        }
+                    }
+
+                    // Insights Velocity Monolith
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.linearGradient(listOf(VibrantIndigo.copy(alpha = 0.20f), GlassSurface1))
+                            )
+                            .border(1.dp, VibrantIndigo.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                            .clickable(onClick = onNavigateToAnalytics)
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            Icon(imageVector = Icons.Default.TrendingUp, contentDescription = "Insights", tint = SoftIndigo, modifier = Modifier.size(24.dp))
+                            Text(text = "Insights Velocity", color = OnSurfaceHigh, fontSize = 13.sp, style = Typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                            Text(text = "Category Breakdown", color = OnSurfaceVariant, fontSize = 10.sp)
+                        }
                     }
                 }
             }
 
-            // 3. 4-Column Quick Action Monoliths (Stitch Screen 1)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Spending Velocity Bezier Curve Graph Card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(GlassSurface1)
+                    .border(1.dp, GlassBorderStroke, RoundedCornerShape(16.dp))
+                    .padding(16.dp)
             ) {
-                // Monolith 1: + Log Expense
-                Surface(
-                    onClick = {
-                        if (expenseViewModel != null) {
-                            expenseViewModel.openAddDialog()
-                            showQuickAddDialog = true
-                        } else {
-                            onNavigateToExpenses()
-                        }
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    color = SurfaceObsidianBase,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(NeonEmerald.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.AddCircle, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("+ Log", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("Expense", color = TextTertiary, fontSize = 9.sp)
-                    }
-                }
-
-                // Monolith 2: 🛍️ Simulator
-                Surface(
-                    onClick = { onNavigateToSimulator() },
-                    shape = RoundedCornerShape(16.dp),
-                    color = SurfaceObsidianBase,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(NeonCyan.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Sensors, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("Afford?", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("Simulator", color = TextTertiary, fontSize = 9.sp)
-                    }
-                }
-
-                // Monolith 3: ⚡ Leak Hunter
-                Surface(
-                    onClick = { onNavigateToLeakHunter() },
-                    shape = RoundedCornerShape(16.dp),
-                    color = SurfaceObsidianBase,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(AlertAmber.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Radar, contentDescription = null, tint = AlertAmber, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("Leaks", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("Audit", color = TextTertiary, fontSize = 9.sp)
-                    }
-                }
-
-                // Monolith 4: 📊 Insights
-                Surface(
-                    onClick = { onNavigateToAnalytics() },
-                    shape = RoundedCornerShape(16.dp),
-                    color = SurfaceObsidianBase,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(NeonViolet.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Analytics, contentDescription = null, tint = NeonViolet, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("Insights", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("Velocity", color = TextTertiary, fontSize = 9.sp)
-                    }
-                }
-            }
-
-            // 4. Spending Velocity Curve Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceObsidianBase),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
+                Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text("SPENDING VELOCITY", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                            Text("Safe Pacing (-14% vs avg)", color = NeonEmerald, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        // Filter Pills
+                        Text(text = "Spending Velocity", color = OnSurfaceHigh, fontSize = 14.sp, style = Typography.headlineSmall)
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            listOf("All", "UPI", "Cards", "Cash").forEach { filter ->
-                                val isSelected = selectedVelocityFilter == filter
+                            listOf("All", "UPI", "Cards", "Cash").forEachIndexed { idx, filter ->
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(9999.dp))
-                                        .background(if (isSelected) SurfaceObsidianElevated else SurfaceObsidianSubtle)
-                                        .border(1.dp, if (isSelected) NeonEmerald.copy(alpha = 0.4f) else Color.Transparent, RoundedCornerShape(9999.dp))
-                                        .clickable { selectedVelocityFilter = filter }
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        .background(if (idx == 0) ElectricEmerald.copy(alpha = 0.2f) else Color.Transparent)
+                                        .border(1.dp, if (idx == 0) ElectricEmerald else GlassBorderStroke, RoundedCornerShape(9999.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
-                                    Text(
-                                        filter,
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) NeonEmerald else TextTertiary
-                                    )
+                                    Text(text = filter, color = if (idx == 0) ElectricEmerald else MutedOutline, fontSize = 9.sp)
                                 }
                             }
                         }
                     }
 
-                    val points = remember(state.trendData) {
-                        if (state.trendData.isNotEmpty()) {
-                            state.trendData
-                        } else {
-                            listOf(
-                                TrendPoint("W1", 3400.0),
-                                TrendPoint("W2", 2800.0),
-                                TrendPoint("W3", 4200.0),
-                                TrendPoint("W4", 3400.0)
-                            )
-                        }
-                    }
-
                     TrendGraphView(
-                        data = points,
-                        currencySymbol = currencySymbol,
-                        lineColor = NeonEmerald
+                        dataPoints = expenses.take(10).map { it.amount }.reversed(),
+                        currency = currentCurrency,
+                        modifier = Modifier.padding(top = 12.dp)
                     )
                 }
             }
 
-            // 5. Recent Transactions Ledger Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceObsidianBase),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Recent Activity Ledger
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Recent Outflows", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text(
-                            "View All",
-                            color = NeonEmerald,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable { onNavigateToExpenses() }
-                        )
-                    }
+                    Text(text = "Recent Activity", color = OnSurfaceHigh, fontSize = 14.sp, style = Typography.headlineSmall)
+                    Text(
+                        text = "See All",
+                        color = ElectricEmerald,
+                        fontSize = 12.sp,
+                        style = Typography.labelSmall,
+                        modifier = Modifier.clickable(onClick = onNavigateToExpenses)
+                    )
+                }
 
-                    val liveExpenses = expState?.expenses ?: emptyList()
-                    val filteredExpenses = remember(liveExpenses, selectedVelocityFilter) {
-                        if (selectedVelocityFilter == "All") liveExpenses
-                        else liveExpenses.filter { it.paymentMethodName?.contains(selectedVelocityFilter, ignoreCase = true) == true }
-                    }
-
-                    if (filteredExpenses.isEmpty()) {
-                        // Sample Stitch ledger rows
-                        listOf(
-                            Triple("Swiggy Gourmet", 640.0, "Food • UPI"),
-                            Triple("Uber Premier", 320.0, "Transit • Card"),
-                            Triple("Blue Tokai Coffee", 180.0, "Lifestyle • UPI")
-                        ).forEach { (title, amt, sub) ->
-                            TransactionRow(
-                                title = title,
-                                amount = amt,
-                                subtitle = sub,
-                                currencySymbol = currencySymbol,
-                                onClick = { onNavigateToExpenses() }
-                            )
-                        }
-                    } else {
-                        filteredExpenses.take(5).forEach { exp ->
-                            val sub = "${exp.categoryName ?: "Expense"} • ${exp.paymentMethodName ?: "UPI"}"
-                            TransactionRow(
-                                title = exp.description.ifBlank { "Expense" },
-                                amount = exp.amount,
-                                subtitle = sub,
-                                currencySymbol = currencySymbol,
-                                onClick = {
-                                    expenseViewModel?.openEditDialog(exp)
-                                    showQuickAddDialog = true
+                if (expenses.isEmpty()) {
+                    Text(text = "No expenses recorded yet. Tap '+ Log Expense' to add!", color = MutedOutline, fontSize = 12.sp)
+                } else {
+                    expenses.take(4).forEach { item ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(GlassSurface1)
+                                .border(1.dp, GlassBorderStroke, RoundedCornerShape(12.dp))
+                                .clickable { selectedExpenseToEdit = item }
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(SurfaceContainerHigh),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Receipt, contentDescription = "Receipt", tint = ElectricEmerald, modifier = Modifier.size(18.dp))
+                                    }
+                                    Column {
+                                        Text(text = item.displayDescription, color = OnSurfaceHigh, fontSize = 13.sp, style = Typography.labelLarge)
+                                        Text(text = "${item.category?.displayName ?: "Expense"} • ${item.displayDate}", color = OnSurfaceVariant, fontSize = 11.sp)
+                                    }
                                 }
-                            )
+
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = "-${CurrencyFormatter.format(item.amount, currentCurrency)}",
+                                        color = OnSurfaceHigh,
+                                        fontSize = 13.sp,
+                                        style = Typography.labelLarge
+                                    )
+                                    Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MutedOutline, modifier = Modifier.size(14.dp))
+                                }
+                            }
                         }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(60.dp))
         }
     }
 
-    // Quick Add Expense Dialog (Stitch Frictionless Expense Capture)
-    if (showQuickAddDialog && expenseViewModel != null) {
+    // Dialogs
+    if (showQuickAddDialog || selectedExpenseToEdit != null) {
         QuickAddExpenseDialog(
-            viewModel = expenseViewModel,
+            expenseViewModel = expenseViewModel,
+            existingExpense = selectedExpenseToEdit,
             onDismiss = {
                 showQuickAddDialog = false
-                viewModel.refreshDashboard()
+                selectedExpenseToEdit = null
+                dashboardViewModel.loadDashboardData()
             }
         )
     }
-}
 
-@Composable
-private fun TransactionRow(
-    title: String,
-    amount: Double,
-    subtitle: String,
-    currencySymbol: String,
-    onClick: () -> Unit = {}
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceObsidianSubtle)
-            .clickable(onClick = onClick)
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(SurfaceObsidianHighlight),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val icon = if (title.contains("Swiggy", ignoreCase = true) || subtitle.contains("Food", ignoreCase = true)) "🍔"
-                    else if (title.contains("Uber", ignoreCase = true) || subtitle.contains("Transit", ignoreCase = true)) "🚗"
-                    else if (title.contains("Coffee", ignoreCase = true) || title.contains("Chai", ignoreCase = true)) "☕"
-                    else "💳"
-                    Text(icon, fontSize = 18.sp)
+    if (showSimulatorDialog) {
+        PurchaseSimulatorDialog(
+            aiViewModel = aiViewModel,
+            expenseViewModel = expenseViewModel,
+            onDismiss = { showSimulatorDialog = false }
+        )
+    }
+
+    if (showLeakHunterDialog) {
+        LeakHunterDialog(
+            aiViewModel = aiViewModel,
+            onDismiss = { showLeakHunterDialog = false }
+        )
+    }
+
+    if (showWrappedModal) {
+        MonthlyWrappedModal(
+            aiViewModel = aiViewModel,
+            onDismiss = { showWrappedModal = false }
+        )
+    }
+
+    if (showProfileDialog) {
+        AlertDialog(
+            onDismissRequest = { showProfileDialog = false },
+            containerColor = SurfaceContainerHigh,
+            title = {
+                Text("User Profile & Security", color = OnSurfaceHigh, style = Typography.headlineMedium, fontSize = 16.sp)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Logged in as:", color = OnSurfaceVariant, fontSize = 12.sp)
+                    Text("vinay@paradox.com", color = ElectricEmerald, fontSize = 14.sp, style = Typography.labelLarge)
+                    Text("Active Currency: $currentCurrency", color = OnSurface, fontSize = 12.sp)
+                    Text("AI Engine: Gemini 3.6 Flash • RAG Synced", color = LuminousCyan, fontSize = 11.sp)
                 }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text(subtitle, color = TextTertiary, fontSize = 11.sp)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showProfileDialog = false
+                        onSignOut()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AlertCoral)
+                ) {
+                    Text("Sign Out", color = PitchBlack)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showProfileDialog = false }) {
+                    Text("Close", color = OnSurfaceVariant)
                 }
             }
-
-            Text(
-                "-$currencySymbol${String.format("%,.0f", amount)}",
-                color = AlertCoral,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
-            )
-        }
+        )
     }
 }

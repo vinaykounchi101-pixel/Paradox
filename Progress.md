@@ -451,8 +451,24 @@ Paradox/
 
 ---
 
-## 21. Current Session Handoff & Memory State
-- All features across Phases 1 through 15 are fully operational, tested, and verified on physical hardware.
+## 21. Phase 16: Jetpack Compose Null-Safety Hardening, Backend DataEnvelope Unwrapping & Device Stability
+- **Compose Layout Null-Safety & Fallback Getters**:
+  1. **NPE Prevention (`AndroidParagraphHelper.createCharSequence`)**: Resolved Jetpack Compose text layout crashes triggered when backend DTO fields arrived null during initial/empty dashboard states.
+  2. **Comprehensive Fallback Getters**: Added computed safe getters across all data models (`CategoryDto.displayName`, `ExpenseDto.displayDescription`, `ExpenseDto.displayDate`, `AiChatResponse.displayReply`, `SimulatePurchaseResponse.displayVerdict`, `LeakItemDto.displayPlugTip`, `MonthlyWrappedResponse.displayArchetype`, etc.).
+- **Backend `DataEnvelope` & `PaginatedEnvelope` Unwrapping**:
+  1. **Generic Envelopes (`ApiResponse.kt`)**: Created `DataEnvelope<T>` and `PaginatedEnvelope<T>` in `data/models/` matching FastAPI Pydantic envelopes (`{"data": ...}`, `{"data": [...], "meta": ...}`).
+  2. **API & Repository Alignment**: Updated `ParadoxApi.kt`, `AiRepository.kt`, `BudgetRepository.kt`, and `ExpenseRepository.kt` to unpack `.data` payloads cleanly, eliminating deserialization misses.
+- **Profile Dialog & UX Refinements**:
+  1. **User Profile & Security Dialog**: Replaced instant logout on profile avatar tap with a dedicated Material 3 AlertDialog displaying authenticated user email (`vinay@paradox.com`), active currency, AI engine status, and explicit logout confirmation button.
+- **Physical Device Compilation & Verification**:
+  - Rebuilt debug APK with Gradle 8.9 (`assembleDebug`), generated `Paradox.apk` (21.3MB).
+  - Deployed to physical device Motorola Edge 60 Fusion (`ZA2239H4J9`) via ADB.
+  - Interactively validated all 4 Action Monoliths (`+ Log Expense`, `Afford? Check`, `Leaks Audit`, `Insights Velocity`), bottom bar tabs, and live Finny Minglish AI chat with zero crashes.
+
+---
+
+## 22. Current Session Handoff & Memory State
+- All features across Phases 1 through 16 are fully operational, tested, and verified on physical hardware.
 - Active platforms & production environments:
   - Vercel Web Frontend: `https://paradox-neon.vercel.app`
   - Render Backend API: `https://paradox-2t3x.onrender.com`
@@ -462,4 +478,4 @@ Paradox/
   - Backend: `pytest tests/ -v` -> 58/58 passed (100% green).
   - Frontend: `npm run build` -> 0 errors across 14 routes.
   - Android: `gradlew assembleDebug` -> BUILD SUCCESSFUL (0 errors), APK generated, installed, and verified on device `ZA2239H4J9`.
-- Persistent Agent Memory updated in `.agents/rules/paradox-memory.md`.
+- Persistent Agent Memory updated in `.agents/rules/paradox-memory.md` and repo knowledge items.

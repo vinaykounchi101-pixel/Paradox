@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Paradox" parent="android:Theme.Material.NoActionBar">
-        <item name="android:statusBarColor">#09090B</item>
-        <item name="android:navigationBarColor">#09090B</item>
-        <item name="android:windowBackground">#09090B</item>
+        <item name="android:statusBarColor">@color/pitch_black</item>
+        <item name="android:navigationBarColor">@color/pitch_black</item>
+        <item name="android:windowBackground">@color/pitch_black</item>
     </style>
 </resources>

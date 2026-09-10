@@ -171,7 +171,10 @@ async def test_api_failure_fallback_to_heuristic(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_ai_insights_heuristic():
+async def test_ai_insights_heuristic(monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.GEMINI_API_KEY", None)
+    monkeypatch.setattr("app.core.config.settings.OPENAI_API_KEY", None)
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", None)
     service = AIService()
 
     # Case 1: Healthy pacing

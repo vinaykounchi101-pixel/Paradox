@@ -218,3 +218,13 @@ This document details technical debt items, architectural tradeoffs, short-term 
 * **Future Work**:
   - Add client-side CSV preview / mapping step prior to sending multipart payloads to allow users to verify detected columns.
 
+## 21. Jetpack Compose Layout Null-Safety & Backend DataEnvelope Unwrapping
+* **Status**: **RESOLVED in Phase 16**.
+* **Architecture / Tradeoff**:
+  - **Compose Text Layout NPE**: Jetpack Compose `Text(...)` and `AndroidParagraphHelper` invoke `java.lang.String.length()` during layout measurement. If nullable backend DTO fields resolve to `null`, Compose crashes at runtime.
+  - **Resolution**:
+    - Hardened all Kotlin DTOs with non-null computed property getters (`displayName`, `displayDescription`, `displayDate`, `displayVerdict`, `displayAdvice`, `displayPlugTip`, `displayContent`, etc.).
+    - Implemented `DataEnvelope<T>` and `PaginatedEnvelope<T>` in `ApiResponse.kt` matching FastAPI Pydantic envelopes (`{"data": ...}`, `{"data": [...], "meta": ...}`).
+    - Replaced abrupt profile icon logout with a Material 3 `AlertDialog` for authenticated user profile inspection.
+* **Future Work**:
+  - Add automated Compose screenshot testing with Paparazzi / Robolectric in Android CI pipeline.

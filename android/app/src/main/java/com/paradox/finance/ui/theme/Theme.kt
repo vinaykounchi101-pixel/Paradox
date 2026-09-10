@@ -1,7 +1,6 @@
 package com.paradox.finance.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -11,22 +10,26 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryIndigo,
-    onPrimary = TextPrimary,
-    primaryContainer = SurfaceCard,
-    onPrimaryContainer = TextPrimary,
-    secondary = AccentEmerald,
-    onSecondary = TextPrimary,
-    tertiary = AccentViolet,
-    background = BackgroundDark,
-    onBackground = TextPrimary,
-    surface = SurfaceDark,
-    onSurface = TextPrimary,
-    surfaceVariant = SurfaceCard,
-    onSurfaceVariant = TextSecondary,
-    outline = BorderDark,
-    error = AccentRose,
-    onError = TextPrimary
+    primary = ElectricEmerald,
+    onPrimary = OnPrimary,
+    primaryContainer = EmeraldContainer,
+    secondary = SoftIndigo,
+    onSecondary = PitchBlack,
+    secondaryContainer = IndigoContainer,
+    tertiary = LuminousCyan,
+    onTertiary = PitchBlack,
+    tertiaryContainer = CyanContainer,
+    background = PitchBlack,
+    onBackground = OnSurface,
+    surface = ObsidianCanvas,
+    onSurface = OnSurface,
+    surfaceVariant = SurfaceContainerHigh,
+    onSurfaceVariant = OnSurfaceVariant,
+    error = CoralError,
+    onError = PitchBlack,
+    errorContainer = ErrorContainer,
+    outline = MutedOutline,
+    outlineVariant = OutlineVariant
 )
 
 @Composable
@@ -37,14 +40,11 @@ fun ParadoxTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as? Activity)?.window
-            if (window != null) {
-                window.statusBarColor = BackgroundDark.toArgb()
-                window.navigationBarColor = BackgroundDark.toArgb()
-                val insetsController = WindowCompat.getInsetsController(window, view)
-                insetsController.isAppearanceLightStatusBars = false
-                insetsController.isAppearanceLightNavigationBars = false
-            }
+            val window = (view.context as Activity).window
+            window.statusBarColor = PitchBlack.toArgb()
+            window.navigationBarColor = PitchBlack.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
         }
     }
 

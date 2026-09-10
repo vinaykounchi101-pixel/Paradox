@@ -2,87 +2,60 @@ package com.paradox.finance.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// =========================================================================
-// 🌑 PARADOX DESIGN SYSTEM — OBSIDIAN FLOW (Design.md & Stitch Screens)
-// =========================================================================
+// Stitch Obsidian Flow Palette
+val PitchBlack = Color(0xFF0A0B0E)
+val ObsidianCanvas = Color(0xFF10131A)
+val SurfaceContainerLowest = Color(0xFF0B0E15)
+val SurfaceContainerLow = Color(0xFF191B23)
+val SurfaceContainer = Color(0xFF1D1F27)
+val SurfaceContainerHigh = Color(0xFF272A32)
+val SurfaceContainerHighest = Color(0xFF32353D)
+val SurfaceVariant = Color(0xFF32353C)
+val SurfaceDim = Color(0xFF10131A)
+val SurfaceBright = Color(0xFF363941)
 
-// 1. Canvas & Foundation Tones (Pitch Black & Obsidian Elevations)
-val BackgroundPitchBlack = Color(0xFF000000)          // OLED Pitch Black (#000000)
-val BackgroundDark = Color(0xFF0A0D14)                // Base Canvas (Charcoal-Slate Obsidian)
-val SurfaceObsidianSubtle = Color(0xFF0D0E12)          // Surface Container Lowest (#0D0E12)
-val SurfaceObsidianBase = Color(0xFF14161F)            // Surface Elevation 1 Base Cards (#14161F)
-val SurfaceObsidianElevated = Color(0xFF1A1D26)        // Surface Elevation 2 Elevated Cards (#1A1D26)
-val SurfaceObsidianHighlight = Color(0xFF242838)       // Surface Elevation 3 Highlight (#242838)
+// Frosted Glass Layer Colors
+val GlassSurface1 = Color(0xBA121722)
+val GlassSurface2 = Color(0xD91A2234)
+val GlassSurfaceFloating = Color(0xE00A0D14)
+val GlassBorderSubtle = Color(0x1AFFFFFF)
+val GlassBorderStroke = Color(0x333C4A42)
+val GlassBorderActive = Color(0x594EDEA3)
 
-val SurfaceDark = Color(0xFF121722)                   // Legacy Surface Elevation 1
-val SurfaceCard = Color(0xFF1A2234)                   // Legacy Surface Elevation 2
-val SurfaceBright = Color(0xFF272A32)                 // Surface High
+// Semantic Neon Accents
+val NeonEmerald = Color(0xFF00F5A0)
+val ElectricEmerald = Color(0xFF4EDEA3)
+val EmeraldContainer = Color(0xFF10B981)
+val OnPrimary = Color(0xFF003824)
 
-val BorderGlass = Color(0x14FFFFFF)                    // rgba(255, 255, 255, 0.08)
-val BorderGlassFocused = Color(0x2EFFFFFF)             // rgba(255, 255, 255, 0.18)
-val BorderDark = Color(0xFF1E2638)                    // Subtle Surface 1px Stroke
-val BorderMuted = Color(0xFF3C4A42)                   // Outline Variant
+val NeonCyan = Color(0xFF00D2FF)
+val LuminousCyan = Color(0xFF4CD7F6)
+val CyanContainer = Color(0xFF00B2D0)
 
-// 2. Typography & Contrast Hierarchy
-val TextPrimary = Color(0xFFF8FAFC)                   // High Contrast (#F8FAFC)
-val TextSecondary = Color(0xFF94A3B8)                 // Mid Contrast (#94A3B8)
-val TextTertiary = Color(0xFF64748B)                  // Subtitle & Labels (#64748B)
-val TextMuted = Color(0xFF475569)                     // Muted Contrast
+val VibrantIndigo = Color(0xFF6366F1)
+val SoftIndigo = Color(0xFFC0C1FF)
+val IndigoContainer = Color(0xFF424479)
 
-// 3. Financial Semantic Colors & Stitch Neons
-val NeonEmerald = Color(0xFF10B981)                   // Income / Safe Velocity (#10B981)
-val NeonTeal = Color(0xFF14B8A6)                      // Pacing / Telemetry (#14B8A6)
-val NeonCyan = Color(0xFF06B6D4)                      // AI Copilot & Telemetry (#06B6D4)
-val NeonViolet = Color(0xFF8B5CF6)                    // Goals / Insights (#8B5CF6)
-val AlertCoral = Color(0xFFF43F5E)                    // Expense Alert / Drain (#F43F5E)
-val AlertAmber = Color(0xFFF59E0B)                    // Warning / Caution (#F59E0B)
+val AlertCoral = Color(0xFFFF4565)
+val CoralError = Color(0xFFFFB4AB)
+val ErrorContainer = Color(0xFF93000A)
 
-val AccentEmerald = NeonEmerald
-val AccentEmeraldLight = Color(0xFF4EDEA3)
-val AccentEmeraldGlow = Color(0x3310B981)
+val WarningAmber = Color(0xFFFFB800)
+val AmberGlow = Color(0xFFFFC533)
 
-val PrimaryIndigo = Color(0xFF6366F1)
-val PrimaryIndigoHover = Color(0xFF4F46E5)
-val PrimaryIndigoLight = Color(0xFFC0C1FF)
-val PrimaryIndigoGlow = Color(0x336366F1)
+// Text & Contrast
+val OnSurfaceHigh = Color(0xFFF8FAFC)
+val OnSurface = Color(0xFFE1E2EC)
+val OnSurfaceVariant = Color(0xFFBBCABF)
+val MutedOutline = Color(0xFF86948A)
+val OutlineVariant = Color(0xFF3C4A42)
 
-val AccentCyan = NeonCyan
-val AccentCyanLight = Color(0xFF4CD7F6)
-val AccentCyanGlow = Color(0x3306B6D4)
-
-val AccentRose = AlertCoral
-val AccentRoseLight = Color(0xFFFFB4AB)
-val AccentRoseGlow = Color(0x33F43F5E)
-
-val AccentViolet = NeonViolet
-val AccentAmber = AlertAmber
-
-// 4. 50/30/20 Budget Framework
-val NeedsColor = Color(0xFF3B82F6)                    // Blue-500 (50% Needs)
-val WantsColor = Color(0xFFF59E0B)                    // Amber-500 (30% Wants)
-val SavingsColor = Color(0xFF10B981)                  // Emerald-500 (20% Savings)
-
-// 5. Utility Compatibility Aliases
-val Zinc950 = BackgroundDark
-val Zinc900 = SurfaceDark
-val Zinc800 = SurfaceCard
-val Zinc700 = BorderDark
-val Zinc600 = Color(0xFF334155)
-val Zinc500 = TextMuted
-val Zinc400 = TextSecondary
-val Zinc300 = Color(0xFFCBD5E1)
-val Zinc200 = Color(0xFFE2E8F0)
-val Zinc50 = TextPrimary
-
-val Indigo600 = PrimaryIndigoHover
-val Indigo500 = PrimaryIndigo
-val Indigo400 = Color(0xFF818CF8)
-
-val Emerald500 = AccentEmerald
-val Emerald400 = Color(0xFF34D399)
-
-val Rose500 = AccentRose
-val Rose400 = Color(0xFFFB7185)
-
-val Amber500 = AccentAmber
-val Amber400 = Color(0xFFFBBF24)
+// Category Graph Palette (8 Curated Colors)
+val ChartIndigo = Color(0xFF6366F1)
+val ChartCyan = Color(0xFF06B6D4)
+val ChartEmerald = Color(0xFF10B981)
+val ChartRose = Color(0xFFF43F5E)
+val ChartAmber = Color(0xFFF59E0B)
+val ChartPurple = Color(0xFF8B5CF6)
+val ChartBlue = Color(0xFF3B82F6)
+val ChartPink = Color(0xFFEC4899)

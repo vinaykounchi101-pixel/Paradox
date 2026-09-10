@@ -1,109 +1,46 @@
 package com.paradox.finance
 
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.fragment.app.FragmentActivity
-import com.paradox.finance.data.preferences.AuthPreferences
-import com.paradox.finance.data.remote.ApiClient
-import com.paradox.finance.ui.navigation.AppNavHost
-import com.paradox.finance.ui.theme.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.paradox.finance.data.repository.AiRepository
+import com.paradox.finance.data.repository.AuthRepository
+import com.paradox.finance.data.repository.BudgetRepository
+import com.paradox.finance.data.repository.ExpenseRepository
+import com.paradox.finance.ui.navigation.AppNavigation
+import com.paradox.finance.ui.theme.ParadoxTheme
+import com.paradox.finance.ui.viewmodels.*
 
-class MainActivity : FragmentActivity() {
-
-    private lateinit var authPreferences: AuthPreferences
+class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize secure preferences & Retrofit client
-        authPreferences = AuthPreferences(this)
-        ApiClient.initialize(this)
+        val app = application as ParadoxApplication
+        val authRepository = AuthRepository(app.tokenManager)
+        val expenseRepository = ExpenseRepository(app.database)
+        val budgetRepository = BudgetRepository(app.database)
+        val aiRepository = AiRepository()
 
         setContent {
             ParadoxTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    AppNavHost(
-                        activity = this@MainActivity,
-                        authPreferences = authPreferences
-                    )
-                }
-            }
-        }
-    }
-}
+                val authViewModel: AuthViewModel = viewModel { AuthViewModel(authRepository) }
+                val dashboardViewModel: DashboardViewModel = viewModel { DashboardViewModel(budgetRepository, expenseRepository, aiRepository) }
+                val expenseViewModel: ExpenseViewModel = viewModel { ExpenseViewModel(expenseRepository, budgetRepository) }
+                val budgetViewModel: BudgetViewModel = viewModel { BudgetViewModel(budgetRepository, expenseRepository) }
+                val aiViewModel: AiViewModel = viewModel { AiViewModel(aiRepository) }
 
-@Composable
-fun SplashPreview() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(24.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(PrimaryIndigo, AccentEmerald)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "P",
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Black,
-                    color = TextPrimary
+                AppNavigation(
+                    authViewModel = authViewModel,
+                    dashboardViewModel = dashboardViewModel,
+                    expenseViewModel = expenseViewModel,
+                    budgetViewModel = budgetViewModel,
+                    aiViewModel = aiViewModel
                 )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "PARADOX",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 2.sp
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "AI Financial Intelligence Suite",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            CircularProgressIndicator(
-                color = PrimaryIndigo,
-                strokeWidth = 3.dp,
-                modifier = Modifier.size(36.dp)
-            )
         }
     }
 }

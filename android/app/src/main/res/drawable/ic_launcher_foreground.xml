@@ -1,12 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Paradox Neon Emerald & Cyan Geometric Monogram -->
     <path
-        android:fillColor="#6366F1"
-        android:pathData="M38,28h22c9.94,0 18,8.06 18,18s-8.06,18 -18,18h-12v18h-10v-54zM48,54h12c4.42,0 8,-3.58 8,-8s-3.58,-8 -8,-8h-12v16z" />
+        android:fillColor="#00F5A0"
+        android:pathData="M34,26 L64,26 C72,26 78,32 78,40 C78,48 72,54 64,54 L46,54 L46,82 L34,82 Z M46,38 L46,44 L62,44 C65,44 67,42 67,40 C67,38 65,38 62,38 Z" />
     <path
-        android:fillColor="#10B981"
-        android:pathData="M48,64h12c2,0 4,-0.5 5.5,-1.5l6,6c-3.2,2.3 -7.2,3.5 -11.5,3.5h-12v-8z" />
+        android:fillColor="#00D2FF"
+        android:pathData="M52,56 L74,82 L60,82 L42,60 Z" />
 </vector>
